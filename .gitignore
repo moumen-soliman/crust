@@ -32,3 +32,4 @@ spike/out/
 # Landing site build output
 site/.next/
 site/node_modules/
+my-video

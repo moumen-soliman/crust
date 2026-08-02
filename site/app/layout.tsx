@@ -3,14 +3,23 @@ import type { ReactNode } from 'react'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'crust — route-level performance for Next.js App Router',
+  title: 'crust — catch Next.js regressions before they merge',
   description:
-    'Bundle attribution, static shell composition and regression blame for Next.js App Router. Find out which import grew a route and which call site pushed a component out of the shell.',
+    'Production-build regression analysis for Next.js App Router. Explain route modes, static-shell composition, bundle attribution, and the source line behind a regression.',
   metadataBase: new URL('https://crust.moumen.dev'),
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'crust',
-    description: 'Route-level performance analysis for Next.js App Router.',
+    title: 'crust — know what became slower before it merges',
+    description:
+      'Compare production builds, catch silent static-shell regressions, and trace the cause to a component, import, and source line.',
     type: 'website',
+    url: '/',
+    siteName: 'crust',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'crust — catch Next.js regressions before they merge',
+    description: 'Route modes, shell composition, bundle attribution, and regression blame for Next.js App Router.',
   },
   icons: { icon: '/icon.svg' },
 }
