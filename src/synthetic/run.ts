@@ -82,7 +82,28 @@ export async function runSynthetic(options: SyntheticOptions): Promise<{ runId: 
           await session.send('Network.emulateNetworkConditions', { offline: false, ...NETWORK_PROFILES[network] })
         }
 
+        // LCP has to be observed, not queried. `getEntriesByType` after load
+        // returns nothing on a page that never registered an observer, which is
+        // why an unpatched harness reports lcp 0 for every route. The observer
+        // has to exist before the first paint, so it goes in an init script.
+        await page.addInitScript(() => {
+          const w = window as typeof window & { __crustLcp?: number }
+          w.__crustLcp = 0
+          try {
+            new PerformanceObserver((list) => {
+              const entries = list.getEntries()
+              const last = entries[entries.length - 1]
+              if (last) w.__crustLcp = last.startTime
+            }).observe({ type: 'largest-contentful-paint', buffered: true })
+          } catch {
+            // Entry type unsupported; LCP stays 0 and is reported as such.
+          }
+        })
+
         await page.goto(new URL(route, options.baseUrl).href, { waitUntil: 'load' })
+        // LCP keeps updating until the largest element settles; a short quiet
+        // period after load catches late hero images without waiting on idle.
+        await page.waitForTimeout(500)
         const sample = await page.evaluate(readPageSample)
         await context.close()
 
@@ -122,13 +143,13 @@ export async function runSynthetic(options: SyntheticOptions): Promise<{ runId: 
 function readPageSample(): PageSample {
   const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
   const paint = performance.getEntriesByType('paint')
-  const lcpEntries = performance.getEntriesByType('largest-contentful-paint')
+  const observed = (window as typeof window & { __crustLcp?: number }).__crustLcp ?? 0
   const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[]
 
   return {
     ttfb: nav.responseStart,
     fcp: paint.find((p) => p.name === 'first-contentful-paint')?.startTime ?? 0,
-    lcp: lcpEntries.length > 0 ? lcpEntries[lcpEntries.length - 1]!.startTime : 0,
+    lcp: observed,
     domContentLoaded: nav.domContentLoadedEventEnd,
     load: nav.loadEventEnd,
     transferBytes: nav.transferSize + resources.reduce((sum, r) => sum + r.transferSize, 0),

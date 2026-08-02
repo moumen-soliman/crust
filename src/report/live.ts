@@ -24,13 +24,14 @@ export function renderLiveSection(state: CollectorState): string {
 
   const streaming = state.streaming
   if (streaming?.supported && streaming.fills.length > 0) {
-    const last = Math.max(...streaming.fills.map((f) => f.filledAt))
+    const timed = streaming.fills.filter((f) => f.filledAt !== null)
+    const last = timed.length > 0 ? Math.max(...timed.map((f) => f.filledAt!)) : 0
     parts.push('<div class="sec"><b>Streaming — when each hole filled</b>')
     for (const fill of streaming.fills) {
-      const width = last > 0 ? Math.max(2, (fill.filledAt / last) * 100) : 2
+      const width = fill.filledAt !== null && last > 0 ? Math.max(2, (fill.filledAt / last) * 100) : 2
       parts.push(
         `<div class="mod"><span class="fill-bar"><i style="width:${width.toFixed(1)}%"></i></span>` +
-          `<span><code>${escape(fill.boundaryId)}</code> ${ms(fill.filledAt)}</span></div>`,
+          `<span><code>${escape(fill.boundaryId)}</code> ${fill.filledAt === null ? 'before collector start' : ms(fill.filledAt)}</span></div>`,
       )
     }
     parts.push('</div>')
@@ -49,7 +50,10 @@ export function renderLiveSection(state: CollectorState): string {
     parts.push('</div>')
   }
 
-  return `<div class="live">${parts.join('')}</div>`
+  // The `.crust` wrapper is not decoration: every rule in the shared stylesheet
+  // is scoped under it, so a bare `.live` block inherits the host page's fonts
+  // and colors and renders as unstyled text.
+  return `<div class="crust"><div class="live">${parts.join('')}</div></div>`
 }
 
 export function renderLiveStyles(): string {

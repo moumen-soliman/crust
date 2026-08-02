@@ -47,16 +47,24 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
   const remoteRef = await git(['rev-parse', '--verify', `refs/remotes/${remote}/${HISTORY_BRANCH}`], repoRoot)
 
   const worktree = await mkdtemp(join(tmpdir(), 'crust-history-'))
+  // A throwaway local branch name, pushed to `perf-history` by refspec.
+  //
+  // Checking out `perf-history` locally looks tidier and breaks on the second
+  // run: `--orphan` refuses when the branch already exists, and `-B` refuses
+  // when another worktree has it checked out. Nothing needs a local branch —
+  // `HEAD:perf-history` is the only thing the remote sees.
+  const tempBranch = `crust-history-${Date.now().toString(36)}`
+
   try {
     if (remoteRef) {
-      const added = await git(['worktree', 'add', worktree, remoteRef], repoRoot)
+      const added = await git(['worktree', 'add', '--detach', worktree, remoteRef], repoRoot)
       if (added === null) return { pushed: false, branch: HISTORY_BRANCH, detail: 'could not create a worktree' }
-      await git(['checkout', '-B', HISTORY_BRANCH], worktree)
+      await git(['checkout', '-b', tempBranch], worktree)
     } else {
       const added = await git(['worktree', 'add', '--detach', worktree], repoRoot)
       if (added === null) return { pushed: false, branch: HISTORY_BRANCH, detail: 'could not create a worktree' }
       // Orphan: no parent, no shared history with the code.
-      await git(['checkout', '--orphan', HISTORY_BRANCH], worktree)
+      await git(['checkout', '--orphan', tempBranch], worktree)
       await git(['rm', '-rf', '--ignore-unmatch', '.'], worktree)
     }
 
@@ -77,7 +85,10 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
     )
     if (committed === null) return { pushed: false, branch: HISTORY_BRANCH, detail: 'commit failed' }
 
-    const pushed = await git(['push', remote, `HEAD:${HISTORY_BRANCH}`], worktree)
+    // Push from the repo root, not the worktree: a relative remote URL
+    // (`../other.git`, common in submodules and test setups) resolves against the
+    // repository directory, and from a worktree in /tmp it resolves to nothing.
+    const pushed = await git(['push', remote, `${tempBranch}:${HISTORY_BRANCH}`], repoRoot)
     if (pushed === null) {
       return {
         pushed: false,
@@ -90,6 +101,9 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
   } finally {
     await git(['worktree', 'remove', '--force', worktree], repoRoot)
     await rm(worktree, { recursive: true, force: true })
+    // The temp branch outlives the worktree; leaving one behind per run would
+    // litter the user's branch list.
+    await git(['branch', '-D', tempBranch], repoRoot)
   }
 }
 

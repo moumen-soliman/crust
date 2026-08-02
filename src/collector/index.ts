@@ -81,10 +81,34 @@ export function startCollector(options: CollectorOptions = {}): () => void {
     // No LCP entry type — the audit runs without LCP-specific findings.
   }
 
+  /**
+   * The audit runs twice on purpose.
+   *
+   * The over-download check needs `naturalWidth`, which is 0 until the image has
+   * decoded — and a lazy image below the fold has not even started. Auditing once
+   * silently drops the highest-value finding on exactly the images most likely to
+   * be oversized. So: an early pass for the structural findings, then a second
+   * pass once the images that were still loading have settled.
+   */
   const runAudit = (): void => {
     const idle = window.requestIdleCallback ?? ((callback: () => void) => window.setTimeout(callback, 200))
     idle(() => {
       state.images = auditImages(lcpElement)
+
+      const pending = Array.from(document.querySelectorAll('img')).filter((img) => !img.complete)
+      if (pending.length === 0) return
+
+      let settled = 0
+      const onSettle = (): void => {
+        if (++settled < pending.length) return
+        idle(() => {
+          state.images = auditImages(lcpElement)
+        })
+      }
+      for (const img of pending) {
+        img.addEventListener('load', onSettle, { once: true })
+        img.addEventListener('error', onSettle, { once: true })
+      }
     })
   }
   if (document.readyState === 'complete') runAudit()

@@ -3,18 +3,21 @@
 import { useEffect } from 'react'
 
 /**
- * Gated on a build-time env var, so when it is unset the bundler eliminates the
- * dynamic import entirely and neither the widget nor the manifest reaches
- * production. A runtime `if` would still ship both.
+ * Gated on a build-time env var, so when it is unset the bundler eliminates both
+ * dynamic imports and neither the widget nor the collector reaches production.
+ * A runtime `if` would still ship the code.
  */
 export function CrustDevtools() {
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_CRUST) return
-    let dispose: (() => void) | undefined
-    import('crust/widget').then((m) => {
-      dispose = m.mountCrustWidget()
-    })
-    return () => dispose?.()
+
+    const disposers: (() => void)[] = []
+    void import('crust/collector').then((m) => disposers.push(m.startCollector()))
+    void import('crust/widget').then((m) => disposers.push(m.mountCrustWidget()))
+
+    return () => {
+      for (const dispose of disposers) dispose()
+    }
   }, [])
 
   return null

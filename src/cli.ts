@@ -141,22 +141,21 @@ cli
   })
 
 cli
-  .command('history push', 'Publish .perf snapshots to the orphan perf-history branch')
+  // cac matches a command on its first token only, so `history push` as a command
+  // name is never reachable — it silently falls through and does nothing. The
+  // action has to be a positional argument.
+  .command('history <action>', 'Sync .perf snapshots with the perf-history branch (push | fetch)')
   .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
   .option('--remote <name>', 'Git remote', { default: 'origin' })
-  .action(async (options: CommonOptions & { remote: string }) => {
+  .action(async (action: string, options: CommonOptions & { remote: string }) => {
+    if (action !== 'push' && action !== 'fetch') {
+      console.error(pc.red(`Unknown history action "${action}". Expected push or fetch.`))
+      process.exitCode = 1
+      return
+    }
     const root = await findWorkspaceRoot(resolve(options.cwd))
-    const result = await pushHistory(root, { remote: options.remote })
-    console.log(`${result.pushed ? pc.green('✓') : pc.yellow('•')} ${result.detail}`)
-  })
-
-cli
-  .command('history fetch', 'Pull snapshots from the perf-history branch into .perf/')
-  .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
-  .option('--remote <name>', 'Git remote', { default: 'origin' })
-  .action(async (options: CommonOptions & { remote: string }) => {
-    const root = await findWorkspaceRoot(resolve(options.cwd))
-    const result = await fetchHistory(root, { remote: options.remote })
+    const sync = action === 'push' ? pushHistory : fetchHistory
+    const result = await sync(root, { remote: options.remote })
     console.log(`${result.pushed ? pc.green('✓') : pc.yellow('•')} ${result.detail}`)
   })
 
