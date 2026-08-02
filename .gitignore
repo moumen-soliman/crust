@@ -21,3 +21,13 @@ spike/out/
 
 # This repo's own .perf is demo residue from fixture runs, not project history
 /.perf/
+
+# Dev environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Landing site build output
+site/.next/
+site/node_modules/

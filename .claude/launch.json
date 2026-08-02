@@ -4,8 +4,30 @@
     {
       "name": "crust-fixture",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "crust-fixture-basic", "exec", "next", "start", "--port", "3111"],
+      "runtimeArgs": [
+        "--filter",
+        "crust-fixture-basic",
+        "exec",
+        "next",
+        "start",
+        "--port",
+        "3111"
+      ],
       "port": 3111
+    },
+    {
+      "name": "crust-site",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "crust-site",
+        "exec",
+        "next",
+        "start",
+        "--port",
+        "3222"
+      ],
+      "port": 3222
     }
   ]
 }

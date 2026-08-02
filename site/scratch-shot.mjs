@@ -1,0 +1,10 @@
+import { chromium } from 'playwright'
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, colorScheme: 'dark' })
+await p.goto('http://localhost:3222', { waitUntil: 'networkidle' })
+await p.screenshot({ path: '/private/tmp/claude-501/-Users-moumensoliman-code-crust/e78dab6a-3b61-4d3d-9779-3fca07e297dc/scratchpad/land-dark.png', fullPage: true })
+await p.close()
+const l = await b.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, colorScheme: 'light' })
+await l.goto('http://localhost:3222', { waitUntil: 'networkidle' })
+await l.screenshot({ path: '/private/tmp/claude-501/-Users-moumensoliman-code-crust/e78dab6a-3b61-4d3d-9779-3fca07e297dc/scratchpad/land-light.png', fullPage: false })
+await b.close(); console.log('ok')
