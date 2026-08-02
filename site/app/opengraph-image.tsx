@@ -1,10 +1,10 @@
 import { ImageResponse } from 'next/og'
 
-export const alt = 'crust — catch Next.js regressions before they merge'
+export const alt = 'crust - catch Next.js regressions before they merge'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-/** Dark landing tokens as sRGB — Satori does not evaluate OKLCH. */
+/** Dark landing tokens as sRGB - Satori does not evaluate OKLCH. */
 const c = {
   bg: '#141414',
   surface: '#1d1d1d',
@@ -28,7 +28,7 @@ export default function OpenGraphImage() {
           fontFamily: 'ui-sans-serif, system-ui, sans-serif',
         }}
       >
-        {/* Centered shell with hairline side rules — same layout idea as the site. */}
+        {/* Centered shell with hairline side rules - same layout idea as the site. */}
         <div
           style={{
             width: 1080,
@@ -106,7 +106,7 @@ export default function OpenGraphImage() {
               display: 'flex',
             }}
           >
-            Production-build regression blame for Next.js App Router — mode, shell, bytes, and the
+            Production-build regression blame for Next.js App Router - mode, shell, bytes, and the
             source line that did it.
           </div>
 
