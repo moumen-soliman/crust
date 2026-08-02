@@ -226,7 +226,7 @@ h2 { font-size: var(--t-h2); font-weight: 500; letter-spacing: -0.02em; margin: 
 
 /* ── grids ──────────────────────────────────────────────── */
 
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+.grid { display: grid; grid-template-columns: repeat(3, minmax(250px, 1fr));
   gap: 1px; background: var(--border); border-top: 1px solid var(--border); }
 .grid > div { background: var(--bg); padding: 22px var(--pad); }
 .grid h3 { margin: 0 0 6px; font-size: var(--t-small); font-weight: 550;

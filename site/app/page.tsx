@@ -1,7 +1,7 @@
 import { CodePanel, type CodeTab } from './code-panel'
 import { Mark } from './mark'
 
-const DOCS = 'https://docs.crust.moumen.dev/docs'
+const DOCS = 'https://docs.crust.moumen.dev'
 const GITHUB = 'https://github.com/moumen-soliman/crust'
 
 const TABS: CodeTab[] = [
@@ -176,9 +176,9 @@ export default function Home() {
           crust
         </a>
         <div className="nav-links">
-          <a href={`${DOCS}/quickstart`}>Quickstart</a>
-          <a href={`${DOCS}/concepts/regressions`}>How it thinks</a>
-          <a href={`${DOCS}/reference/cli`}>CLI</a>
+          <a href={`${DOCS}/docs/quickstart`}>Quickstart</a>
+          <a href={`${DOCS}/docs/concepts/regressions`}>How it thinks</a>
+          <a href={`${DOCS}/docs/reference/cli`}>CLI</a>
         </div>
         <a className="nav-right" href={GITHUB}>
           GitHub
@@ -202,7 +202,7 @@ export default function Home() {
             enough build history to tell you what changed and whether the pull request should merge.
           </p>
           <div className="actions">
-            <a className="btn btn-primary" href={`${DOCS}/quickstart`}>
+            <a className="btn btn-primary" href={`${DOCS}/docs/quickstart`}>
               Read the quickstart
             </a>
             <a className="btn btn-cmd" href="https://www.npmjs.com/package/@moumensoliman/crust">
@@ -376,10 +376,10 @@ export default function Home() {
           compare against.
         </p>
         <div className="actions">
-          <a className="btn btn-primary" href={`${DOCS}/quickstart`}>
+          <a className="btn btn-primary" href={`${DOCS}/docs/quickstart`}>
             Get started
           </a>
-          <a className="btn btn-cmd" href={`${DOCS}/reference/cli`}>
+          <a className="btn btn-cmd" href={`${DOCS}/docs/reference/cli`}>
             <span className="chev">›</span> npx @moumensoliman/crust report --open
           </a>
         </div>

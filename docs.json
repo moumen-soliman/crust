@@ -12,7 +12,7 @@
   "logo": {
     "light": "/docs/logo/light.svg",
     "dark": "/docs/logo/dark.svg",
-    "href": "https://crust.moumen.dev"
+    "href": "https://crust.moumen.dev/"
   },
   "appearance": {
     "default": "system"

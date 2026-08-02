@@ -1,9 +1,6 @@
 <p align="center">
-  <a href="https://crust.moumen.dev">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/logo/dark.svg" />
-      <img width="80" alt="crust" src="./docs/logo/light.svg" />
-    </picture>
+  <a href="https://crust.moumen.dev/">
+    <img width="80" height="80" alt="crust" src="https://crust.moumen.dev/icon.svg" />
   </a>
 </p>
 
@@ -17,7 +14,7 @@
 
 <p align="center">
   <a href="https://docs.crust.moumen.dev/docs/quickstart">Get started</a> ·
-  <a href="https://docs.crust.moumen.dev/docs">Documentation</a> ·
+  <a href="https://docs.crust.moumen.dev/">Documentation</a> ·
   <a href="https://github.com/moumen-soliman/crust/issues/new">Report a bug</a> ·
   <a href="https://github.com/moumen-soliman/crust/issues/new">Request a feature</a>
 </p>
@@ -377,57 +374,9 @@ Two optional JSON files in `.perf/`, for the tail the analyzer cannot resolve:
 
 ### Architecture
 
-```mermaid
-flowchart LR
-  subgraph Inputs["Inputs — never development output"]
-    Source["Application source"]
-    Build["Production .next build"]
-    Git["Git, lockfile, config, Node"]
-  end
-
-  subgraph Analyze["crust analyze"]
-    Detect["Detect Next version<br/>and bundler"]
-    Graph["Build module and<br/>component graph"]
-    Bytes["Map route → chunks →<br/>modules and packages"]
-    Predict["Predict static shell<br/>and dynamic causes"]
-    Verify["Verify against<br/>emitted shell HTML"]
-    Identity["Derive stable<br/>build identity"]
-  end
-
-  Source --> Graph
-  Build --> Detect
-  Build --> Bytes
-  Build --> Verify
-  Git --> Identity
-  Detect --> Graph
-  Detect --> Bytes
-  Graph --> Predict
-  Predict --> Verify
-
-  Detect --> Snapshot["Build snapshot"]
-  Bytes --> Snapshot
-  Verify --> Snapshot
-  Identity --> Snapshot
-
-  Snapshot --> Findings["Prioritized findings<br/>and route table"]
-  Snapshot --> Store[".perf snapshot store"]
-  Store --> Baseline["Comparable baseline"]
-  Snapshot --> Diff["Route-level diff"]
-  Baseline --> Diff
-
-  Diff --> Blame["Mode, cache, shell,<br/>and byte blame"]
-  Blame --> Rules["Automatic regressions<br/>+ configured ceilings"]
-  Rules --> CLI["CLI exit code"]
-  Rules --> Comment["PR comment"]
-  Snapshot --> Report["HTML report"]
-
-  classDef input fill:#eef4ff,stroke:#4776c5,color:#111;
-  classDef core fill:#fff7e6,stroke:#c98316,color:#111;
-  classDef output fill:#edf9f0,stroke:#38804b,color:#111;
-  class Source,Build,Git input;
-  class Detect,Graph,Bytes,Predict,Verify,Identity,Snapshot,Store,Baseline,Diff core;
-  class Findings,Blame,Rules,CLI,Comment,Report output;
-```
+<p align="center">
+  <img src="https://crust.moumen.dev/crust-architecture.svg" alt="crust architecture: production source and build artifacts become a comparable snapshot, findings, regression blame, CI checks, and reports" />
+</p>
 
 The source graph supplies the **why**; production artifacts supply the **what**. crust joins both
 into one snapshot, then compares that snapshot only with a compatible baseline. Runtime tooling is
@@ -435,59 +384,15 @@ optional and does not participate in the core build verdict.
 
 ### What happens on a pull request
 
-```mermaid
-sequenceDiagram
-  actor Developer
-  participant Next as Next.js
-  participant Crust as crust
-  participant Store as perf-history
-  participant PR as Pull request
-
-  Developer->>Next: next build
-  Next-->>Crust: .next production artifacts
-  Crust->>Store: fetch baseline snapshots
-  Crust->>Crust: analyze source + build output
-  Crust->>Crust: derive build identity
-
-  alt no baseline exists
-    Crust->>Crust: run absolute ceilings only
-    Crust-->>PR: no baseline yet
-  else baseline is incompatible
-    Store-->>Crust: different bundler, Next major, or schema
-    Crust->>Crust: skip delta-based checks
-    Crust-->>PR: explain why comparison was refused
-  else baseline is comparable
-    Store-->>Crust: matching baseline
-    Crust->>Crust: diff mode, cache, shell, and bytes
-    Crust->>Crust: select strongest proven cause
-    Crust->>Crust: apply automatic regressions + budgets
-    Crust-->>PR: update one actionable comment
-  end
-
-  Crust->>Store: publish current snapshot
-  Crust-->>Developer: exit 0 or 1
-```
+<p align="center">
+  <img src="https://crust.moumen.dev/crust-pull-request.svg" alt="crust pull request workflow from production build through baseline comparison, PR comment, snapshot publication, and exit code" />
+</p>
 
 The decision rule is intentionally conservative:
 
-```mermaid
-flowchart TD
-  Start["Current snapshot"] --> HasBase{"Baseline found?"}
-  HasBase -- No --> Absolute["Run absolute byte<br/>and shell ceilings"]
-  HasBase -- Yes --> Compatible{"Same bundler,<br/>Next major, and schema?"}
-  Compatible -- No --> Refuse["Do not compute regressions<br/>State why comparison is unsafe"]
-  Compatible -- Yes --> Compare["Compare rendering mode,<br/>cache reasons, shell, and bytes"]
-  Compare --> Certain{"Direction proven?"}
-  Certain -- No --> Unknown["Report unknown<br/>Never fail on a guess"]
-  Certain -- Yes --> Regressed{"Strict regression?"}
-  Regressed -- Yes --> Fail["Name source cause<br/>Fail CI unless route is exempt"]
-  Regressed -- No --> Pass["Report improvement or<br/>neutral change"]
-  Absolute --> Result["PR comment + exit code"]
-  Refuse --> Result
-  Unknown --> Result
-  Fail --> Result
-  Pass --> Result
-```
+<p align="center">
+  <img src="https://crust.moumen.dev/crust-decision-rule.svg" alt="crust decision rule: compare only compatible baselines, never fail on unknown evidence, and enforce proven regressions" />
+</p>
 
 1. **Detect the build** — crust reads the resolved Next.js version, bundler, route manifests,
    prerender metadata, client-reference manifests, and emitted shell HTML.

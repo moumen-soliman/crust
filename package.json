@@ -4,7 +4,7 @@
   "description": "Production-build regression analysis for Next.js App Router: route modes, bundle attribution, static-shell composition, and source blame.",
   "license": "MIT",
   "author": "Moumen Soliman",
-  "homepage": "https://crust.moumen.dev",
+  "homepage": "https://crust.moumen.dev/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/moumen-soliman/crust.git"
