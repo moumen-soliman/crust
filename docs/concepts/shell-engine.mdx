@@ -1,0 +1,87 @@
+---
+title: "Shell engine"
+description: "Predicting the static shell from source, then checking the prediction against what the build actually produced."
+---
+
+The shell engine answers a question the build output cannot: **why** did a component stop being
+prerendered.
+
+It works in layers, each validating the one before it.
+
+## Layer 1 — predict, from source
+
+crust walks the route's server component tree, finds `<Suspense>` boundaries, marks components that
+touch a dynamic API or an uncached read, and propagates that up to the nearest enclosing boundary.
+
+This is the only layer that can name a cause:
+
+```text
+✂ <Theme> — cookies() at app/dashboard/page.tsx:18
+```
+
+Two inverted rule sets share this code path, detected from the build's own resolved config rather
+than by parsing `next.config`:
+
+| | `experimental_ppr` (legacy) | Cache Components |
+|---|---|---|
+| Default | Static; a dynamic API opts out | Dynamic; `use cache` opts in |
+| Trigger | Dynamic API call | Absence of caching |
+| Failure mode | Build error — loud | Silent shell shrinkage |
+
+<Note>
+A `<Suspense>` boundary is **not** automatically a hole. If everything under it is cached, the
+build prerenders straight through the boundary. Treating every boundary as a hole would report a
+regression on every route that uses Suspense correctly.
+</Note>
+
+## Layer 2 — verify, against the build output
+
+The prediction is checked against the shell HTML the build actually wrote to
+`.next/server/app/**`. React's markers make this plain-text work:
+
+```html
+<main>
+  <h1>Product alpha</h1>
+  <!--$?--><template id="B:0"></template>
+  <p id="gallery-fallback">Loading gallery…</p><!--/$-->
+</main>
+```
+
+`<!--$?-->` marks a boundary still showing its fallback, and the fallback sits exactly where its
+hole is. Boundary ids are assigned in document order.
+
+<Warning>
+`postponedState` is never parsed. The Next docs are explicit that reading or altering it produces
+incorrect output — and it turns out to be unnecessary, because the shell HTML is already readable.
+</Warning>
+
+A route built with `generateStaticParams` emits both `products/[slug].html` — the unparameterized
+fallback, which is **zero bytes** — and `products/alpha.html`, the real shell. crust diffs against a
+parameterized shell; diffing the empty one would report that the whole shell vanished on every
+build.
+
+## Layer 3 — observe, at runtime
+
+The [runtime collector](/guides/runtime) records when each hole actually filled, by watching for
+React's inline completion scripts:
+
+```js
+$RC("B:0","S:0")
+```
+
+Those `B:0` ids are the same ones layer 2 read out of the prerendered shell, so the join needs no
+source access at all.
+
+<Note>
+These completions are **not** in the `__next_f` flight payload — that carries the RSC data. A
+collector that watches only `__next_f` finds the chunks and never the swaps.
+</Note>
+
+Boundaries that resolved before the collector mounted are reported with no timestamp rather than a
+fabricated one.
+
+## Shell ratio
+
+The figure crust reports is the share of the rendered route that is **not** inside a pending
+boundary, measured on visible text rather than bytes. Inline scripts and the flight payload dwarf
+the markup, so a byte-based ratio would track the payload instead of what a user sees.

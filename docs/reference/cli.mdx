@@ -1,0 +1,114 @@
+---
+title: "CLI"
+description: "Every command, every flag."
+---
+
+All commands accept `--cwd <dir>` (default: current directory) pointing at the **Next.js app**, and
+most accept `--dist-dir <dir>` (default: `.next`).
+
+## analyze
+
+Analyse a production build and record a snapshot.
+
+```bash
+npx crust analyze [--json [file]] [--no-save]
+```
+
+| Flag | Meaning |
+|---|---|
+| `--json [file]` | Emit the snapshot as JSON. With no path, prints to stdout. |
+| `--no-save` | Do not write into `.perf/`. |
+
+## diff
+
+Compare this build against a stored snapshot. Exits non-zero if no baseline is found.
+
+```bash
+npx crust diff [ref]
+```
+
+`ref` accepts a build id, a git SHA, a branch name, or `HEAD~3`. Defaults to `HEAD~1`.
+
+## ci
+
+Check budgets and print a PR comment. **Exits non-zero on a breach.**
+
+```bash
+npx crust ci [ref] [--comment <file>]
+```
+
+Defaults to comparing against `main`. Without `.perf/budgets.json` nothing is enforced and nothing
+fails. See [budgets](/reference/budgets).
+
+## report
+
+Write a self-contained HTML report.
+
+```bash
+npx crust report [--out crust-report.html] [--open]
+```
+
+No external requests: styles, script and data are inlined.
+
+## manifest
+
+Write the snapshot where the [in-app widget](/guides/widget) can fetch it.
+
+```bash
+npx crust manifest [--out public/crust-manifest.json]
+```
+
+<Warning>
+The manifest lists every route, source path and component name in your app. Generate it in analyze
+builds only.
+</Warning>
+
+## history
+
+Sync snapshots with the orphan `perf-history` branch.
+
+```bash
+npx crust history push [--remote origin]
+npx crust history fetch [--remote origin]
+```
+
+`push` reports and exits cleanly when the remote rejects it — a fork PR's token is read-only on the
+base repository, and that is not a failure worth breaking the check over.
+
+## prune
+
+Apply the retention ladder.
+
+```bash
+npx crust prune [--dry-run]
+```
+
+Newest 50 builds at full fidelity → one per commit → module detail dropped after 90 days. Route
+totals and shell ratios are kept forever.
+
+## synthetic
+
+Measure routes against a running deployment. Needs Playwright as an optional peer.
+
+```bash
+npx crust synthetic <baseUrl> [...routes] \
+  [--iterations 5] [--cpu 4] [--network fast-3g|slow-3g|none]
+```
+
+## list
+
+List stored snapshots, newest first.
+
+```bash
+npx crust list
+```
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success, or no budgets configured |
+| `1` | Budget breach, or `diff` found no baseline |
+
+Any unsupported project — Next outside 15–16, a dev-only build, a Pages Router app — throws with a
+message naming the reason rather than emitting numbers it cannot stand behind.

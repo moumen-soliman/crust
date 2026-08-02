@@ -1,0 +1,86 @@
+---
+title: "Staging and synthetic runs"
+description: "An ingest endpoint that cannot be vandalised, and measurements you can actually compare."
+---
+
+## Ingest endpoint
+
+```ts app/api/__crust/ingest/route.ts
+import { createIngestHandler } from 'crust/ingest'
+
+export const POST = createIngestHandler({
+  secret: process.env.CRUST_INGEST_SECRET!,
+  dir: '.perf-server/samples',
+  ratePerMinute: 60,
+})
+```
+
+Point the collector at it:
+
+```ts
+startCollector({ ingestUrl: '/api/__crust/ingest' })
+```
+
+The handler is authenticated with a constant-time comparison, rate-limited per client, bounded in
+payload size, and **write-only** — a 204 with no body, so there is nothing to probe. `GET` returns
+405.
+
+<Warning>
+An open POST appending to a history table is free vandalism. The secret must be at least 16
+characters; the handler throws at construction otherwise.
+</Warning>
+
+Never sync staging data back into git. Let CI write to the repo and keep the server's samples on
+the server.
+
+## Synthetic runs
+
+```bash
+npx crust synthetic https://staging.example.com / /products/1 \
+  --iterations 5 --cpu 4 --network fast-3g
+```
+
+```text
+crust synthetic 01KZ016N3F895E073QFKRWR979  4x cpu · fast-3g · median of 4
+
+/                  ttfb 9 ms  fcp 214 ms  lcp 214 ms  128.2 kB
+/products/1        ttfb 10 ms fcp 226 ms  lcp 226 ms  136.7 kB
+```
+
+Playwright is an optional peer, so ordinary installs never download a browser:
+
+```bash
+pnpm add -D playwright && pnpm exec playwright install chromium
+```
+
+### What makes the numbers comparable
+
+- **The first iteration is discarded.** A cold start measures the deployment's morning — server
+  compile caches, CDN misses, JIT warmup — not your code.
+- **The median is reported**, not the mean. A mean is hostage to a single GC pause.
+- **Throttle and network are pinned** into the run's environment fingerprint.
+- **The collector and widget are off.** A measurement tool competing for the main thread moves the
+  numbers it reports.
+
+<Warning>
+Staging numbers are relative, never absolute. Smaller instances, different or absent CDN, more cold
+starts, and above all a seeded database at a fraction of production size — an 8 ms query on 500 rows
+is 400 ms on 5 million. crust labels the trend "vs. previous build", never "is this fast".
+</Warning>
+
+## Server spans
+
+Deliberately minimal — your APM may already cover this.
+
+```ts instrumentation.ts
+import { registerOTel } from '@vercel/otel'
+import { CrustSpanAggregator } from 'crust/otel'
+
+export function register() {
+  registerOTel({ serviceName: 'my-app', spanProcessors: [new CrustSpanAggregator()] })
+}
+```
+
+It groups render and fetch time by route. The processor is structurally typed against OTel's
+`ReadableSpan` shape, so crust takes on no OpenTelemetry dependency, and it uses the supported
+`instrumentation.ts` hook rather than patching server internals.

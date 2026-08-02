@@ -1,0 +1,58 @@
+---
+title: "Monorepos"
+description: "Workspace roots, per-package tsconfig paths, and where snapshots land."
+---
+
+crust is built for workspaces. Point it at the **app**, not the repo root:
+
+```bash
+npx crust analyze --cwd apps/web
+```
+
+The workspace root is discovered by walking up for a lockfile or `pnpm-workspace.yaml`, stopping at
+the repository boundary. That matters: without the boundary the walk finds stray lockfiles in your
+home directory and anchors every source path there.
+
+## Cross-package attribution
+
+Bytes originating in `packages/ui` are reported against `packages/ui`, even though the build ran in
+`apps/web`:
+
+```text
+/  526.8 kB
+  packages/ui/src/Chart.tsx        376 B
+  packages/icons/src/Sparkline.tsx  86 B
+```
+
+This works through barrel files and workspace package boundaries — which is exactly where
+over-inclusion hides. A route that imports one component from a barrel commonly ships three.
+
+## Per-package tsconfig
+
+Each package gets its own resolver, chosen by the nearest enclosing `tsconfig.json`.
+
+<Note>
+A single project-wide resolver is wrong here: `packages/core` has its own `paths`, so resolving its
+`@/types/X` against the app's tsconfig fails for every file in the package. On a real workspace that
+produced 272 spurious "could not resolve" warnings.
+</Note>
+
+Declaration-only aliases (`@/types/*` pointing at `.d.ts` files) resolve and are then dropped —
+types are erased before a bundler sees them, so they can never affect bundle size.
+
+## Where things are written
+
+| Path | Written by |
+|---|---|
+| `<workspace-root>/.perf/` | snapshots, budgets, aliases, overrides |
+| `<app>/public/crust-manifest.json` | `crust manifest --out` |
+| `./crust-report.html` | `crust report --out` |
+
+Snapshots live at the workspace root so several apps in one repo share a history.
+
+## Turbopack roots
+
+Turbopack anchors source paths at the root it infers, which is the workspace root rather than the
+app directory whenever an outer lockfile exists. crust resolves sources by matching against files
+that actually exist, in both directions, so this needs no configuration — but setting
+`turbopack.root` explicitly in `next.config` removes the ambiguity from your build as well.

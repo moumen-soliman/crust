@@ -1,0 +1,93 @@
+---
+title: "Quickstart"
+description: "From a production build to a report in two commands."
+---
+
+## Requirements
+
+- Next.js 15 or 16, App Router
+- Node 20+
+- A **production** build. crust refuses to measure `next dev` — dev output is unminified,
+  unbundled and HMR-laden, so any number taken from it is fiction.
+
+## 1. Build, then analyze
+
+<CodeGroup>
+```bash npm
+next build
+npx crust analyze
+```
+
+```bash pnpm
+next build
+pnpm dlx crust analyze
+```
+</CodeGroup>
+
+```text
+crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
+
+Route              First load   Shell  Mode
+/                    543.2 kB    100%  static
+/dashboard           527.4 kB     39%  partial
+                    ↳ cookies() at app/dashboard/page.tsx:18
+                    ✂ <Theme> — cookies() at app/dashboard/page.tsx:18
+/products/[slug]     543.2 kB    100%  partial
+```
+
+The snapshot is written to `.perf/` — one file per build, so two branches recording builds never
+conflict.
+
+## 2. See it visually
+
+```bash
+npx crust report --open
+```
+
+A single self-contained HTML file: summary figures, the route table, and per-route detail with the
+modules, dependencies, client boundaries and holes. No server, no integration, nothing external.
+
+## 3. Compare against a baseline
+
+After a change, rebuild and diff:
+
+```bash
+next build
+npx crust diff main
+```
+
+<Tip>
+`crust diff` accepts a build id, a git SHA, a branch name, or `HEAD~3`. History is walked
+topologically, so a snapshot recorded later on another branch is never mistaken for an ancestor.
+</Tip>
+
+## Unlock per-file attribution
+
+Route sizes, rendering modes, dynamic-route blame and shell composition all work out of the box.
+Tracing bytes to a specific **file** needs source maps in the production build:
+
+```ts next.config.ts
+export default {
+  productionBrowserSourceMaps: true,
+}
+```
+
+Most projects do not have this on, so this is usually the difference between *"this route is
+2.8 MB"* and *"`packages/features/src/course/…` is 340 kB of it"*.
+
+<Warning>
+Without maps crust still reports every route total and the full shell analysis — it says the
+attribution is unavailable rather than guessing. Turn maps on in a dedicated analyze build if you
+would rather not ship them.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add the CI check" icon="circle-check" href="/guides/ci">
+    Budgets, a PR comment, and snapshot history on an orphan branch.
+  </Card>
+  <Card title="Run it in your app" icon="window-maximize" href="/guides/widget">
+    A floating panel in your running app, gated out of production builds.
+  </Card>
+</CardGroup>

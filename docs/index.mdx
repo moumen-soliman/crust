@@ -1,0 +1,62 @@
+---
+title: "Introduction"
+description: "What crust measures, and the one thing nothing else catches."
+---
+
+crust builds a static map of a Next.js App Router project from source, joins it to the build
+output, and stores a snapshot per build — so a regression traces back to the commit and the import
+that caused it.
+
+## The failure it exists to catch
+
+Under Cache Components, removing a cache directive deep in a utility silently shrinks the static
+shell. No build error. No bundle growth. Nothing surfaces it.
+
+```text
+crust diff  cfdcf500 → 4a802397
+
+/products/[slug]  543.2 kB  +0.0 kB
+    shell 100% → 45%
+    ✂ <ProductGallery> left the shell — uncached fetch at lib/http.ts:3
+```
+
+The call site named there is three frames below the page, in a file the route never mentions.
+
+<Note>
+Under the older `experimental_ppr` model a dynamic API outside a Suspense boundary threw a build
+error, so you found out immediately. Cache Components inverts the default: absence of caching is
+what postpones, and it fails quietly.
+</Note>
+
+## What it does
+
+<CardGroup cols={2}>
+  <Card title="Analyze" icon="chart-simple" href="/reference/cli#analyze">
+    Route table, first-load JS, server/client boundaries, and why each route is dynamic.
+  </Card>
+  <Card title="Diff" icon="code-compare" href="/reference/cli#diff">
+    Per-route deltas naming the module responsible, not just the route that grew.
+  </Card>
+  <Card title="Shell engine" icon="layer-group" href="/concepts/shell-engine">
+    Predicted versus actual static shell, and the call site that broke it.
+  </Card>
+  <Card title="CI" icon="circle-check" href="/guides/ci">
+    Budgets on bundle size and shell ratio, with a PR comment that updates in place.
+  </Card>
+</CardGroup>
+
+## Why not the tools you already have
+
+| | Route bundles | History and blame | Shell composition |
+|---|---|---|---|
+| `@next/bundle-analyzer` | Yes | No | No |
+| Speed Insights | No | No source attribution | No |
+| size-limit in CI | Not route-aware | Budgets only | No |
+| **crust** | Yes | Yes | Yes |
+
+Route-level regression blame and shell composition, together, is the gap.
+
+## Support
+
+Next.js 15 and 16, webpack and Turbopack. Outside that range crust refuses to run rather than emit
+numbers it cannot stand behind. See [support and non-goals](/support).

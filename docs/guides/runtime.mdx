@@ -1,0 +1,67 @@
+---
+title: "Runtime collector"
+description: "Web Vitals, long animation frames, an image audit and the streaming waterfall."
+---
+
+```ts
+import { startCollector } from 'crust/collector'
+
+const dispose = startCollector()
+```
+
+Gate it exactly like [the widget](/guides/widget). When the panel is open it shows the live values
+for the current page.
+
+## What it collects
+
+<CardGroup cols={2}>
+  <Card title="Web Vitals" icon="gauge">
+    LCP with its element, CLS by session window, INP, TTFB and FCP — from raw `PerformanceObserver`,
+    with no dependency.
+  </Card>
+  <Card title="Long animation frames" icon="hourglass">
+    Frames over 50 ms, the worst script in each, and total blocking time.
+  </Card>
+  <Card title="Image audit" icon="image">
+    Raw `<img>`, lazy-loaded LCP elements, missing `fetchpriority`, over-download and missing
+    dimensions.
+  </Card>
+  <Card title="Streaming waterfall" icon="water">
+    When each Suspense boundary actually filled — [shell engine layer 3](/concepts/shell-engine).
+  </Card>
+</CardGroup>
+
+## The image audit runs twice
+
+The over-download check needs `naturalWidth`, which is `0` until an image has decoded — and a lazy
+image below the fold has not even started. Auditing once silently drops the most valuable finding on
+exactly the images most likely to be oversized.
+
+So there is an early pass for the structural findings, and a second pass once the images that were
+still loading settle.
+
+```text
+img alt="hero" — raw <img> — next/image would add sizing, format negotiation and lazy loading
+img alt="hero" — decoded 1600px for a 640px slot — ~60% wasted; check sizes=
+img alt="hero" — no intrinsic dimensions — the page shifts when it loads
+```
+
+## Observer effect
+
+Everything is passive observation. The state object is shared by reference, so there is no polling
+and no copying, and the only active DOM walk — the image audit — runs after `load` in an idle
+callback.
+
+<Note>
+Synthetic runs measure with the collector and widget **off**. A measurement tool that competes for
+the main thread moves the numbers it reports.
+</Note>
+
+## Shipping samples somewhere
+
+```ts
+startCollector({ ingestUrl: '/api/__crust/ingest', route: '/products/[slug]' })
+```
+
+On `pagehide` the collector beacons a compact sample. See [staging](/guides/staging) for the
+endpoint.

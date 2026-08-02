@@ -1,0 +1,67 @@
+---
+title: "Support and non-goals"
+description: "What is supported, what will never be built, and what to expect from maintenance."
+---
+
+## Supported
+
+| | |
+|---|---|
+| Next.js | 15 and 16, App Router |
+| Bundlers | webpack and Turbopack |
+| Node | 20+ |
+| Package managers | pnpm, npm, yarn, bun |
+
+Two Next majors, both bundlers. Outside that range crust **refuses to run** rather than emit output
+derived from artifacts whose shape has not been verified.
+
+<Note>
+Manifest shapes and artifact locations are undocumented and move on minor releases. A nightly CI job
+runs the fixtures against `next@canary`, so breakage surfaces before an issue does.
+</Note>
+
+## Non-goals
+
+These are permanent. They were written down before the first user arrived, because saying no in
+month three is only easy if you said it in month zero.
+
+<AccordionGroup>
+  <Accordion title="Not a runtime APM">
+    No error tracking, no distributed tracing, no alerting. The optional
+    [span aggregator](/guides/staging#server-spans) groups render time by route and stops there.
+  </Accordion>
+  <Accordion title="Not a Lighthouse or PageSpeed replacement">
+    crust measures what your build produced and what your users' browsers reported. It does not
+    produce a score.
+  </Accordion>
+  <Accordion title="Not multi-framework">
+    Next.js App Router only. A Pages Router app gets a clear refusal; a hybrid app gets its `app/`
+    routes analysed with a warning that `pages/` is invisible to every number.
+  </Accordion>
+  <Accordion title="Not a hosted service">
+    No accounts, no SaaS dashboard. Snapshots live in your repository.
+  </Accordion>
+  <Accordion title="Not a bundler">
+    It reads build output. It never changes how your app builds in production.
+  </Accordion>
+  <Accordion title="No config file">
+    Until three separate people request the same option. Zero-config is a feature, and config
+    surface is permanent API you cannot remove. The two JSON escape hatches in
+    [`.perf/`](/reference/files) are data, not configuration.
+  </Accordion>
+</AccordionGroup>
+
+## Known limits
+
+- **Per-file attribution needs `productionBrowserSourceMaps`.** Without it, route totals and shell
+  analysis still work; attribution reports itself unavailable.
+- **Taint propagation is module-level**, not function-level. It errs toward reporting dynamism.
+- **The stamping transform is not built.** Component-level runtime attribution would need it;
+  source maps cover file-level attribution instead, and measure better on Turbopack than webpack.
+- **Server components rendered from props or `children`** are reported as
+  [unknown](/concepts/unknowns) rather than guessed at.
+
+## Maintenance
+
+MIT. Supports Next 15–16, best-effort, issues triaged weekly. That is the commitment — stating it
+plainly is more useful than an implied promise nobody wrote down.

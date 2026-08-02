@@ -1,0 +1,72 @@
+---
+title: "Attribution"
+description: "How bytes in a chunk are traced back to the file that produced them."
+---
+
+## Route to chunk
+
+The two bundlers expose this in opposite ways, which is why crust keeps one adapter interface and
+two implementations rather than branching inline.
+
+| | webpack | Turbopack |
+|---|---|---|
+| Chunk paths mirror the route tree | Yes | No — flat, content-hashed |
+| `clientModules[src].chunks` populated | Yes | Yes |
+| …but scoped to the route | **No — global** | **Yes** |
+| Chunk list format | `[id, path, id, path]`, URL-encoded | flat, `/_next/`-prefixed |
+
+On webpack, the client reference manifest holds the whole app's client module table — the manifest
+emitted for `/dashboard` lists chunks belonging to `/`. Unioning it would attribute every client
+component to every route, so crust intersects it against the route's own convention chunk instead.
+
+<Note>
+`app-build-manifest.json` does not exist in Next 16, and `build-manifest.json` carries no App Router
+route data at all. It is still present in Next 15 — the manifest set genuinely differs across the
+two supported majors.
+</Note>
+
+## Chunk to source
+
+Byte ranges are mapped through source maps. Each mapping owns the bytes from its own position to
+the next; regions no mapping covers are counted as **unattributed** rather than smeared onto the
+nearest source.
+
+Measured on the fixture apps:
+
+| Bundler | Attributed |
+|---|---|
+| webpack | 87.1% |
+| Turbopack | **99.8%** |
+
+webpack's shortfall is almost entirely one file — `polyfills-*.js` ships with no map. Excluding it,
+webpack reaches ~99.6%.
+
+<Tip>
+Turbopack names source maps independently of their chunk (`3cqmf8g-py4nf.js` →
+`3ixj0_2my9s3k.js.map`). Guessing `chunk + '.map'` — webpack's actual convention — finds nothing and
+reports 17.5%. crust follows the `sourceMappingURL` comment.
+</Tip>
+
+## Identifying your code
+
+Deciding whether a mapped source is *yours* is not a prefix check.
+
+Next ships source maps that point into its **own** `src/`, so a `!path.includes('node_modules')`
+test reports Next's router and segment cache as your application code. The bundlers also disagree
+on anchoring: webpack emits `webpack://_N_E/./components/x.tsx`, Turbopack emits
+`turbopack:///[project]/…` where `[project]` is the inferred workspace root, not the app directory.
+
+crust resolves a source by asking whether it names a file that **actually exists** in the
+workspace, matching in both directions — the source path can be shorter or longer than the indexed
+path. Ambiguity resolves to nothing, never to a guess.
+
+## Buckets
+
+Every byte lands in exactly one of:
+
+- **your modules** — resolved to a workspace file
+- **dependencies** — resolved to a package name, with the pnpm virtual store segment skipped
+- **outside project** — mapped, but to a path carrying no package name (Next's own `../../src/…`)
+- **unattributed** — no mapping covers it, or the chunk shipped without a map
+
+The last bucket is reported, not hidden. Knowing how much cannot be explained is the point.

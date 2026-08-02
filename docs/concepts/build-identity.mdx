@@ -1,0 +1,60 @@
+---
+title: "Build identity"
+description: "Why a git SHA is not enough to key a performance history on."
+---
+
+A SHA alone gives false continuity. Bundle sizes move with lockfiles, Next upgrades, Node versions
+and config edits **at the same commit**.
+
+So a build id hashes everything that can change the numbers:
+
+```js
+buildId = sha256([
+  gitSha,
+  dirtyDiffHash,   // '' when the tree is clean
+  lockfileHash,
+  nextVersion,
+  nodeMajor,
+  bundler,         // 'turbopack' | 'webpack'
+  configHash,      // the build's own resolved config
+]).slice(0, 16)
+```
+
+<Note>
+The dirty-tree component matters most in practice. Most measuring happens on uncommitted work, and
+keying on the SHA alone makes ten experiments overwrite each other under one identity.
+</Note>
+
+Outside a git repository, a content fingerprint of the emitted chunk filenames stands in — those are
+content-hashed by both bundlers, so it changes exactly when the output does.
+
+## Run identity
+
+A build can be measured many times. Each [synthetic run](/guides/staging) gets a sortable id and an
+environment fingerprint:
+
+```text
+run.env = { machine, cpuCount, throttle, network, coldStart, browserVersion }
+```
+
+<Warning>
+Runs with different environment fingerprints must never be merged into one trend line. A laptop on
+battery versus CI looks exactly like a regression that is not one.
+</Warning>
+
+## Route identity
+
+Trends are keyed on the **page file path**, not the URL pattern:
+
+```json
+{ "id": "app/products/[slug]/page.tsx", "pattern": "/products/[slug]" }
+```
+
+Patterns change during refactors, and keying on them would silently restart the history. When a
+file itself moves, [`.perf/aliases.json`](/reference/files#aliases-json) stitches it back.
+
+## Orphaned history
+
+Squash merges destroy the pre-squash SHAs, so ancestry lookup finds nothing. Every snapshot also
+stores a `sourceSignature` — a hash of the route table and module set — so an orphaned baseline can
+be re-linked by content.

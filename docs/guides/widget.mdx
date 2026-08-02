@@ -1,0 +1,91 @@
+---
+title: "The in-app widget"
+description: "A floating panel in your running app, eliminated from production builds."
+---
+
+## 1. Write the manifest
+
+```bash
+next build
+npx crust manifest --out public/crust-manifest.json
+```
+
+<Warning>
+This file lists every route, source path and component name in your app. Generate it in analyze
+builds only — never in the build you deploy.
+</Warning>
+
+## 2. Mount it
+
+```tsx components/CrustDevtools.tsx
+'use client'
+
+import { useEffect } from 'react'
+
+export function CrustDevtools() {
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_CRUST) return
+
+    const disposers: (() => void)[] = []
+    void import('crust/collector').then((m) => disposers.push(m.startCollector()))
+    void import('crust/widget').then((m) => disposers.push(m.mountCrustWidget()))
+
+    return () => {
+      for (const dispose of disposers) dispose()
+    }
+  }, [])
+
+  return null
+}
+```
+
+Render it in your root layout, then build with the gate on:
+
+```bash
+NEXT_PUBLIC_CRUST=1 next build && next start
+```
+
+A `crust` pill appears in the corner.
+
+## Why it is built this way
+
+<AccordionGroup>
+  <Accordion title="The gate is checked before the import, not inside the module">
+    With the variable unset, the bundler eliminates both dynamic imports entirely — neither the
+    widget nor the collector reaches your production bundle. A runtime `if` inside the module would
+    still ship the code and the manifest.
+  </Accordion>
+  <Accordion title="It renders in a shadow root">
+    Your CSS cannot break the panel and the panel's CSS cannot leak into your app. A devtool that
+    restyles the page it is measuring is worse than no devtool.
+  </Accordion>
+  <Accordion title="It uses no UI framework">
+    Plain DOM. This ships into your page, and coupling it to a React version would make it a support
+    burden and drag a second renderer into the bundle.
+  </Accordion>
+  <Accordion title="It fetches lazily">
+    The manifest loads only when the panel is first opened. The widget must not move the numbers it
+    exists to report.
+  </Accordion>
+</AccordionGroup>
+
+## Options
+
+```ts
+mountCrustWidget({
+  manifestUrl: '/crust-manifest.json',
+  position: 'bottom-right', // or bottom-left, top-right, top-left
+})
+```
+
+Both calls return a disposer.
+
+## Without any integration
+
+If you would rather not touch the app at all:
+
+```bash
+npx crust report --open
+```
+
+Same data, same design, as one self-contained HTML file.

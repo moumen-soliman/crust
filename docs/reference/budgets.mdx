@@ -1,0 +1,73 @@
+---
+title: "Budgets"
+description: "The shape of .perf/budgets.json."
+---
+
+Place the file at the **workspace root**. Nothing is enforced until it exists.
+
+```json .perf/budgets.json
+{
+  "defaultFirstLoadBytes": 250000,
+  "firstLoadBytes": {
+    "/products/[slug]": 180000
+  },
+  "maxGrowth": 0.05,
+  "defaultMinShellRatio": 0.6,
+  "minShellRatio": {
+    "/checkout": 0.8
+  }
+}
+```
+
+## Fields
+
+<ParamField path="defaultFirstLoadBytes" type="number">
+  Ceiling on first-load JS, in bytes, for any route without a specific entry.
+</ParamField>
+
+<ParamField path="firstLoadBytes" type="Record<string, number>">
+  Per-route ceilings, keyed on the **URL pattern** as printed by `crust analyze`
+  (`/products/[slug]`, not the file path). Overrides the default.
+</ParamField>
+
+<ParamField path="maxGrowth" type="number">
+  Maximum tolerated growth versus the baseline, as a fraction. `0.05` is 5%. Requires a baseline;
+  ignored when there is none.
+</ParamField>
+
+<ParamField path="defaultMinShellRatio" type="number">
+  Minimum share of a route that must be static, 0–1, for any route without a specific entry. Only
+  applies to routes that emitted a shell.
+</ParamField>
+
+<ParamField path="minShellRatio" type="Record<string, number>">
+  Per-route shell floors. Overrides the default.
+</ParamField>
+
+## Choosing the axes
+
+All three answer different questions:
+
+| Axis | Catches |
+|---|---|
+| `firstLoadBytes` | "This route is simply too big" |
+| `maxGrowth` | "This PR made it noticeably worse" |
+| `minShellRatio` | "This route stopped being static" |
+
+<Note>
+Bytes alone is the common mistake. A PR that removes a cache directive can halve your static shell
+while the bundle stays byte-identical — and a bytes-only check passes it.
+</Note>
+
+## Blame
+
+Each breach carries the largest contributor it can name — your module, a dependency, or the call
+site that postponed a component:
+
+```text
+- `/products/[slug]` — static shell is 45% of the route, below the 60% floor
+  - blame: `uncached fetch at lib/http.ts:3`
+```
+
+When no source map is available, blame falls back to the unattributed total and says so rather than
+naming the largest thing it happens to know about.

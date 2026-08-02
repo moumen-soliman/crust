@@ -1,0 +1,61 @@
+---
+title: "Files on disk"
+description: "What crust writes, what to commit, and the two escape hatches."
+---
+
+```text
+.perf/
+  schema.json              schema + tool version
+  budgets.json             your budgets (you write this)
+  aliases.json             route renames (optional)
+  overrides.json           unresolvable imports (optional)
+  builds/ab/ab3f91c2.json  one file per snapshot
+  modules/9f/9f2c81.json   content-addressed module tables
+  runs/01J8X…/             synthetic run samples
+  index.db                 derived cache — gitignored, rebuildable
+```
+
+## Commit `builds/` and `modules/`
+
+One file per snapshot, never a shared append-only log. A `history.jsonl` would conflict every single
+time two branches both record a build — exactly when history is most worth having.
+
+Module tables are content-addressed separately because module sizes repeat almost identically
+between builds; inlining them would make each snapshot 50–200 kB of near-duplicate data.
+
+Add `index.db` to `.gitignore`. It is derived and rebuilt by scan, and publishing it just creates
+conflicts between machines that built it at different times.
+
+## aliases.json
+
+Trends are keyed on the page file path, which survives URL refactors but not file moves. An alias
+stitches the history back together:
+
+```json .perf/aliases.json
+{
+  "app/old/page.tsx": "app/new/page.tsx"
+}
+```
+
+## overrides.json
+
+Manual answers for specifiers no resolver can settle — computed dynamic imports, exotic
+plugin-resolved aliases. Maps a specifier to a workspace-relative file:
+
+```json .perf/overrides.json
+{
+  "@weird/alias": "packages/ui/src/index.ts"
+}
+```
+
+<Tip>
+Do not chase 100% resolution in code when a ten-line JSON file covers the tail. crust reports what
+it could not resolve so you know exactly what to put here.
+</Tip>
+
+## schema.json
+
+Records the snapshot schema version. It is bumped on any change to the stored shapes — a snapshot
+outlives the tool version that wrote it, and silently reinterpreting old records under new semantics
+is how a history feature starts lying about the past. `crust diff` refuses to compare across schema
+versions.
