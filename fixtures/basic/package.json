@@ -1,0 +1,20 @@
+{
+  "name": "crust-fixture-basic",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build:webpack": "next build --webpack",
+    "build:turbopack": "next build --turbopack"
+  },
+  "dependencies": {
+    "next": "16.2.12",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "crust": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "typescript": "^5.8.0"
+  }
+}
