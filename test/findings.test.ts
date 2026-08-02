@@ -26,7 +26,7 @@ function route(overrides: Partial<RouteSnapshot> = {}): RouteSnapshot {
 function snapshot(routes: RouteSnapshot[], warnings: string[] = []): Snapshot {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.0',
+    toolVersion: '0.1.1',
     buildId: 'aaaaaaaaaaaaaaaa',
     createdAt: '2026-01-01T00:00:00.000Z',
     gitSha: null,

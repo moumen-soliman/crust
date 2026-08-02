@@ -9,45 +9,46 @@ const TABS: CodeTab[] = [
     name: 'diff',
     lines: [
       <>
-        <span className="c-dim">$</span> next build <span className="c-dim">&amp;&amp;</span> npx @moumensoliman/crust diff main
+        <span className="text-muted">$</span> next build <span className="text-muted">&amp;&amp;</span> npx
+        @moumensoliman/crust diff main
       </>,
       <></>,
       <>
-        crust diff <span className="c-dim">cfdcf500 → 4a802397</span>
+        crust diff <span className="text-muted">cfdcf500 → 4a802397</span>
       </>,
       <></>,
-      <span className="c-red">/products/[slug] ▼</span>,
+      <span className="text-red">/products/[slug] ▼</span>,
       <>
-        {'  '}rendering <span className="c-red">static → partial</span>
+        {'  '}rendering <span className="text-red">static → partial</span>
       </>,
       <>
-        {'  '}shell <span className="c-red">100% → 45%</span>
+        {'  '}shell <span className="text-red">100% → 45%</span>
       </>,
       <>
-        {'  '}cause <span className="c-str">uncached fetch at lib/http.ts:3</span>
+        {'  '}cause <span className="text-green">uncached fetch at lib/http.ts:3</span>
       </>,
       <>
-        {'  '}introduced by <span className="c-key">&lt;ProductGallery&gt;</span>
+        {'  '}introduced by <span className="text-blue">&lt;ProductGallery&gt;</span>
       </>,
       <></>,
-      <span className="c-red">1 failing check · exit 1</span>,
+      <span className="text-red">1 failing check · exit 1</span>,
     ],
   },
   {
     name: 'analyze',
     lines: [
       <>
-        crust <span className="c-dim">4a802397 · next 16.2 · turbopack</span>
+        crust <span className="text-muted">4a802397 · next 16.2 · turbopack</span>
       </>,
       <></>,
-      <span className="c-key">Fix first</span>,
+      <span className="text-blue">Fix first</span>,
       <></>,
       <>1. /products/[slug]</>,
-      <span className="c-red">{'   only 45% is in the static shell'}</span>,
-      <span className="c-dim">{'   ↳ uncached fetch at lib/http.ts:3'}</span>,
-      <span className="c-str">{'   → add `use cache` above that read'}</span>,
+      <span className="text-red">{'   only 45% is in the static shell'}</span>,
+      <span className="text-muted">{'   ↳ uncached fetch at lib/http.ts:3'}</span>,
+      <span className="text-green">{'   → add `use cache` above that read'}</span>,
       <></>,
-      <span className="c-dim">Route              First load  Shell  Mode</span>,
+      <span className="text-muted">Route              First load  Shell  Mode</span>,
       <>/                    143.2 kB   100%  static</>,
       <>/products/[slug]     168.4 kB    45%  partial</>,
     ],
@@ -57,25 +58,30 @@ const TABS: CodeTab[] = [
     lines: [
       <>{'{'}</>,
       <>
-        {'  '}<span className="c-key">&quot;defaultFirstLoadBytes&quot;</span>: <span className="c-num">250000</span>,
+        {'  '}
+        <span className="text-blue">&quot;defaultFirstLoadBytes&quot;</span>: <span className="text-amber">250000</span>,
       </>,
       <>
-        {'  '}<span className="c-key">&quot;maxGrowth&quot;</span>: <span className="c-num">0.05</span>,
+        {'  '}
+        <span className="text-blue">&quot;maxGrowth&quot;</span>: <span className="text-amber">0.05</span>,
       </>,
       <>
-        {'  '}<span className="c-key">&quot;defaultMinShellRatio&quot;</span>: <span className="c-num">0.6</span>,
+        {'  '}
+        <span className="text-blue">&quot;defaultMinShellRatio&quot;</span>: <span className="text-amber">0.6</span>,
       </>,
       <>
-        {'  '}<span className="c-key">&quot;allowRegression&quot;</span>: [
+        {'  '}
+        <span className="text-blue">&quot;allowRegression&quot;</span>: [
       </>,
       <>
-        {'    '}<span className="c-str">&quot;/admin/[...slug]&quot;</span>
+        {'    '}
+        <span className="text-green">&quot;/admin/[...slug]&quot;</span>
       </>,
       <>{'  ]'}</>,
       <>{'}'}</>,
       <></>,
-      <span className="c-dim">{'// strict regressions need no config'}</span>,
-      <span className="c-dim">{'// ceilings stay yours to choose'}</span>,
+      <span className="text-muted">{'// strict regressions need no config'}</span>,
+      <span className="text-muted">{'// ceilings stay yours to choose'}</span>,
     ],
   },
 ]
@@ -167,233 +173,318 @@ const NON_GOALS = [
   ['Not a bundler.', 'It reads build output and never changes how the application builds.'],
 ]
 
+const btn =
+  'inline-flex items-center justify-center gap-2 min-h-10 px-4 rounded-[7px] border border-transparent text-small font-medium no-underline cursor-pointer font-[inherit] transition-[scale,opacity,background-color,border-color,color] duration-[140ms] ease-crust active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-blue focus-visible:outline-offset-2 max-[520px]:w-full motion-reduce:active:scale-100'
+const btnPrimary = `${btn} bg-fg text-bg hover:opacity-[0.86]`
+const btnCmd = `${btn} border-border bg-surface text-muted font-mono text-meta hover:text-fg hover:border-faint`
+const secHead =
+  'flex flex-wrap items-baseline gap-3.5 border-b border-border px-pad py-[26px]'
+const grid =
+  'grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-px border-t border-border bg-border'
+const gridCell = 'bg-bg px-pad py-[22px]'
+const nogoRow =
+  'border-b border-border py-4 text-small text-muted text-pretty last:border-b-0'
+
 export default function Home() {
   return (
-    <div className="shell">
-      <nav className="nav pad">
-        <a className="brand" href="/">
+    <div className="mx-auto min-h-screen max-w-shell border-x border-border">
+      <nav className="sticky top-0 z-20 flex h-[54px] items-center gap-5 border-b border-border bg-bg/84 px-pad backdrop-blur-[12px] backdrop-saturate-[180%]">
+        <a className="inline-flex items-center gap-2 text-body font-[550] tracking-[-0.01em] no-underline" href="/">
           <Mark size={17} />
           crust
         </a>
-        <div className="nav-links">
-          <a href={`${DOCS}/docs/quickstart`}>Quickstart</a>
-          <a href={`${DOCS}/docs/concepts/regressions`}>How it thinks</a>
-          <a href={`${DOCS}/docs/reference/cli`}>CLI</a>
+        <div className="mx-auto flex gap-[26px] max-[720px]:hidden">
+          <a
+            className="text-micro uppercase tracking-[0.09em] text-muted no-underline transition-colors duration-[120ms] hover:text-fg"
+            href={`${DOCS}/docs/quickstart`}
+          >
+            Quickstart
+          </a>
+          <a
+            className="text-micro uppercase tracking-[0.09em] text-muted no-underline transition-colors duration-[120ms] hover:text-fg"
+            href={`${DOCS}/docs/concepts/regressions`}
+          >
+            How it thinks
+          </a>
+          <a
+            className="text-micro uppercase tracking-[0.09em] text-muted no-underline transition-colors duration-[120ms] hover:text-fg"
+            href={`${DOCS}/docs/reference/cli`}
+          >
+            CLI
+          </a>
         </div>
-        <a className="nav-right" href={GITHUB}>
+        <a
+          className="inline-flex items-center gap-[7px] text-meta text-muted no-underline hover:text-fg"
+          href={GITHUB}
+        >
           GitHub
         </a>
       </nav>
 
-      <header className="hero pad">
+      <header className="grid items-center gap-[clamp(28px,5vw,56px)] px-pad py-[clamp(44px,7vw,88px)] max-[900px]:grid-cols-1 min-[901px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <div>
-          <div className="crumbs">
-            <span>Next 15 &amp; 16</span>
-            <span>webpack</span>
-            <span>Turbopack</span>
+          <div className="mb-7 flex gap-2.5 text-micro uppercase tracking-[0.06em] text-faint">
+            <span className="after:text-border after:content-['_/'] last:after:content-none">
+              Next 15 &amp; 16
+            </span>
+            <span className="after:text-border after:content-['_/'] last:after:content-none">webpack</span>
+            <span className="after:text-border after:content-['_/'] last:after:content-none">Turbopack</span>
           </div>
-          <h1>
+          <h1 className="m-0 text-h1 font-medium leading-[1.12] tracking-[-0.028em] text-balance">
             Know what became slower,
             <br />
-            and <span className="underlined">the source line that did it</span>
+            and{' '}
+            <span className="underline decoration-faint decoration-dotted decoration-1 underline-offset-[6px]">
+              the source line that did it
+            </span>
           </h1>
-          <p className="lead">
+          <p className="mt-5 max-w-[46ch] text-small leading-[1.65] text-muted text-pretty">
             crust explains why every App Router page is static, partial, ISR or dynamic—then keeps
             enough build history to tell you what changed and whether the pull request should merge.
           </p>
-          <div className="actions">
-            <a className="btn btn-primary" href={`${DOCS}/docs/quickstart`}>
+          <div className="mt-[30px] flex flex-wrap gap-2.5 max-[520px]:flex-col">
+            <a className={btnPrimary} href={`${DOCS}/docs/quickstart`}>
               Read the quickstart
             </a>
-            <a className="btn btn-cmd" href="https://www.npmjs.com/package/@moumensoliman/crust">
-              <span className="chev">›</span> npx @moumensoliman/crust analyze
+            <a className={btnCmd} href="https://www.npmjs.com/package/@moumensoliman/crust">
+              <span className="text-faint">›</span> npx @moumensoliman/crust analyze
             </a>
           </div>
         </div>
         <CodePanel tabs={TABS} />
       </header>
 
-      <section className="rule">
-        <div className="sec-head pad">
-          <h2>The regression bundle budgets cannot see</h2>
-          <p>No build error. No byte moved. The static shell still dropped from 100% to 45%.</p>
+      <section className="border-t border-border">
+        <div className={secHead}>
+          <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">
+            The regression bundle budgets cannot see
+          </h2>
+          <p className="m-0 text-small text-muted text-pretty">
+            No build error. No byte moved. The static shell still dropped from 100% to 45%.
+          </p>
         </div>
-        <div className="sec-body pad">
-          <div className="split">
-            <div className="win">
-              <div className="win-bar">
-                <span className="dots">
-                  <i />
-                  <i />
-                  <i />
+        <div className="px-pad py-[clamp(28px,4vw,44px)]">
+          <div className="grid gap-4 max-[900px]:grid-cols-1 min-[901px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+            <div className="overflow-hidden rounded-[10px] border border-border bg-surface">
+              <div className="flex items-center gap-2 border-b border-border px-[13px] py-[9px] text-micro uppercase tracking-[0.06em] text-faint">
+                <span className="flex gap-[5px]">
+                  <i className="block size-2 rounded-full bg-border" />
+                  <i className="block size-2 rounded-full bg-border" />
+                  <i className="block size-2 rounded-full bg-border" />
                 </span>
                 production build
               </div>
-              <div className="win-body">
-                <div className="rt">
-                  <span className="h">Route</span>
-                  <span className="h n">First load</span>
-                  <span className="h">Shell</span>
-                  <span className="h">Mode</span>
-
-                  <span className="route">/</span>
-                  <span className="n">143.2 kB</span>
-                  <span className="bar">
-                    <i style={{ width: '100%' }} />
+              <div className="overflow-x-auto px-[18px] pt-4 pb-5">
+                <div className="grid min-w-0 grid-cols-[1fr_auto_auto_auto] items-center gap-x-3.5 gap-y-2.5 text-meta max-[520px]:min-w-[430px]">
+                  <span className="text-micro uppercase tracking-[0.06em] text-faint">Route</span>
+                  <span className="text-right text-micro uppercase tracking-[0.06em] text-faint">
+                    First load
                   </span>
-                  <span className="mode m-static">static</span>
+                  <span className="text-micro uppercase tracking-[0.06em] text-faint">Shell</span>
+                  <span className="text-micro uppercase tracking-[0.06em] text-faint">Mode</span>
 
-                  <span className="route">/products/[slug]</span>
-                  <span className="n">168.4 kB</span>
-                  <span className="bar low">
-                    <i style={{ width: '45%' }} />
+                  <span className="font-mono text-fg">/</span>
+                  <span className="text-right text-muted tabular-nums">143.2 kB</span>
+                  <span className="h-1 w-[62px] overflow-hidden rounded-sm bg-border">
+                    <i className="block h-full rounded-sm bg-fg" style={{ width: '100%' }} />
                   </span>
-                  <span className="mode m-partial">partial</span>
+                  <span className="inline-flex items-center gap-1.5 text-muted before:block before:size-1.5 before:shrink-0 before:rounded-full before:bg-green">
+                    static
+                  </span>
 
-                  <span className="route">/dashboard</span>
-                  <span className="n">152.7 kB</span>
-                  <span className="bar low">
-                    <i style={{ width: '39%' }} />
+                  <span className="font-mono text-fg">/products/[slug]</span>
+                  <span className="text-right text-muted tabular-nums">168.4 kB</span>
+                  <span className="h-1 w-[62px] overflow-hidden rounded-sm bg-border">
+                    <i className="block h-full rounded-sm bg-red" style={{ width: '45%' }} />
                   </span>
-                  <span className="mode m-partial">partial</span>
+                  <span className="inline-flex items-center gap-1.5 text-muted before:block before:size-1.5 before:shrink-0 before:rounded-full before:bg-blue">
+                    partial
+                  </span>
+
+                  <span className="font-mono text-fg">/dashboard</span>
+                  <span className="text-right text-muted tabular-nums">152.7 kB</span>
+                  <span className="h-1 w-[62px] overflow-hidden rounded-sm bg-border">
+                    <i className="block h-full rounded-sm bg-red" style={{ width: '39%' }} />
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-muted before:block before:size-1.5 before:shrink-0 before:rounded-full before:bg-blue">
+                    partial
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="win">
-              <div className="win-bar">Pull request</div>
-              <div className="win-body cmt">
-                <h4 className="fail">crust: /products/[slug] is no longer static</h4>
-                <div className="row">
+            <div className="overflow-hidden rounded-[10px] border border-border bg-surface">
+              <div className="flex items-center gap-2 border-b border-border px-[13px] py-[9px] text-micro uppercase tracking-[0.06em] text-faint">
+                Pull request
+              </div>
+              <div className="px-[18px] pt-4 pb-5 text-meta leading-[1.7]">
+                <h4 className="mb-2.5 text-small font-[550] text-red">
+                  crust: /products/[slug] is no longer static
+                </h4>
+                <div className="mb-2 flex gap-2 text-muted text-pretty">
+                  <span className="mt-2 block size-[5px] shrink-0 rounded-full bg-faint" />
                   <span>
-                    rendering: <b>static → partial</b>
+                    rendering: <b className="text-fg">static → partial</b>
                     <br />
-                    static shell: <b className="fail">100% → 45%</b>
+                    static shell: <b className="text-red">100% → 45%</b>
                   </span>
                 </div>
-                <div className="row">
+                <div className="mb-2 flex gap-2 text-muted text-pretty">
+                  <span className="mt-2 block size-[5px] shrink-0 rounded-full bg-faint" />
                   <span>
-                    Cause: <code>uncached fetch at lib/http.ts:3</code>
+                    Cause:{' '}
+                    <code className="rounded px-[5px] py-px text-micro text-fg bg-raised">
+                      uncached fetch at lib/http.ts:3
+                    </code>
                     <br />
-                    Introduced by: <code>&lt;ProductGallery&gt;</code>
+                    Introduced by:{' '}
+                    <code className="rounded px-[5px] py-px text-micro text-fg bg-raised">
+                      &lt;ProductGallery&gt;
+                    </code>
                   </span>
                 </div>
-                <div className="row">
-                  <span className="fail">1 failing check · exit 1</span>
+                <div className="mb-2 flex gap-2 text-muted text-pretty">
+                  <span className="mt-2 block size-[5px] shrink-0 rounded-full bg-faint" />
+                  <span className="text-red">1 failing check · exit 1</span>
                 </div>
               </div>
             </div>
           </div>
-          <p className="lead" style={{ maxWidth: '70ch' }}>
-            A <code>use cache</code> directive was removed three call frames below the page. Conventional
-            size checks passed because the JavaScript was identical. crust joined source analysis to
-            the emitted shell and named both the call site and the component that left it.
+          <p className="mt-5 max-w-[70ch] text-small leading-[1.65] text-muted text-pretty">
+            A <code className="font-mono">use cache</code> directive was removed three call frames
+            below the page. Conventional size checks passed because the JavaScript was identical.
+            crust joined source analysis to the emitted shell and named both the call site and the
+            component that left it.
           </p>
         </div>
       </section>
 
-      <section className="rule">
-        <div className="sec-head pad">
-          <h2>How it works</h2>
-          <p>Source explains why. Production artifacts prove what. History reveals what changed.</p>
+      <section className="border-t border-border">
+        <div className={secHead}>
+          <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">How it works</h2>
+          <p className="m-0 text-small text-muted text-pretty">
+            Source explains why. Production artifacts prove what. History reveals what changed.
+          </p>
         </div>
-        <div className="grid">
+        <div className={grid}>
           {WORKFLOW.map((step) => (
-            <div key={step.title}>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
+            <div key={step.title} className={gridCell}>
+              <h3 className="mb-1.5 text-small font-[550] tracking-[-0.006em]">{step.title}</h3>
+              <p className="m-0 text-meta leading-[1.65] text-muted text-pretty">{step.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rule">
-        <div className="sec-head pad">
-          <h2>One route-level model</h2>
-          <p>Rendering, caching, shell composition and bundles are evidence for the same verdict.</p>
+      <section className="border-t border-border">
+        <div className={secHead}>
+          <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">
+            One route-level model
+          </h2>
+          <p className="m-0 text-small text-muted text-pretty">
+            Rendering, caching, shell composition and bundles are evidence for the same verdict.
+          </p>
         </div>
-        <div className="grid">
+        <div className={grid}>
           {FEATURES.map((feature) => (
-            <div key={feature.title}>
-              <h3>{feature.title}</h3>
-              <p>{feature.body}</p>
+            <div key={feature.title} className={gridCell}>
+              <h3 className="mb-1.5 text-small font-[550] tracking-[-0.006em]">{feature.title}</h3>
+              <p className="m-0 text-meta leading-[1.65] text-muted text-pretty">{feature.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rule">
-        <div className="sec-head pad">
-          <h2>How crust decides</h2>
-          <p>A check that fails on guesses gets switched off.</p>
+      <section className="border-t border-border">
+        <div className={secHead}>
+          <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">
+            How crust decides
+          </h2>
+          <p className="m-0 text-small text-muted text-pretty">
+            A check that fails on guesses gets switched off.
+          </p>
         </div>
-        <div className="sec-body pad">
-          <div className="nogo">
+        <div className="px-pad py-[clamp(28px,4vw,44px)]">
+          <div>
             {CERTAINTY.map(([title, body]) => (
-              <div key={title}>
-                <b>{title}</b> {body}
+              <div key={title} className={nogoRow}>
+                <b className="font-[550] text-fg">{title}</b> {body}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="rule">
-        <div className="sec-head pad">
-          <h2>Beyond the build</h2>
-          <p>Useful secondary surfaces. None are required for analyze, diff or CI.</p>
+      <section className="border-t border-border">
+        <div className={secHead}>
+          <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">Beyond the build</h2>
+          <p className="m-0 text-small text-muted text-pretty">
+            Useful secondary surfaces. None are required for analyze, diff or CI.
+          </p>
         </div>
-        <div className="grid">
+        <div className={grid}>
           {SECONDARY.map((feature) => (
-            <div key={feature.title}>
-              <h3>{feature.title}</h3>
-              <p>{feature.body}</p>
+            <div key={feature.title} className={gridCell}>
+              <h3 className="mb-1.5 text-small font-[550] tracking-[-0.006em]">{feature.title}</h3>
+              <p className="m-0 text-meta leading-[1.65] text-muted text-pretty">{feature.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rule">
-        <div className="sec-head pad">
-          <h2>What it is not</h2>
-          <p>The boundary keeps the core small enough to trust.</p>
+      <section className="border-t border-border">
+        <div className={secHead}>
+          <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">What it is not</h2>
+          <p className="m-0 text-small text-muted text-pretty">
+            The boundary keeps the core small enough to trust.
+          </p>
         </div>
-        <div className="sec-body pad">
-          <div className="nogo">
+        <div className="px-pad py-[clamp(28px,4vw,44px)]">
+          <div>
             {NON_GOALS.map(([title, body]) => (
-              <div key={title}>
-                <b>{title}</b> {body}
+              <div key={title} className={nogoRow}>
+                <b className="font-[550] text-fg">{title}</b> {body}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="rule cta pad">
-        <h2>Start with one production build</h2>
-        <p>
+      <section className="border-t border-border px-pad py-[clamp(48px,7vw,88px)] text-center">
+        <h2 className="mb-3 text-h2 font-medium tracking-[-0.02em] text-balance">
+          Start with one production build
+        </h2>
+        <p className="mx-auto max-w-[44ch] text-small text-muted text-pretty">
           Explain every route now. Add a baseline, and the next pull request has something honest to
           compare against.
         </p>
-        <div className="actions">
-          <a className="btn btn-primary" href={`${DOCS}/docs/quickstart`}>
+        <div className="mt-[30px] flex flex-wrap justify-center gap-2.5 max-[520px]:flex-col">
+          <a className={btnPrimary} href={`${DOCS}/docs/quickstart`}>
             Get started
           </a>
-          <a className="btn btn-cmd" href={`${DOCS}/docs/reference/cli`}>
-            <span className="chev">›</span> npx @moumensoliman/crust report --open
+          <a className={btnCmd} href={`${DOCS}/docs/reference/cli`}>
+            <span className="text-faint">›</span> npx @moumensoliman/crust report --open
           </a>
         </div>
       </section>
 
-      <footer>
-        <div className="foot pad">
+      <footer className="border-t border-border py-[22px]">
+        <div className="flex flex-wrap items-center gap-4 px-pad text-meta text-muted">
           <Mark size={14} />
-          <a href={DOCS}>Docs</a>
-          <span className="sep">/</span>
-          <a href={GITHUB}>GitHub</a>
-          <span className="sep">/</span>
-          <a href={`${GITHUB}/blob/main/LICENSE`}>MIT</a>
-          <span className="right">Next.js 15 &amp; 16 · webpack + Turbopack · Node 20+</span>
+          <a className="no-underline hover:text-fg" href={DOCS}>
+            Docs
+          </a>
+          <span className="text-border">/</span>
+          <a className="no-underline hover:text-fg" href={GITHUB}>
+            GitHub
+          </a>
+          <span className="text-border">/</span>
+          <a className="no-underline hover:text-fg" href={`${GITHUB}/blob/main/LICENSE`}>
+            MIT
+          </a>
+          <span className="ms-auto max-[520px]:ms-0 max-[520px]:w-full">
+            Next.js 15 &amp; 16 · webpack + Turbopack · Node 20+
+          </span>
         </div>
       </footer>
     </div>

@@ -18,7 +18,7 @@ import { fetchHistory, pushHistory } from './store/history-branch.ts'
 import { runSynthetic } from './synthetic/run.ts'
 import type { Snapshot } from './store/snapshot.ts'
 
-const VERSION = '0.1.0'
+const VERSION = '0.1.1'
 const cli = cac('crust')
 
 interface CommonOptions {
