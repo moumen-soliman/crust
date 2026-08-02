@@ -59,7 +59,7 @@ export function renderLiveSection(state: CollectorState): string {
 export function renderLiveStyles(): string {
   return `
 .crust .live { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 4px; }
-.crust .live .stats { margin-top: 8px; border-top: 0; }
+.crust .live .stats { margin-top: 8px; }
 .crust .stat.warn b { color: var(--red); }
 .crust .fill-bar { display: inline-block; width: 140px; height: 4px; border-radius: 2px;
   background: var(--border); overflow: hidden; vertical-align: middle; }

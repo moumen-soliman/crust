@@ -62,6 +62,22 @@ crust does not compute enforceable deltas when any of these changed:
 The PR comment names the incompatibility and omits route-level causes. Comparing across those
 boundaries would attribute framework or measurement changes to the application PR.
 
+### Build configuration changed
+
+crust records configuration that materially changes emitted output. `crust analyze` reports these
+changes separately when it finds a compatible local baseline:
+
+- Cache Components
+- bundler, Next.js version, and Node major
+- browser source-map emission
+- relevant experimental flags
+- per-route `dynamic`, `revalidate`, `runtime`, and `fetchCache`
+
+A bundler, Next major, snapshot schema, or Cache Components change makes route deltas unsafe and
+stops regression enforcement. Other changes remain comparable and are retained as configuration
+evidence; explicit presentation of every non-blocking change in `diff` and CI is still being
+completed.
+
 ### Byte noise
 
 Chunk filenames are content-hashed, so tiny byte changes can appear even when behavior did not.

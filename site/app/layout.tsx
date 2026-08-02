@@ -4,7 +4,7 @@ import './globals.css'
 
 const title = 'crust - catch Next.js regressions before they merge'
 const description =
-  'Production-build regression analysis for Next.js App Router. Explain route modes, static-shell composition, bundle attribution, and the source line behind a regression.'
+  'Production-build regression analysis for Next.js App Router. Explain route modes, static-shell composition, bundle attribution, and complete source cause chains.'
 
 export const metadata: Metadata = {
   title,
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'crust - know what became slower before it merges',
     description:
-      'Compare production builds, catch silent static-shell regressions, and trace the cause to a component, import, and source line.',
+      'Compare production builds, trace regressions to a component, import, and source line, and see every route sharing the cause.',
     type: 'website',
     url: '/',
     siteName: 'crust',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title,
     description:
-      'Route modes, shell composition, bundle attribution, and regression blame for Next.js App Router.',
+      'Route modes, shell composition, bundle attribution, complete cause chains, and regression blame for Next.js App Router.',
   },
   icons: { icon: '/icon.svg' },
 }

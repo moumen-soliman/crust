@@ -1,0 +1,19 @@
+{
+  "name": "crust-fixture-legacy",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build:webpack": "next build",
+    "build:turbopack": "next build --turbopack"
+  },
+  "dependencies": {
+    "next": "15.5.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "typescript": "^5.8.0"
+  }
+}

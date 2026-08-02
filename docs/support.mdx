@@ -15,6 +15,20 @@ description: "What is supported, what will never be built, and what to expect fr
 Two Next majors, both bundlers. Outside that range crust **refuses to run** rather than emit output
 derived from artifacts whose shape has not been verified.
 
+The production-build compatibility suite pins route classification, shell discovery, source
+attribution, and cause relationships across:
+
+- Next.js 15 with webpack and its legacy rendering rules
+- Next.js 16 with webpack, Cache Components on and off
+- Next.js 16 with Turbopack
+- static, dynamic, ISR, partially static, catch-all, optional catch-all, and route-handler output
+- monorepos, aliases, workspace packages, and barrel exports
+- source attribution across webpack and Turbopack
+
+Separate parser tests cover both flat and indexed source maps.
+
+Unsupported artifact shapes fail explicitly instead of falling through to a plausible number.
+
 <Note>
 Manifest shapes and artifact locations are undocumented and move on minor releases. A nightly CI job
 runs the fixtures against `next@canary`, so breakage surfaces before an issue does.
@@ -30,9 +44,9 @@ month three is only easy if you said it in month zero.
     No error tracking, no distributed tracing, no alerting. The optional
     [span aggregator](/docs/guides/staging#server-spans) groups render time by route and stops there.
   </Accordion>
-  <Accordion title="Not a Lighthouse or PageSpeed replacement">
-    crust measures what your build produced and what your users' browsers reported. It does not
-    produce a score.
+  <Accordion title="No composite performance score">
+    Build and runtime observations remain separate and retain their source evidence. crust does not
+    collapse unrelated measurements into one score.
   </Accordion>
   <Accordion title="Not multi-framework">
     Next.js App Router only. A Pages Router app gets a clear refusal; a hybrid app gets its `app/`
@@ -55,7 +69,9 @@ month three is only easy if you said it in month zero.
 
 - **Per-file attribution needs `productionBrowserSourceMaps`.** Without it, route totals and shell
   analysis still work; attribution reports itself unavailable.
-- **Taint propagation is module-level**, not function-level. It errs toward reporting dynamism.
+- **Function tracing has a conservative fallback.** Direct imports are narrowed per export;
+  namespace imports, computed calls, and opaque edges fall back to module-level taint and are
+  reported in coverage.
 - **The stamping transform is not built.** Component-level runtime attribution would need it;
   source maps cover file-level attribution instead, and measure better on Turbopack than webpack.
 - **Server components rendered from props or `children`** are reported as

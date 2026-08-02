@@ -28,29 +28,29 @@ pnpm dlx @moumensoliman/crust analyze
 </CodeGroup>
 
 ```text
-crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
+crust — 3 routes                         Next 16.2.12 · webpack
 
-Fix first
+BUILD HEALTH
+1 static · 2 dynamic · 0 handlers
+Median first load: 543.2 kB
+No compatible local baseline — this build is the starting point
+Analysis confidence: 96% (3/3 routes classified)
+CI → regression checks need a baseline
 
-  1. /dashboard only 39% of this route is in the static shell
-     ↳ cookies() at app/dashboard/page.tsx:18 - in <Theme>
-     → <Theme> is postponed by that call. Isolate it inside Suspense, or accept the
-       hole when the data must be per-request.
+FIX FIRST
+1. /dashboard only 39% of this route is in the static shell
+   cookies() at app/dashboard/page.tsx:18 - in <Theme>
 
-  2. /products/[slug] only 45% of this route is in the static shell
-     ↳ uncached fetch at lib/http.ts:3 - in <ProductGallery>
-     → Add `use cache` above that read to pull <ProductGallery> back into the shell.
+LARGEST CLIENT CONTRIBUTOR
+components/ProductGallery.tsx — 84.1 kB
 
-Route              First load   Shell  Mode
-/                    543.2 kB    100%  static
-/dashboard           527.4 kB     39%  partial
-                    ↳ cookies() at app/dashboard/page.tsx:18
-                    ✂ <Theme> - cookies() at app/dashboard/page.tsx:18
-/products/[slug]     543.2 kB     45%  partial
+Routes → crust analyze --routes
+Report → crust analyze --report
 ```
 
-The findings come first because a new project has no baseline yet. The complete route table follows
-so you can inspect every route, including ones that need no action.
+The default view answers what changed, why, how strong the evidence is, and whether CI should fail.
+Add `--routes` for the full route inventory, `--verbose` for coverage counts and analysis gaps, or
+`--report` for the HTML report.
 
 The snapshot is written to `.perf/` using one file per build. Two branches can record builds without
 editing a shared history file.
@@ -69,8 +69,8 @@ editing a shared history file.
 npx @moumensoliman/crust report --open
 ```
 
-A single self-contained HTML file: summary figures, the route table, and per-route detail with the
-modules, dependencies, client boundaries and holes. No server, no integration, nothing external.
+A single self-contained HTML file with no server or external requests. It adds route, component,
+and source search; filters and grouping; complete cause chains; and shared-cause blast radius.
 
 ## 3. Compare against a baseline
 

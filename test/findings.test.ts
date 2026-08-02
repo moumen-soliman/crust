@@ -1,47 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { findingsFor } from '../src/findings/findings.ts'
+import { route, snapshot as base } from './factories.ts'
 import type { RouteSnapshot, Snapshot } from '../src/store/snapshot.ts'
 
-function route(overrides: Partial<RouteSnapshot> = {}): RouteSnapshot {
-  return {
-    id: 'app/page.tsx',
-    pattern: '/',
-    filePath: 'app/page.tsx',
-    renderingMode: 'STATIC',
-    renderingModeReason: null,
-    firstLoadBytes: 100_000,
-    routeBytes: 10_000,
-    sharedBytes: 90_000,
-    unattributedBytes: 0,
-    modules: {},
-    dependencies: {},
-    dynamicReasons: [],
-    clientBoundaryRoots: [],
-    shell: null,
-    warnings: [],
-    ...overrides,
-  }
-}
 
 function snapshot(routes: RouteSnapshot[], warnings: string[] = []): Snapshot {
-  return {
-    schemaVersion: 1,
-    toolVersion: '0.1.1',
-    buildId: 'aaaaaaaaaaaaaaaa',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    gitSha: null,
-    committedAt: null,
-    parentSha: null,
-    branch: 'main',
-    dirty: false,
-    nextVersion: '16.2.12',
-    nodeMajor: 22,
-    bundler: 'webpack',
-    sourceSignature: 'sig',
-    routes,
-    modules: {},
-    warnings,
-  }
+  return base({ routes, warnings })
 }
 
 describe('first-run findings', () => {

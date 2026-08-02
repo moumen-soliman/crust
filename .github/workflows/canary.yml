@@ -20,9 +20,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
+      - run: pnpm build
       - run: pnpm --filter crust-fixture-basic add next@canary
       - run: pnpm --filter crust-fixture-basic exec next build --webpack
       - run: CRUST_FIXTURE_MODE=cc pnpm --filter crust-fixture-basic exec next build --webpack
       - run: CRUST_FIXTURE_MODE=turbo pnpm --filter crust-fixture-basic exec next build --turbopack
-      - run: node src/cli.ts analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
-      - run: node src/cli.ts analyze --cwd fixtures/basic --dist-dir .next-turbo --no-save
+      - run: node dist/cli.js analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
+      - run: node dist/cli.js analyze --cwd fixtures/basic --dist-dir .next-turbo --no-save

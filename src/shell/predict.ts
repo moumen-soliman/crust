@@ -17,6 +17,11 @@ interface Located {
   file: string
 }
 
+interface Resolution {
+  located: Located | null
+  ambiguous: boolean
+}
+
 /**
  * Layer 1 of the shell engine: predict the static shell from source alone.
  *
@@ -47,15 +52,39 @@ export function predictShell(
     return { predictedStatic: [], predictedHoles: [], unknown: [], wholeRouteDynamic: 'route entry not analysable' }
   }
 
-  // Component name -> where it is defined. First definition wins; a collision is
-  // recorded rather than silently resolved to the wrong file.
-  const index = new Map<string, Located>()
-  const ambiguous = new Set<string>()
+  const byName = new Map<string, Located[]>()
   for (const node of graph.nodes.values()) {
     for (const facts of node.facts.components) {
-      if (index.has(facts.name)) ambiguous.add(facts.name)
-      else index.set(facts.name, { facts, file: node.file })
+      const found = byName.get(facts.name) ?? []
+      found.push({ facts, file: node.file })
+      byName.set(facts.name, found)
     }
+  }
+
+  const locate = (name: string, fromFile: string, seen = new Set<string>()): Resolution => {
+    const key = `${fromFile}:${name}`
+    if (seen.has(key)) return { located: null, ambiguous: false }
+    seen.add(key)
+
+    const local = graph.nodes.get(fromFile)?.facts.components.find((component) => component.name === name)
+    if (local) return { located: { facts: local, file: fromFile }, ambiguous: false }
+
+    const binding = graph.nodes.get(fromFile)?.componentImports[name]
+    if (binding) {
+      const target = graph.nodes.get(binding.file)
+      const targetName = binding.imported === 'default' ? target?.facts.defaultExportName : binding.imported
+      if (targetName) return locate(targetName, binding.file, seen)
+    }
+
+    const candidates = byName.get(name) ?? []
+    return candidates.length === 1
+      ? { located: candidates[0]!, ambiguous: false }
+      : { located: null, ambiguous: candidates.length > 1 }
+  }
+
+  const isOpaqueImport = (file: string, name: string): boolean => {
+    const node = graph.nodes.get(file)
+    return Boolean(node?.facts.imports.some((imp) => imp.bindings.some((binding) => binding.local === name)))
   }
 
   const predictedStatic = new Set<string>()
@@ -64,7 +93,7 @@ export function predictShell(
   let wholeRouteDynamic: string | null = null
 
   const root = entry.facts.defaultExportName
-  if (!root || !index.has(root)) {
+  if (!root || !locate(root, entryFile).located) {
     return {
       predictedStatic: [],
       predictedHoles: [],
@@ -76,18 +105,17 @@ export function predictShell(
   const visited = new Set<string>()
 
   /** Walk the shell side of the tree. Returns nothing; results accumulate above. */
-  const walkStatic = (name: string): void => {
-    if (visited.has(name)) return
-    visited.add(name)
+  const walkStatic = (name: string, fromFile = entryFile): void => {
+    const resolution = locate(name, fromFile)
+    const located = resolution.located
+    const visitKey = located ? `${located.file}:${located.facts.name}` : `${fromFile}:${name}`
+    if (visited.has(visitKey)) return
+    visited.add(visitKey)
 
-    const located = index.get(name)
     if (!located) {
       // Not a component we can see. It may be a host element (already filtered),
       // a dependency's component, or one arriving through props.
-      return
-    }
-    if (ambiguous.has(name)) {
-      unknown.add(`${name} is defined in more than one file; cannot tell which one renders here`)
+      if (resolution.ambiguous) unknown.add(`${name} is defined in more than one file; cannot tell which one renders here`)
       return
     }
 
@@ -118,13 +146,13 @@ export function predictShell(
 
     for (const child of located.facts.renders) {
       if (isIntrinsic(child)) continue
-      walkStatic(child)
+      walkStatic(child, located.file)
     }
 
     for (const boundary of located.facts.suspense) {
       for (const child of boundary.children) {
         if (isIntrinsic(child)) continue
-        markPostponed(child, `${located.file}:${boundary.line}`)
+        markPostponed(child, `${located.file}:${boundary.line}`, located.file)
       }
     }
   }
@@ -141,20 +169,22 @@ export function predictShell(
    * dynamic. Treating every boundary as a hole would report a shell regression on
    * every route that uses Suspense correctly.
    */
-  const markPostponed = (name: string, boundary: string): void => {
-    if (visited.has(name)) return
-    visited.add(name)
-
-    const located = index.get(name)
+  const markPostponed = (name: string, boundary: string, fromFile: string): void => {
+    const resolution = locate(name, fromFile)
+    const located = resolution.located
+    const visitKey = located ? `${located.file}:${located.facts.name}` : `${fromFile}:${name}`
+    if (visited.has(visitKey)) return
+    visited.add(visitKey)
     const reason = located ? (ownTaint(located) ?? firstReason(taint.get(located.file))) : null
 
     if (!reason) {
       if (located) predictedStatic.add(name)
-      else unknown.add(`${name} inside the boundary at ${boundary} is not resolvable to a source file`)
+      else if (resolution.ambiguous) unknown.add(`${name} inside the boundary at ${boundary} resolves to multiple source files`)
+      else if (!isOpaqueImport(fromFile, name)) unknown.add(`${name} inside the boundary at ${boundary} is not resolvable to a source file`)
       if (!located) return
       for (const child of located.facts.renders) {
         if (isIntrinsic(child)) continue
-        markPostponed(child, boundary)
+        markPostponed(child, boundary, located.file)
       }
       return
     }
@@ -164,12 +194,12 @@ export function predictShell(
     if (!located) return
     for (const child of located.facts.renders) {
       if (isIntrinsic(child)) continue
-      markPostponed(child, boundary)
+      markPostponed(child, boundary, located.file)
     }
     for (const nested of located.facts.suspense) {
       for (const child of nested.children) {
         if (isIntrinsic(child)) continue
-        markPostponed(child, `${located.file}:${nested.line}`)
+        markPostponed(child, `${located.file}:${nested.line}`, located.file)
       }
     }
   }

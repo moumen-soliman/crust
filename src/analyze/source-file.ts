@@ -30,13 +30,49 @@ export interface SourceFacts {
    */
   exports: string[]
   components: ComponentFacts[]
+  /** Named functions and what each reaches, for per-export taint narrowing. */
+  functions: FunctionFacts[]
+  /**
+   * Exported name -> the local binding that implements it. `export { a as b }`
+   * records `b -> a`; a default export records `default -> Page`. Without this
+   * an importer knows which name it asked for but not which declaration answers.
+   */
+  exportBindings: Record<string, string>
+  /**
+   * Identifiers referenced outside any function. This code runs the moment the
+   * module is imported, so whatever it reaches is reachable from every importer
+   * regardless of which export they asked for.
+   */
+  moduleScopeReferences: string[]
   /** Parse failures and constructs we refuse to interpret. */
   unresolved: string[]
+}
+
+export interface FunctionFacts {
+  name: string
+  line: number
+  /**
+   * Every binding mentioned in value position, not only the ones invoked.
+   * `withAuth(readSession)` reaches `readSession` with no call expression
+   * anywhere near it, and narrowing taint along call edges alone would drop the
+   * reason for the exact indirection people use to share request-bound work.
+   */
+  references: string[]
+  /**
+   * A reference that could not be followed - a computed member, an index call.
+   * The narrowing pass treats an opaque function as reaching everything its
+   * module can, which is what module-level taint already assumed.
+   */
+  opaque: boolean
+  /** Carries a `'use cache'` directive. */
+  isCached: boolean
 }
 
 export interface ImportRef {
   specifier: string
   names: string[]
+  /** Local JSX binding -> name exported by the imported module. */
+  bindings: { local: string; imported: string }[]
   line: number
 }
 
@@ -88,6 +124,9 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
     useCacheSites: [],
     exports: [],
     components: [],
+    functions: [],
+    exportBindings: {},
+    moduleScopeReferences: [],
     unresolved: [],
   }
 
@@ -127,13 +166,17 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         facts.imports.push({
           specifier: String(node.source?.value ?? ''),
           names: (node.specifiers ?? []).map(importedName),
+          bindings: (node.specifiers ?? []).map(importBinding),
           line: at(node.start).line,
         })
         break
 
       case 'ExportNamedDeclaration':
         collectRouteConfig(node, facts)
-        if (node.exportKind !== 'type') facts.exports.push(...exportedNames(node))
+        if (node.exportKind !== 'type') {
+          facts.exports.push(...exportedNames(node))
+          Object.assign(facts.exportBindings, exportBindingsOf(node))
+        }
         // `export { Hero } from './Hero'` is an edge in the module graph just as
         // much as an import is. Missing it means barrel files - the exact
         // structure that causes the over-inclusion this tool exists to find -
@@ -142,6 +185,10 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
           facts.imports.push({
             specifier: String(node.source.value),
             names: (node.specifiers ?? []).map((s: OxcNode) => String(s.local?.name ?? s.exported?.name ?? '')),
+            bindings: (node.specifiers ?? []).map((s: OxcNode) => ({
+              local: String(s.exported?.name ?? s.local?.name ?? ''),
+              imported: String(s.local?.name ?? s.exported?.name ?? ''),
+            })),
             line: at(node.start).line,
           })
         }
@@ -152,14 +199,17 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         // file cannot say what that is.
         facts.exports.push('*')
         if (node.source?.value) {
-          facts.imports.push({ specifier: String(node.source.value), names: ['*'], line: at(node.start).line })
+          facts.imports.push({ specifier: String(node.source.value), names: ['*'], bindings: [], line: at(node.start).line })
         }
         break
 
       case 'ExportDefaultDeclaration': {
         const decl = node.declaration
         const name = decl?.id?.name ?? decl?.name
-        if (typeof name === 'string') facts.defaultExportName = name
+        if (typeof name === 'string') {
+          facts.defaultExportName = name
+          facts.exportBindings['default'] = name
+        }
         facts.exports.push(typeof name === 'string' ? name : 'default')
         break
       }
@@ -198,9 +248,17 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         const p = at(node.start)
         facts.dynamicApis.push({ name: 'searchParams', line: p.line, column: p.column, inFunction: name ?? fnName })
       }
-      if (hasDirective(node.body ?? null, 'use cache')) {
+      const isCached = hasDirective(node.body ?? null, 'use cache')
+      if (isCached) {
         const p = at(node.start)
         facts.useCacheSites.push({ name: name ?? '<anonymous>', line: p.line, column: p.column, inFunction: fnName })
+      }
+
+      // Every named function, not only components: the narrowing pass follows
+      // service helpers far more often than it follows anything that renders.
+      if (name) {
+        const { names, opaque } = collectReferences(node)
+        facts.functions.push({ name, line: at(node.start).line, references: names, opaque, isCached })
       }
       // A component is a capitalised function that returns JSX.
       if (name && /^[A-Z]/.test(name)) {
@@ -219,12 +277,107 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
     }
   })
 
+  facts.moduleScopeReferences = collectModuleScopeReferences(program)
+
   if (facts.components.some((c) => c.hasOpaqueChildren)) {
     facts.unresolved.push('renders components passed as children or props; shell prediction is partial here')
   }
 
   return facts
 }
+
+/* ── references ────────────────────────────────────────────────────────── */
+
+/**
+ * Bindings mentioned in value position inside a subtree.
+ *
+ * Deliberately references rather than calls. The roadmap's motivating case is a
+ * module exporting `cachedProduct` and `liveProduct` where the route calls only
+ * the first, and a call-edge graph answers that - but it answers
+ * `withAuth(liveProduct)` wrongly, and narrowing that returns a wrong "static"
+ * is worse than not narrowing at all. Over-collecting only forfeits precision.
+ *
+ * Declaration names, parameters, non-computed property keys and member
+ * properties are bindings being *introduced* or field names, not references to
+ * anything this module imported, so they are skipped. A computed member or index
+ * call cannot be followed and marks the whole function opaque instead.
+ */
+function referencesIn(root: unknown, stopAtFunctions: boolean): { names: string[]; opaque: boolean } {
+  const names = new Set<string>()
+  let opaque = false
+
+  const descend = (node: unknown, parentKey: string | null): void => {
+    if (node === null || typeof node !== 'object') return
+    if (Array.isArray(node)) {
+      for (const child of node) descend(child, parentKey)
+      return
+    }
+    const current = node as OxcNode
+    if (typeof current.type !== 'string') return
+
+    // An import statement introduces bindings; it does not reference them.
+    if (current.type === 'ImportDeclaration') return
+
+    // Nor does an export statement run anything. `export { a, b } from './x'`
+    // names two bindings and executes neither, so reading its specifiers as
+    // references makes a barrel re-export every reason it forwards - which is
+    // the precise over-blame this narrowing exists to remove. The declaration
+    // form is different: `export const x = load()` really does call `load`.
+    if (current.type === 'ExportAllDeclaration') return
+    if (current.type === 'ExportNamedDeclaration') return descend(current.declaration, 'declaration')
+
+    // A function body runs when the function is called, not when the module is
+    // imported, so module-scope collection stops at the boundary.
+    if (stopAtFunctions && isFunctionLike(current)) return
+
+    if (current.type === 'MemberExpression') {
+      // `ns.getProduct()` reaches through `ns`, so the object still counts;
+      // `registry[name]()` names nothing this pass can resolve.
+      if (current.computed) opaque = true
+      descend(current.object, 'object')
+      return
+    }
+
+    if (current.type === 'Property' && !current.computed) {
+      descend(current.value, 'value')
+      return
+    }
+
+    if (current.type === 'Identifier') {
+      if (parentKey !== 'id' && parentKey !== 'key' && parentKey !== 'property') {
+        names.add(String(current.name))
+      }
+      return
+    }
+
+    // `<Sparkline />` reaches Sparkline as surely as calling it would.
+    if (current.type === 'JSXIdentifier') {
+      const name = String(current.name ?? '')
+      if (/^[A-Z]/.test(name)) names.add(name)
+      return
+    }
+
+    for (const key of Object.keys(current)) {
+      if (SKIP_KEYS.has(key)) continue
+      if (key === 'id' || key === 'params') continue
+      descend(current[key], key)
+    }
+  }
+
+  descend(root, null)
+  return { names: [...names], opaque }
+}
+
+const collectReferences = (fn: OxcNode) => referencesIn(fn.body, false)
+
+/**
+ * References in code that is not inside any function.
+ *
+ * Import-time work belongs to every importer no matter which export they asked
+ * for, so this is the one place per-export narrowing must not apply.
+ */
+const collectModuleScopeReferences = (program: OxcNode): string[] =>
+  referencesIn(program.body, true).names
 
 /* ── JSX ───────────────────────────────────────────────────────────────── */
 
@@ -344,6 +497,37 @@ function exportedNames(node: OxcNode): string[] {
   }
 
   return names
+}
+
+/**
+ * Exported name -> the local binding behind it.
+ *
+ * A re-export (`export { a as b } from './x'`) has no local `a` in this file at
+ * all. The module graph already records that edge keyed by the *exported* name,
+ * so mapping `b -> b` sends the resolver to the entry that exists rather than to
+ * a binding that does not.
+ */
+function exportBindingsOf(node: OxcNode): Record<string, string> {
+  const bindings: Record<string, string> = {}
+  const isReExport = Boolean(node.source?.value)
+
+  const decl = node.declaration
+  if (decl) {
+    if (typeof decl.id?.name === 'string') bindings[decl.id.name] = decl.id.name
+    for (const d of decl.declarations ?? []) {
+      if (typeof d.id?.name === 'string') bindings[d.id.name] = d.id.name
+    }
+  }
+
+  for (const spec of node.specifiers ?? []) {
+    if (spec.exportKind === 'type') continue
+    const exported = spec.exported?.name ?? spec.local?.name
+    const local = spec.local?.name ?? spec.exported?.name
+    if (typeof exported !== 'string') continue
+    bindings[exported] = isReExport ? exported : (typeof local === 'string' ? local : exported)
+  }
+
+  return bindings
 }
 
 /* ── declarations ──────────────────────────────────────────────────────── */
@@ -496,6 +680,13 @@ function importedName(spec: OxcNode): string {
   if (spec.type === 'ImportDefaultSpecifier') return 'default'
   if (spec.type === 'ImportNamespaceSpecifier') return '*'
   return String(spec.imported?.name ?? spec.local?.name ?? '')
+}
+
+function importBinding(spec: OxcNode): { local: string; imported: string } {
+  const local = String(spec.local?.name ?? spec.imported?.name ?? '')
+  if (spec.type === 'ImportDefaultSpecifier') return { local, imported: 'default' }
+  if (spec.type === 'ImportNamespaceSpecifier') return { local, imported: '*' }
+  return { local, imported: String(spec.imported?.name ?? spec.local?.name ?? '') }
 }
 
 function buildLineIndex(code: string): number[] {

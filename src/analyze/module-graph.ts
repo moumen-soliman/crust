@@ -10,6 +10,14 @@ export interface ModuleNode {
   facts: SourceFacts
   /** Workspace-relative paths of first-party imports. */
   imports: string[]
+  /** Local component binding -> resolved first-party module and export. */
+  componentImports: Record<string, { file: string; imported: string }>
+  /**
+   * `import * as services` -> the module behind `services`. Kept apart from
+   * `componentImports` because which export a namespace member reads is not
+   * knowable from the import, so these can only ever be followed wholesale.
+   */
+  namespaceImports: Record<string, string>
   /** Specifiers that could not be resolved, reported rather than ignored. */
   unresolvedImports: string[]
   /**
@@ -127,7 +135,17 @@ export async function buildModuleGraph(
 
     const facts = await readSourceFacts(abs, rel)
     const imports: string[] = []
+    const componentImports: Record<string, { file: string; imported: string }> = {}
+    const namespaceImports: Record<string, string> = {}
     const unresolvedImports: string[] = []
+
+    const recordBindings = (imp: (typeof facts.imports)[number], target: string): void => {
+      for (const binding of imp.bindings) {
+        if (!binding.local) continue
+        if (binding.imported === '*') namespaceImports[binding.local] = target
+        else componentImports[binding.local] = { file: target, imported: binding.imported }
+      }
+    }
 
     for (const imp of facts.imports) {
       if (imp.specifier.startsWith('node:')) continue
@@ -135,6 +153,7 @@ export async function buildModuleGraph(
       const overridden = overrides[imp.specifier]
       if (overridden && index.files.has(overridden)) {
         imports.push(overridden)
+        recordBindings(imp, overridden)
         queue.push({ abs: join(index.root, overridden), clientAncestor: clientAncestor || facts.isClientComponent })
         continue
       }
@@ -152,6 +171,7 @@ export async function buildModuleGraph(
       const resolvedRel = toPosix(relative(index.root, resolved))
       if (!index.files.has(resolvedRel)) continue
       imports.push(resolvedRel)
+      recordBindings(imp, resolvedRel)
       queue.push({ abs: resolved, clientAncestor: clientAncestor || facts.isClientComponent })
     }
 
@@ -159,6 +179,8 @@ export async function buildModuleGraph(
       file: rel,
       facts,
       imports,
+      componentImports,
+      namespaceImports,
       unresolvedImports,
       isClientBoundaryRoot: facts.isClientComponent && !clientAncestor,
     })
@@ -196,24 +218,44 @@ function resolveSpecifier(
  * never claims something is static when it isn't, which is the direction that
  * matters. Function-level narrowing is a later refinement, not a correctness fix.
  */
+export interface TaintSite {
+  reason: string
+  /** Enclosing function, or null when the site runs at module scope. */
+  inFunction: string | null
+}
+
+/**
+ * The dynamic reads a module performs in its own code.
+ *
+ * Shared by the module-level propagation below and the per-export narrowing in
+ * `reachableTaint`. The two must format reasons identically or the narrowing
+ * filter silently matches nothing and quietly discards every reason it sees.
+ */
+export function directTaintSites(node: ModuleNode): TaintSite[] {
+  const sites: TaintSite[] = []
+
+  for (const api of node.facts.dynamicApis) {
+    sites.push({ reason: `${api.name}() at ${node.file}:${api.line}`, inFunction: api.inFunction })
+  }
+  // A `'use cache'` function is cached however its fetches are written - the
+  // directive is the caching, so flagging the fetch inside it would report a
+  // regression on the exact pattern the framework is asking people to adopt.
+  const cachedFunctions = new Set(node.facts.useCacheSites.map((s) => s.name))
+  for (const f of node.facts.fetches) {
+    if (f.inFunction && cachedFunctions.has(f.inFunction)) continue
+    if (f.caching === 'default' || f.caching === 'no-store') {
+      sites.push({ reason: `${UNCACHED_FETCH}${node.file}:${f.line}`, inFunction: f.inFunction })
+    }
+  }
+
+  return sites
+}
+
 export function propagateDynamicTaint(graph: ModuleGraph): Map<string, string[]> {
   const direct = new Map<string, string[]>()
 
   for (const node of graph.nodes.values()) {
-    const reasons: string[] = []
-    for (const api of node.facts.dynamicApis) {
-      reasons.push(`${api.name}() at ${node.file}:${api.line}`)
-    }
-    // A `'use cache'` function is cached however its fetches are written - the
-    // directive is the caching, so flagging the fetch inside it would report a
-    // regression on the exact pattern the framework is asking people to adopt.
-    const cachedFunctions = new Set(node.facts.useCacheSites.map((s) => s.name))
-    for (const f of node.facts.fetches) {
-      if (f.inFunction && cachedFunctions.has(f.inFunction)) continue
-      if (f.caching === 'default' || f.caching === 'no-store') {
-        reasons.push(`${UNCACHED_FETCH}${node.file}:${f.line}`)
-      }
-    }
+    const reasons = directTaintSites(node).map((s) => s.reason)
     if (reasons.length > 0) direct.set(node.file, reasons)
   }
 
@@ -318,6 +360,218 @@ function containsCacheTaint(node: ModuleNode | undefined): boolean {
 
   const cached = new Set(node.facts.useCacheSites.map((s) => s.name))
   return exports.every((name) => cached.has(name))
+}
+
+/**
+ * Reason strings carry a ` via <file>` suffix once they have been inherited.
+ * Narrowing compares against the site itself, which does not.
+ */
+export const baseReason = (reason: string): string => reason.split(' via ')[0]!
+
+/** How the walk got from one hop to the next. */
+export type HopVia =
+  /** A route export Next itself calls. */
+  | 'entry'
+  /** Code outside any function, which runs on import. */
+  | 'module-scope'
+  /** Another declaration in the same file. */
+  | 'local'
+  /** A resolved first-party import, named by its binding. */
+  | 'import'
+  /** `import * as ns` - the member read is unknowable. */
+  | 'namespace'
+  /** The precise answer ran out; this module's taint was taken whole. */
+  | 'opaque'
+
+export interface Hop {
+  file: string
+  /** The binding followed into this hop. */
+  binding: string
+  via: HopVia
+}
+
+export interface Reachability {
+  /**
+   * Site reason -> the hops from a route entry to it, entry first. The path is
+   * what turns "this route is dynamic" into a chain someone can act on, so it
+   * is recorded during the walk rather than reconstructed afterwards from a
+   * graph that no longer knows which edge was taken.
+   */
+  reachable: Map<string, Hop[]>
+  /**
+   * Modules whose taint had to be taken wholesale because something on the path
+   * could not be followed. Non-empty means the answer for those modules is the
+   * old module-level one, and any conclusion drawn from it is inferred.
+   */
+  conservative: string[]
+}
+
+/**
+ * Which dynamic reads a route's entry exports can actually reach.
+ *
+ * Module-level taint answers "does this file transitively import something
+ * dynamic", which is the safe question but blames imports a route never calls:
+ * `import { cachedProduct, liveProduct } from './services'` taints the route
+ * through `liveProduct` even when only `cachedProduct` is ever referenced.
+ *
+ * This walks bindings instead of files. Anything it cannot follow - a computed
+ * call, a namespace import, an export that is not a function it can see, a
+ * module missing from the graph - falls back to taking that module's taint
+ * whole and cascading the same treatment to its imports, which is exactly what
+ * module-level taint already did. So this never adds a reason, only withholds
+ * ones it can prove unreachable, and `conservative` names every place it could
+ * not prove anything.
+ */
+export function reachableTaint(graph: ModuleGraph, entryFiles: string[]): Reachability {
+  const reachable = new Map<string, Hop[]>()
+  const conservative = new Set<string>()
+  const visited = new Set<string>()
+  const queue: { file: string; binding: string; path: Hop[] }[] = []
+
+  // First path in wins. The queue is FIFO, so that is the shortest one - the
+  // fewest hops a developer has to read to understand the same conclusion.
+  const record = (reason: string, path: Hop[]): void => {
+    if (!reachable.has(reason)) reachable.set(reason, path)
+  }
+
+  const takeWholeModule = (file: string, path: Hop[]): void => {
+    if (conservative.has(file)) return
+    conservative.add(file)
+
+    const node = graph.nodes.get(file)
+    if (!node) return
+    const here = [...path, { file, binding: '*', via: 'opaque' as const }]
+    for (const site of directTaintSites(node)) record(site.reason, here)
+    // Cascade: if this module's reach is unknown, so is that of everything it
+    // can hand back. That is module-level taint, restored exactly where the
+    // precise answer ran out.
+    for (const dep of node.imports) takeWholeModule(dep, here)
+  }
+
+  /** `binding` is a name as exported; returns the local declaration behind it. */
+  const localBindingFor = (node: ModuleNode, exported: string): string | null => {
+    if (exported === 'default') return node.facts.defaultExportName
+    return node.facts.exportBindings[exported] ?? exported
+  }
+
+  const enqueue = (file: string, binding: string, path: Hop[], via: HopVia): void => {
+    const key = `${file}::${binding}`
+    if (visited.has(key)) return
+    visited.add(key)
+    queue.push({ file, binding, path: [...path, { file, binding, via }] })
+  }
+
+  /** Follow one resolved import edge to the declaration on the other side. */
+  const followImport = (imported: { file: string; imported: string }, path: Hop[]): void => {
+    const target = graph.nodes.get(imported.file)
+    if (!target) return takeWholeModule(imported.file, path)
+    const local = localBindingFor(target, imported.imported)
+    if (!local) return takeWholeModule(imported.file, path)
+    enqueue(imported.file, local, path, 'import')
+  }
+
+  // Import-time work runs for every importer whatever export they asked for, so
+  // module-scope sites are reachable unconditionally and module-scope references
+  // are entry points in their own right.
+  for (const node of graph.nodes.values()) {
+    const scope: Hop[] = [{ file: node.file, binding: '<module scope>', via: 'module-scope' }]
+    for (const site of directTaintSites(node)) {
+      if (site.inFunction === null) record(site.reason, scope)
+    }
+    for (const reference of node.facts.moduleScopeReferences) {
+      resolveReference(node, reference, scope)
+    }
+  }
+
+  // Next calls more than the default export: `generateMetadata` and friends run
+  // for the same request and make the same route dynamic.
+  for (const entry of entryFiles) {
+    const node = graph.nodes.get(entry)
+    if (!node) {
+      conservative.add(entry)
+      continue
+    }
+    for (const exported of node.facts.exports) {
+      if (exported === '*') {
+        takeWholeModule(entry, [])
+        continue
+      }
+      enqueue(entry, localBindingFor(node, exported) ?? exported, [], 'entry')
+    }
+  }
+
+  while (queue.length > 0) {
+    const { file, binding, path } = queue.shift()!
+    if (conservative.has(file)) continue
+
+    const node = graph.nodes.get(file)
+    if (!node) continue
+
+    const fn = node.facts.functions.find((f) => f.name === binding)
+    if (!fn) {
+      // `export { getProduct } from './services'` declares nothing locally, only
+      // an edge onwards - so follow it rather than condemning this module.
+      const imported = node.componentImports[binding]
+      if (imported) {
+        followImport(imported, path)
+        continue
+      }
+      const namespaced = node.namespaceImports[binding]
+      if (namespaced) {
+        takeWholeModule(namespaced, path)
+        continue
+      }
+      // Not a function and not an edge. Only `export *` is genuinely unknown
+      // here: it exports names this file cannot enumerate.
+      //
+      // Everything else is already covered. A value built at module scope -
+      // `export const client = createClient()` - had its initialiser seeded as a
+      // module-scope reference before the walk started, and a plain constant
+      // reaches nothing at all. Treating those as unknown condemned the whole
+      // module, which made `export const revalidate = 60` inherit every dynamic
+      // read anywhere in its import graph.
+      if (node.facts.exports.includes('*')) takeWholeModule(file, path)
+      continue
+    }
+
+    for (const site of directTaintSites(node)) {
+      if (site.inFunction !== binding) continue
+      // Same containment rule the module-level pass applies: a cache cannot
+      // cache `cookies()`, but it does cache the fetches written inside it.
+      if (fn.isCached && site.reason.startsWith(UNCACHED_FETCH)) continue
+      record(site.reason, path)
+    }
+
+    if (fn.opaque) {
+      takeWholeModule(file, path)
+      continue
+    }
+
+    for (const reference of fn.references) resolveReference(node, reference, path)
+  }
+
+  /** One reference out of a module: a sibling declaration, an import, or nothing. */
+  function resolveReference(node: ModuleNode, reference: string, path: Hop[]): void {
+    if (node.facts.functions.some((f) => f.name === reference)) {
+      enqueue(node.file, reference, path, 'local')
+      return
+    }
+
+    const imported = node.componentImports[reference]
+    if (imported) {
+      followImport(imported, path)
+      return
+    }
+
+    // `import * as services` - which member gets read is not knowable from
+    // the import, so the whole module has to count.
+    const namespaceTarget = node.namespaceImports[reference]
+    if (namespaceTarget) {
+      takeWholeModule(namespaceTarget, [...path, { file: node.file, binding: reference, via: 'namespace' }])
+    }
+  }
+
+  return { reachable, conservative: [...conservative].sort() }
 }
 
 /** `app/products/[slug]/page.tsx` -> the layout chain above it, nearest last. */
