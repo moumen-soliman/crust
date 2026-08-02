@@ -26,7 +26,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/moumen-soliman/crust?label=license&logo=github" alt="License" /></a>
   <a href="https://github.com/moumen-soliman/crust/actions/workflows/ci.yml"><img src="https://github.com/moumen-soliman/crust/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/moumen-soliman/crust/issues"><img src="https://img.shields.io/github/issues/moumen-soliman/crust" alt="Issues" /></a>
-  <a href="https://www.npmjs.com/package/@moumen/crust"><img src="https://img.shields.io/npm/v/@moumen/crust.svg" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/@moumensoliman/crust"><img src="https://img.shields.io/npm/v/@moumensoliman/crust.svg" alt="npm" /></a>
   <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha" />
 </p>
 
@@ -79,20 +79,20 @@ artifacts.
 Install crust as a development dependency so local and CI runs use the same version:
 
 ```bash
-npm install --save-dev @moumen/crust
+npm install --save-dev @moumensoliman/crust
 ```
 
 ```bash
-pnpm add --save-dev @moumen/crust
+pnpm add --save-dev @moumensoliman/crust
 ```
 
 Or run it without adding a dependency:
 
 ```bash
-npx @moumen/crust analyze
+npx @moumensoliman/crust analyze
 ```
 
-The npm package is `@moumen/crust`; the installed executable remains `crust`. Do not install the
+The npm package is `@moumensoliman/crust`; the installed executable remains `crust`. Do not install the
 unscoped `crust` package—it is unrelated. Playwright is an optional peer dependency needed only by
 `crust synthetic`.
 
@@ -103,7 +103,7 @@ crust reads the output of a **production build**. Run one first — it refuses t
 
 ```bash
 next build
-npx @moumen/crust analyze
+npx @moumensoliman/crust analyze
 ```
 
 The first thing it prints is the three things worth fixing, each with the call site and what to do
@@ -139,7 +139,7 @@ Then, after a change:
 
 ```bash
 next build
-npx @moumen/crust diff main
+npx @moumensoliman/crust diff main
 ```
 
 ```
@@ -174,13 +174,13 @@ don't want maps in production.
 A self-contained HTML report — no integration, no server, one file you can open or attach to a PR:
 
 ```bash
-npx @moumen/crust report --open
+npx @moumensoliman/crust report --open
 ```
 
 ### CI
 
 ```bash
-npx @moumen/crust ci main --comment comment.md
+npx @moumensoliman/crust ci main --comment comment.md
 ```
 
 Exits non-zero and writes a PR comment. **Regressions are enforced with no configuration at all**,
@@ -239,13 +239,13 @@ Snapshots live in `.perf/` (one file per build — no merge conflicts) and sync 
 `perf-history` branch so a fresh CI checkout has a baseline:
 
 ```bash
-npx @moumen/crust history fetch
-npx @moumen/crust history push
+npx @moumensoliman/crust history fetch
+npx @moumensoliman/crust history push
 ```
 
 The bundled GitHub Action ([action/action.yml](action/action.yml)) does both, posts the comment,
 and updates it in place on every push. Fork PRs get the comment but skip the push — their token is
-read-only on the base repo, by design. `npx @moumen/crust prune` applies the retention ladder: the newest
+read-only on the base repo, by design. `npx @moumensoliman/crust prune` applies the retention ladder: the newest
 50 builds at full fidelity, then one per commit, then module detail dropped after 90 days; route
 totals and shell ratios are kept forever.
 
@@ -279,7 +279,7 @@ Run the report **inside your app** as a floating panel. Write the manifest where
 it, then mount the widget:
 
 ```bash
-npx @moumen/crust manifest --out public/crust-manifest.json
+npx @moumensoliman/crust manifest --out public/crust-manifest.json
 ```
 
 ```tsx
@@ -292,7 +292,7 @@ export function CrustPanel() {
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_CRUST) return
     let dispose: (() => void) | undefined
-    import('@moumen/crust/widget').then((m) => {
+    import('@moumensoliman/crust/widget').then((m) => {
       dispose = m.mountCrustWidget()
     })
     return () => dispose?.()
@@ -322,7 +322,7 @@ The collector observes real visits — Web Vitals via `PerformanceObserver`, lon
 an image audit, and the streaming waterfall (when each Suspense hole actually filled):
 
 ```tsx
-import { startCollector } from '@moumen/crust/collector'
+import { startCollector } from '@moumensoliman/crust/collector'
 
 startCollector() // behind the same NEXT_PUBLIC_CRUST gate as the widget
 ```
@@ -334,7 +334,7 @@ On staging, beacon samples to a write-only, authenticated, rate-limited endpoint
 
 ```ts
 // app/api/__crust/ingest/route.ts
-import { createIngestHandler } from '@moumen/crust/ingest'
+import { createIngestHandler } from '@moumensoliman/crust/ingest'
 
 export const POST = createIngestHandler({ secret: process.env.CRUST_INGEST_SECRET! })
 ```
@@ -342,7 +342,7 @@ export const POST = createIngestHandler({ secret: process.env.CRUST_INGEST_SECRE
 And measure synthetically with pinned throttling (needs Playwright, an optional peer):
 
 ```bash
-npx @moumen/crust synthetic https://staging.example.com / /products/1 --cpu 4 --network fast-3g
+npx @moumensoliman/crust synthetic https://staging.example.com / /products/1 --cpu 4 --network fast-3g
 ```
 
 The first iteration is discarded (cold start), the median is reported, and runs on different
@@ -357,7 +357,7 @@ aggregates render and fetch time by route:
 
 ```ts
 import { registerOTel } from '@vercel/otel'
-import { CrustSpanAggregator } from '@moumen/crust/otel'
+import { CrustSpanAggregator } from '@moumensoliman/crust/otel'
 
 export function register() {
   registerOTel({ serviceName: 'my-app', spanProcessors: [new CrustSpanAggregator()] })

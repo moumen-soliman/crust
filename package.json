@@ -1,5 +1,5 @@
 {
-  "name": "@moumen/crust",
+  "name": "@moumensoliman/crust",
   "version": "0.1.0",
   "description": "Production-build regression analysis for Next.js App Router: route modes, bundle attribution, static-shell composition, and source blame.",
   "license": "MIT",

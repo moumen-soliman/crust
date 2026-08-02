@@ -23,13 +23,13 @@ runs:
     - name: Fetch snapshot history
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: npx --yes @moumen/crust history fetch || true
+      run: npx --yes @moumensoliman/crust history fetch || true
 
     - name: Run crust
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        npx --yes @moumen/crust ci "${{ inputs.baseline }}" \
+        npx --yes @moumensoliman/crust ci "${{ inputs.baseline }}" \
           --dist-dir "${{ inputs.dist-dir }}" \
           --comment "$RUNNER_TEMP/crust-comment.md"
 
@@ -39,7 +39,7 @@ runs:
       if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: npx --yes @moumen/crust history push || true
+      run: npx --yes @moumensoliman/crust history push || true
 
     - name: Comment on the pull request
       if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}

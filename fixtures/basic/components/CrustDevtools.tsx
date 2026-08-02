@@ -12,8 +12,8 @@ export function CrustDevtools() {
     if (!process.env.NEXT_PUBLIC_CRUST) return
 
     const disposers: (() => void)[] = []
-    void import('@moumen/crust/collector').then((m) => disposers.push(m.startCollector()))
-    void import('@moumen/crust/widget').then((m) => disposers.push(m.mountCrustWidget()))
+    void import('@moumensoliman/crust/collector').then((m) => disposers.push(m.startCollector()))
+    void import('@moumensoliman/crust/widget').then((m) => disposers.push(m.mountCrustWidget()))
 
     return () => {
       for (const dispose of disposers) dispose()

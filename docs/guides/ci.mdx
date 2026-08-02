@@ -108,8 +108,8 @@ route deltas are printed.
 A fresh CI checkout has no `.perf/` directory, so the baseline lives on an orphan branch:
 
 ```bash
-npx @moumen/crust history fetch   # pull snapshots into .perf/
-npx @moumen/crust history push    # publish this build's snapshot
+npx @moumensoliman/crust history fetch   # pull snapshots into .perf/
+npx @moumensoliman/crust history push    # publish this build's snapshot
 ```
 
 An orphan branch shares no history with your code, so it can grow and be truncated freely without
@@ -124,9 +124,9 @@ Diffs still work from whatever snapshots the branch already holds.
 ## Run the check without the action
 
 ```bash
-npx @moumen/crust history fetch
-npx @moumen/crust ci main --comment crust-comment.md
-npx @moumen/crust history push
+npx @moumensoliman/crust history fetch
+npx @moumensoliman/crust ci main --comment crust-comment.md
+npx @moumensoliman/crust history push
 ```
 
 This is useful on other CI providers. `--comment` writes Markdown only; posting it is the CI
@@ -135,7 +135,7 @@ provider's responsibility.
 ## Retention
 
 ```bash
-npx @moumen/crust prune
+npx @moumensoliman/crust prune
 ```
 
 Full fidelity for the newest 50 builds, then one snapshot per commit, then module detail dropped

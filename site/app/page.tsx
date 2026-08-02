@@ -9,7 +9,7 @@ const TABS: CodeTab[] = [
     name: 'diff',
     lines: [
       <>
-        <span className="c-dim">$</span> next build <span className="c-dim">&amp;&amp;</span> npx @moumen/crust diff main
+        <span className="c-dim">$</span> next build <span className="c-dim">&amp;&amp;</span> npx @moumensoliman/crust diff main
       </>,
       <></>,
       <>
@@ -205,8 +205,8 @@ export default function Home() {
             <a className="btn btn-primary" href={`${DOCS}/quickstart`}>
               Read the quickstart
             </a>
-            <a className="btn btn-cmd" href="https://www.npmjs.com/package/@moumen/crust">
-              <span className="chev">›</span> npx @moumen/crust analyze
+            <a className="btn btn-cmd" href="https://www.npmjs.com/package/@moumensoliman/crust">
+              <span className="chev">›</span> npx @moumensoliman/crust analyze
             </a>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function Home() {
             Get started
           </a>
           <a className="btn btn-cmd" href={`${DOCS}/reference/cli`}>
-            <span className="chev">›</span> npx @moumen/crust report --open
+            <span className="chev">›</span> npx @moumensoliman/crust report --open
           </a>
         </div>
       </section>

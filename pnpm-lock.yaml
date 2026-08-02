@@ -51,7 +51,7 @@ importers:
 
   fixtures/basic:
     dependencies:
-      '@moumen/crust':
+      '@moumensoliman/crust':
         specifier: workspace:*
         version: link:../..
       next:

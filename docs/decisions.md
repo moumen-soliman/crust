@@ -5,7 +5,7 @@ The plan (§12) left these open. Building answered them.
 ## Name
 
 The product and binary are `crust`. The unscoped npm name was published and then unpublished by
-someone else, so the package is `@moumen/crust` while the installed executable remains `crust`.
+someone else, so the package is `@moumensoliman/crust` while the installed executable remains `crust`.
 No `next-*` name, per Vercel's trademark guidance.
 
 ## Adapter `onBuildComplete` — not needed

@@ -10,20 +10,20 @@ description: "From a production build to prioritized findings, a snapshot, and a
 - A **production** build. crust refuses to measure `next dev` — dev output is unminified,
   unbundled and HMR-laden, so any number taken from it is fiction.
 
-Install `@moumen/crust` as a development dependency, or use `npx` directly. The package is scoped;
-the executable and the product are both named `crust`.
+Install `@moumensoliman/crust` as a development dependency, or use `npx` directly. The package name differs
+from the executable; the product and executable are both named `crust`.
 
 ## 1. Build, then analyze
 
 <CodeGroup>
 ```bash npm
 next build
-npx @moumen/crust analyze
+npx @moumensoliman/crust analyze
 ```
 
 ```bash pnpm
 next build
-pnpm dlx @moumen/crust analyze
+pnpm dlx @moumensoliman/crust analyze
 ```
 </CodeGroup>
 
@@ -66,7 +66,7 @@ editing a shared history file.
 ## 2. See it visually
 
 ```bash
-npx @moumen/crust report --open
+npx @moumensoliman/crust report --open
 ```
 
 A single self-contained HTML file: summary figures, the route table, and per-route detail with the
@@ -78,7 +78,7 @@ After a change, rebuild and diff:
 
 ```bash
 next build
-npx @moumen/crust diff main
+npx @moumensoliman/crust diff main
 ```
 
 ```text

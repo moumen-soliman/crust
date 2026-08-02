@@ -18,7 +18,7 @@ at the detected workspace root.
 Analyse a production build and record a snapshot.
 
 ```bash
-npx @moumen/crust analyze [--json [file]] [--no-save]
+npx @moumensoliman/crust analyze [--json [file]] [--no-save]
 ```
 
 | Flag | Meaning |
@@ -31,7 +31,7 @@ npx @moumen/crust analyze [--json [file]] [--no-save]
 Compare this build against a stored snapshot. Exits non-zero if no baseline is found.
 
 ```bash
-npx @moumen/crust diff [ref]
+npx @moumensoliman/crust diff [ref]
 ```
 
 `ref` accepts a build id, a git SHA, a branch name, or `HEAD~3`. Defaults to `HEAD~1`.
@@ -42,7 +42,7 @@ Check automatic regressions and configured budgets, then print a PR comment. **E
 breach.**
 
 ```bash
-npx @moumen/crust ci [ref] [--comment <file>]
+npx @moumensoliman/crust ci [ref] [--comment <file>]
 ```
 
 Defaults to comparing against `main`.
@@ -60,7 +60,7 @@ cannot be detected. Absolute ceilings still apply.
 Write a self-contained HTML report.
 
 ```bash
-npx @moumen/crust report [--out crust-report.html] [--open]
+npx @moumensoliman/crust report [--out crust-report.html] [--open]
 ```
 
 No external requests: styles, script and data are inlined.
@@ -70,7 +70,7 @@ No external requests: styles, script and data are inlined.
 Write the snapshot where the [in-app panel](/docs/guides/widget) can fetch it.
 
 ```bash
-npx @moumen/crust manifest [--out public/crust-manifest.json]
+npx @moumensoliman/crust manifest [--out public/crust-manifest.json]
 ```
 
 <Warning>
@@ -83,8 +83,8 @@ builds only.
 Sync snapshots with the orphan `perf-history` branch.
 
 ```bash
-npx @moumen/crust history push [--remote origin]
-npx @moumen/crust history fetch [--remote origin]
+npx @moumensoliman/crust history push [--remote origin]
+npx @moumensoliman/crust history fetch [--remote origin]
 ```
 
 `push` reports and exits cleanly when the remote rejects it — a fork PR's token is read-only on the
@@ -95,7 +95,7 @@ base repository, and that is not a failure worth breaking the check over.
 Apply the retention ladder.
 
 ```bash
-npx @moumen/crust prune [--dry-run]
+npx @moumensoliman/crust prune [--dry-run]
 ```
 
 Newest 50 builds at full fidelity → one per commit → module detail dropped after 90 days. Route
@@ -106,7 +106,7 @@ totals and shell ratios are kept forever.
 Measure routes against a running deployment. Needs Playwright as an optional peer.
 
 ```bash
-npx @moumen/crust synthetic <baseUrl> [...routes] \
+npx @moumensoliman/crust synthetic <baseUrl> [...routes] \
   [--iterations 5] [--cpu 4] [--network fast-3g|slow-3g|none]
 ```
 
@@ -115,7 +115,7 @@ npx @moumen/crust synthetic <baseUrl> [...routes] \
 List stored snapshots, newest first.
 
 ```bash
-npx @moumen/crust list
+npx @moumensoliman/crust list
 ```
 
 ## Exit codes
