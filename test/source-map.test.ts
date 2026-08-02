@@ -3,6 +3,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeChunkList, readSourceMap, resolveFirstParty } from '../src/analyze/source-map.ts'
+import { attributeChunk, createChunkAttributor } from '../src/analyze/attribution.ts'
 import { createIndex } from '../src/core/workspace.ts'
 
 const index = createIndex('/repo', ['app/page.tsx', 'components/Gallery.tsx', 'components/Counter.tsx', 'lib/http.ts'])
@@ -93,5 +94,47 @@ describe('readSourceMap', () => {
     const payload = Buffer.from('{"version":3,"sources":["c.ts"]}').toString('base64')
     const code = `console.log(1)\n//# sourceMappingURL=data:application/json;base64,${payload}`
     expect(await readSourceMap('/nonexistent/chunk.js', code)).toContain('"sources":["c.ts"]')
+  })
+})
+
+describe('chunk attribution', () => {
+  it('attributes indexed source maps emitted as sections', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'crust-'))
+    const chunk = 'indexed.js'
+    await writeFile(join(dir, chunk), 'aaaa\nbbbb')
+    await writeFile(
+      join(dir, `${chunk}.map`),
+      JSON.stringify({
+        version: 3,
+        sections: [
+          {
+            offset: { line: 0, column: 0 },
+            map: { version: 3, sources: ['src/a.ts'], names: [], mappings: 'AAAA' },
+          },
+          {
+            offset: { line: 1, column: 0 },
+            map: { version: 3, sources: ['src/b.ts'], names: [], mappings: 'AAAA' },
+          },
+        ],
+      }),
+    )
+
+    const attribution = await attributeChunk(dir, chunk, createIndex('/repo', ['src/a.ts', 'src/b.ts']))
+
+    expect(attribution.reason).toBeNull()
+    expect(Object.fromEntries(attribution.firstParty)).toEqual({ 'src/a.ts': 5, 'src/b.ts': 4 })
+    expect(attribution.unattributedBytes).toBe(0)
+  })
+
+  it('emits one parse warning when a chunk is shared by multiple routes', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'crust-'))
+    await writeFile(join(dir, 'shared.js'), 'console.log(1)')
+    await writeFile(join(dir, 'shared.js.map'), '{not valid json')
+    const attributor = createChunkAttributor(dir, createIndex('/repo', []))
+
+    await attributor.attribute('shared.js')
+    await attributor.attribute('shared.js')
+
+    expect(attributor.warnings).toEqual(['shared.js: source map could not be parsed'])
   })
 })

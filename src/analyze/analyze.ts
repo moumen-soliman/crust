@@ -14,7 +14,7 @@ import {
 import { predictShell, type ShellRuleSet } from '../shell/predict.ts'
 import { readActualShell } from '../shell/verify.ts'
 import { SCHEMA_VERSION, type RouteSnapshot, type Snapshot } from '../store/snapshot.ts'
-import { attributeChunk, mergeAttribution } from './attribution.ts'
+import { createChunkAttributor, mergeAttribution, type ChunkAttributor } from './attribution.ts'
 import { buildModuleGraph, createResolver, layoutChainFor, propagateDynamicTaint, type ImportOverrides } from './module-graph.ts'
 
 export interface AnalyzeOptions {
@@ -55,6 +55,7 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
   const resolver = createResolver(await findTsconfig(projectDir))
   const appDir = await findAppDir(projectDir, index)
   const overrides = await readOverrides(workspaceRoot)
+  const chunkAttributor = createChunkAttributor(distDir, index)
 
   // Pages Router: detect-and-warn (plan §2). A hybrid app still gets its App
   // Router routes analysed, with a warning that the pages/ half is invisible to
@@ -87,7 +88,7 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
   // 543 kB budget breach. Attributed once, shared by every route.
   const sharedRootAttribution = { firstParty: new Map<string, number>(), dependencies: new Map<string, number>(), unattributed: 0 }
   for (const chunk of sharedRootChunks) {
-    const attribution = await attributeChunk(distDir, chunk, index)
+    const attribution = await chunkAttributor.attribute(chunk)
     mergeAttribution(sharedRootAttribution.firstParty, attribution.firstParty)
     mergeAttribution(sharedRootAttribution.dependencies, attribution.dependencies)
     sharedRootAttribution.unattributed += attribution.unattributedBytes
@@ -116,6 +117,7 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
       sharedRootChunks,
       sharedRootBytes,
       sharedRootAttribution,
+      chunkAttributor,
     })
     routes.push(route)
     for (const [file, bytes] of Object.entries(route.modules)) {
@@ -123,6 +125,8 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
     }
     warnings.push(...route.warnings.map((w) => `${pattern}: ${w}`))
   }
+
+  warnings.push(...chunkAttributor.warnings)
 
   routes.sort((a, b) => a.pattern.localeCompare(b.pattern))
 
@@ -171,6 +175,7 @@ interface RouteContext {
   sharedRootChunks: string[]
   sharedRootBytes: number
   sharedRootAttribution: { firstParty: Map<string, number>; dependencies: Map<string, number>; unattributed: number }
+  chunkAttributor: ChunkAttributor
 }
 
 async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
@@ -193,13 +198,12 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
   mergeAttribution(dependencies, ctx.sharedRootAttribution.dependencies)
 
   for (const chunk of chunks) {
-    const attribution = await attributeChunk(ctx.distDir, chunk, ctx.index)
+    const attribution = await ctx.chunkAttributor.attribute(chunk)
     mergeAttribution(firstParty, attribution.firstParty)
     mergeAttribution(dependencies, attribution.dependencies)
     unattributed += attribution.unattributedBytes
     if (conventionOwned.has(chunk) || chunks.length === 1) routeBytes += attribution.bytes
     else sharedBytes += attribution.bytes
-    if (attribution.reason) warnings.push(`${chunk}: ${attribution.reason}`)
   }
 
   // Module graph and shell prediction need the page's source; without it the

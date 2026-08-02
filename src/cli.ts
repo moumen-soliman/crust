@@ -343,7 +343,9 @@ function printWarnings(snapshot: Snapshot): void {
 
   console.log()
   if (noMaps.length > 0) {
-    const chunks = new Set(noMaps.map((w) => w.split(': ')[1] ?? w)).size
+    // Current snapshots already contain one warning per chunk. The extraction
+    // keeps reports made from older snapshots (which prefixed a route) correct.
+    const chunks = new Set(noMaps.map(chunkFromSourceMapWarning)).size
     console.log(pc.yellow(`${chunks} chunk(s) shipped without source maps, so per-file attribution is unavailable.`))
     console.log(pc.dim('  Route sizes and shell analysis are unaffected. To enable attribution, set'))
     console.log(pc.dim('  productionBrowserSourceMaps: true in next.config and rebuild.'))
@@ -355,6 +357,13 @@ function printWarnings(snapshot: Snapshot): void {
     for (const w of rest.slice(0, 5)) console.log(pc.dim(`  ${w}`))
     if (rest.length > 5) console.log(pc.dim(`  … ${rest.length - 5} more`))
   }
+}
+
+function chunkFromSourceMapWarning(warning: string): string {
+  const reason = ': no source map emitted for this chunk'
+  const beforeReason = warning.endsWith(reason) ? warning.slice(0, -reason.length) : warning
+  const routeSeparator = beforeReason.lastIndexOf(': ')
+  return routeSeparator === -1 ? beforeReason : beforeReason.slice(routeSeparator + 2)
 }
 
 function printDiff(diff: ReturnType<typeof diffSnapshots>): void {

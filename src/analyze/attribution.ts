@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { TraceMap, eachMapping } from '@jridgewell/trace-mapping'
+import { AnyMap, eachMapping, type TraceMap } from '@jridgewell/trace-mapping'
 import { readSourceMap, resolveFirstParty } from './source-map.ts'
 import type { ProjectFileIndex } from '../core/workspace.ts'
 
@@ -17,6 +17,50 @@ export interface ChunkAttribution {
   unattributedBytes: number
   /** Set when the chunk shipped without a source map; the bytes are real but blind. */
   reason: string | null
+}
+
+export interface ChunkAttributor {
+  attribute(chunk: string): Promise<ChunkAttribution>
+  /** One warning per emitted chunk, even when that chunk is shared by many routes. */
+  readonly warnings: readonly string[]
+}
+
+/**
+ * Share source-map work across every route in a build.
+ *
+ * Client-reference manifests repeat common chunks for each route. Apart from
+ * needlessly parsing the same map hundreds of times, attributing each occurrence
+ * independently used to emit the same warning once per route. Keeping the cache
+ * and warning registry together makes the one-chunk/one-warning invariant hard
+ * to accidentally break.
+ */
+export function createChunkAttributor(distDir: string, index: ProjectFileIndex): ChunkAttributor {
+  const cache = new Map<string, Promise<ChunkAttribution>>()
+  const warnings: string[] = []
+  const warned = new Set<string>()
+
+  return {
+    async attribute(chunk) {
+      let pending = cache.get(chunk)
+      if (!pending) {
+        pending = attributeChunk(distDir, chunk, index)
+        cache.set(chunk, pending)
+      }
+
+      const attribution = await pending
+      if (attribution.reason) {
+        const key = `${chunk}\0${attribution.reason}`
+        if (!warned.has(key)) {
+          warned.add(key)
+          warnings.push(`${chunk}: ${attribution.reason}`)
+        }
+      }
+      return attribution
+    },
+    get warnings() {
+      return warnings
+    },
+  }
 }
 
 /**
@@ -47,7 +91,10 @@ export async function attributeChunk(
 
   let map: TraceMap
   try {
-    map = new TraceMap(JSON.parse(rawMap) as ConstructorParameters<typeof TraceMap>[0])
+    // Turbopack (and Sentry's post-processing) can emit indexed maps whose
+    // `sections` each contain a regular map. AnyMap flattens those sections and
+    // remains compatible with the flat maps TraceMap handled previously.
+    map = AnyMap(JSON.parse(rawMap) as Parameters<typeof AnyMap>[0])
   } catch {
     return empty(chunk, bytes, 'source map could not be parsed')
   }
