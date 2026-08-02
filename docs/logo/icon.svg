@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="crust">
+  <!-- Favicon form. Same geometry as mark.svg, but the ink follows the browser
+       chrome rather than the page: #111 on a light tab strip, white on a dark
+       one. Safari ignores SVG favicons and falls back to whatever PNG is
+       declared alongside it. -->
+  <style>
+    .ink { fill: #111111; }
+    @media (prefers-color-scheme: dark) {
+      .ink { fill: #ffffff; }
+    }
+  </style>
+  <path class="ink" d="M26 5v5H6V5h20Z"/>
+  <path class="ink" d="M26 12.5V27H13a7 7 0 0 1-7-7V12.5h20Z"/>
+</svg>

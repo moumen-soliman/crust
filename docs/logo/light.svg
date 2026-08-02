@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="crust">
+  <!-- Fixed dark ink, for light grounds. The counterpart to dark.svg.
+
+       Both exist because GitHub renders a README in whichever theme the reader
+       chose and serves the mark through <picture>, which resolves against the
+       page. A prefers-color-scheme query inside an SVG loaded as an image reads
+       the reader's OS setting instead — not the same thing, and wrong whenever
+       the two disagree.
+
+       Same geometry as mark.svg; only the ink differs. -->
+  <path fill="#111111" d="M26 5v5H6V5h20Z"/>
+  <path fill="#111111" d="M26 12.5V27H13a7 7 0 0 1-7-7V12.5h20Z"/>
+</svg>
