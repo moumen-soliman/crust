@@ -1,0 +1,80 @@
+{
+  "name": "crust",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Route-level performance analyzer for Next.js App Router: bundle attribution, shell composition, and regression blame.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "crust": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./widget": {
+      "types": "./dist/widget.d.ts",
+      "import": "./dist/widget.js",
+      "require": "./dist/widget.cjs"
+    },
+    "./collector": {
+      "types": "./dist/collector.d.ts",
+      "import": "./dist/collector.js",
+      "require": "./dist/collector.cjs"
+    },
+    "./ingest": {
+      "types": "./dist/ingest.d.ts",
+      "import": "./dist/ingest.js",
+      "require": "./dist/ingest.cjs"
+    },
+    "./otel": {
+      "types": "./dist/otel.d.ts",
+      "import": "./dist/otel.js",
+      "require": "./dist/otel.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "spike": "node spike/phase0.ts"
+  },
+  "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "cac": "^6.7.14",
+    "es-module-lexer": "^1.7.0",
+    "get-tsconfig": "^4.14.0",
+    "oxc-parser": "^0.142.0",
+    "oxc-resolver": "^11.24.2",
+    "picocolors": "^1.1.1",
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "playwright": "^1.62.1",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "peerDependencies": {
+    "playwright": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Next.js build output in fixtures
+fixtures/**/.next*/
+fixtures/**/node_modules/
+
+# Derived, rebuildable index (see plan §6)
+.perf/index.db
+.perf/index.db-*
+
+# Generated reports and manifests
+crust-report.html
+fixtures/**/public/crust-manifest.json
+
+# Spike output
+spike/out/
+
+.DS_Store
+
+# This repo's own .perf is demo residue from fixture runs, not project history
+/.perf/

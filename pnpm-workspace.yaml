@@ -1,0 +1,4 @@
+packages:
+  - "fixtures/basic"
+  - "fixtures/monorepo/apps/*"
+  - "fixtures/monorepo/packages/*"

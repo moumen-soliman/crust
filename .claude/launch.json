@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "crust-fixture",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "crust-fixture-basic", "exec", "next", "start", "--port", "3111"],
+      "port": 3111
+    }
+  ]
+}
