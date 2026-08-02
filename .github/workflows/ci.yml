@@ -16,10 +16,17 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The report's filter, group and search controls run in a browser, so
+      # test/report-explore.test.ts drives a real one. Without this it skips.
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
 
+  # The compatibility matrix in test/compat.test.ts pins route classification,
+  # shell discovery, source attribution and cause chains per combination. Its
+  # cases skip when a build is missing, so this job is what makes them run at
+  # all - a combination that stops being built here stops being tested, silently.
   fixtures:
     runs-on: ubuntu-latest
     steps:
@@ -30,10 +37,22 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Both bundlers and both rule sets, because the adapters diverge and only a
-      # real build catches it.
+      # crust's own dist: the fixture imports the widget and collector entries.
+      - run: pnpm build
+
+      # Next 16: both bundlers, Cache Components on and off.
       - run: pnpm --filter crust-fixture-basic exec next build --webpack
       - run: CRUST_FIXTURE_MODE=cc pnpm --filter crust-fixture-basic exec next build --webpack
       - run: CRUST_FIXTURE_MODE=turbo pnpm --filter crust-fixture-basic exec next build --turbopack
-      - run: node src/cli.ts analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
-      - run: node src/cli.ts analyze --cwd fixtures/basic --dist-dir .next-turbo --no-save
+
+      # Next 15: the inverted rule set, plus the route segment config Next 16
+      # rejects under cacheComponents - force-dynamic, revalidate, edge runtime.
+      - run: pnpm --filter crust-fixture-legacy exec next build
+
+      # Monorepo: workspace packages, path aliases and an `export *` barrel.
+      - run: CRUST_FIXTURE_MODE=cc pnpm --filter @fixture/web exec next build --webpack
+
+      - run: pnpm test
+      # The terminal renderer is TSX; exercise the packaged CLI exactly as users do.
+      - run: node dist/cli.js analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
+      - run: node dist/cli.js analyze --cwd fixtures/legacy --no-save

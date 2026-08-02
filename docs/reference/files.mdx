@@ -23,6 +23,10 @@ time two branches both record a build - exactly when history is most worth havin
 Module tables are content-addressed separately because module sizes repeat almost identically
 between builds; inlining them would make each snapshot 50–200 kB of near-duplicate data.
 
+Each build snapshot also keeps cause chains, client-boundary and barrel costs, shared-cause groups,
+build configuration, and the raw counts behind analysis coverage. These are stored with the build
+because a future tool version must not reinterpret old evidence using newer analysis rules.
+
 Add `index.db` to `.gitignore`. It is derived and rebuilt by scan, and publishing it just creates
 conflicts between machines that built it at different times.
 

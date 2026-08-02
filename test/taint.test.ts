@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildModuleGraph, createResolver, propagateDynamicTaint } from '../src/analyze/module-graph.ts'
+import {
+  baseReason,
+  buildModuleGraph,
+  createResolver,
+  propagateDynamicTaint,
+  reachableTaint,
+  type ModuleGraph,
+} from '../src/analyze/module-graph.ts'
 import { createIndex } from '../src/core/workspace.ts'
 
 /**
@@ -10,7 +17,7 @@ import { createIndex } from '../src/core/workspace.ts'
  * real specifiers; a hand-built graph would test the propagation loop while
  * skipping the part that has actually been wrong.
  */
-async function taintOf(files: Record<string, string>, entry: string): Promise<string[]> {
+async function graphOf(files: Record<string, string>, entry: string): Promise<ModuleGraph> {
   // realpath, because macOS hands out `/var/…` temp dirs that are symlinks to
   // `/private/var/…`. The resolver returns the real path, the index is keyed on
   // the symlinked one, and every module edge is silently dropped.
@@ -22,9 +29,34 @@ async function taintOf(files: Record<string, string>, entry: string): Promise<st
   }
 
   const index = createIndex(root, Object.keys(files))
-  const graph = await buildModuleGraph(join(root, entry), index, createResolver(null), {})
-  return propagateDynamicTaint(graph).get(entry) ?? []
+  return buildModuleGraph(join(root, entry), index, createResolver(null), {})
 }
+
+async function taintOf(files: Record<string, string>, entry: string): Promise<string[]> {
+  return propagateDynamicTaint(await graphOf(files, entry)).get(entry) ?? []
+}
+
+/** Module-level taint, then the per-export narrowing applied on top of it. */
+async function narrowedTaintOf(files: Record<string, string>, entry: string) {
+  const graph = await graphOf(files, entry)
+  const moduleLevel = propagateDynamicTaint(graph).get(entry) ?? []
+  const reach = reachableTaint(graph, [entry])
+  return {
+    moduleLevel,
+    narrowed: moduleLevel.filter((reason) => reach.reachable.has(baseReason(reason))),
+    conservative: reach.conservative,
+  }
+}
+
+const SERVICES = `
+  export async function cachedProduct(slug) {
+    'use cache'
+    return { slug }
+  }
+  export async function liveProduct(slug) {
+    return (await fetch('https://example.invalid/' + slug, { cache: 'no-store' })).json()
+  }
+`
 
 const UNCACHED_HELPER = `
 export async function fetchJson(url) {
@@ -191,5 +223,173 @@ describe('taint containment through `use cache`', () => {
 
     expect(reasons.join(' ')).toContain('cookies() at lib/both.tsx')
     expect(reasons.join(' ')).toContain('uncached fetch at lib/http.tsx')
+  })
+})
+
+describe('per-export taint narrowing', () => {
+  it('does not blame a sibling export the route never references', async () => {
+    // The motivating case. Module granularity taints the page through
+    // `liveProduct` purely because it shares a file with the function the page
+    // actually calls.
+    const { moduleLevel, narrowed, conservative } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'page.tsx': `
+          import { cachedProduct } from './lib/services'
+          export default async function Page() { return <div>{(await cachedProduct('a')).slug}</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(moduleLevel.join(' ')).toContain('uncached fetch at lib/services.tsx')
+    expect(narrowed).toEqual([])
+    expect(conservative).toEqual([])
+  })
+
+  it('keeps the reason when the route does reference that export', async () => {
+    const { narrowed } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'page.tsx': `
+          import { liveProduct } from './lib/services'
+          export default async function Page() { return <div>{(await liveProduct('a')).slug}</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(narrowed.join(' ')).toContain('uncached fetch at lib/services.tsx')
+  })
+
+  it('follows a binding handed to another function rather than called', async () => {
+    // `withRetry(liveProduct)` reaches liveProduct with no call expression on it.
+    // A call-edge graph drops this; narrowing on references does not.
+    const { narrowed } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'lib/retry.tsx': `export function withRetry(fn) { return fn }`,
+        'page.tsx': `
+          import { liveProduct } from './lib/services'
+          import { withRetry } from './lib/retry'
+          export default async function Page() {
+            const load = withRetry(liveProduct)
+            return <div>{(await load('a')).slug}</div>
+          }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(narrowed.join(' ')).toContain('uncached fetch at lib/services.tsx')
+  })
+
+  it('follows the chain through a barrel re-export', async () => {
+    const { narrowed } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'lib/index.tsx': `export { cachedProduct, liveProduct } from './services'`,
+        'page.tsx': `
+          import { liveProduct } from './lib/index'
+          export default async function Page() { return <div>{(await liveProduct('a')).slug}</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(narrowed.join(' ')).toContain('uncached fetch at lib/services.tsx')
+  })
+
+  it('narrows through a barrel when only the cached export is taken', async () => {
+    const { moduleLevel, narrowed } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'lib/index.tsx': `export { cachedProduct, liveProduct } from './services'`,
+        'page.tsx': `
+          import { cachedProduct } from './lib/index'
+          export default async function Page() { return <div>{(await cachedProduct('a')).slug}</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(moduleLevel.join(' ')).toContain('uncached fetch')
+    expect(narrowed).toEqual([])
+  })
+
+  it('falls back to the module-level answer for a namespace import', async () => {
+    // Which member `services.x` reads is not knowable from the import, so the
+    // whole module has to count - and the fallback is declared, not silent.
+    const { narrowed, conservative } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'page.tsx': `
+          import * as services from './lib/services'
+          export default async function Page() { return <div>{(await services.cachedProduct('a')).slug}</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(narrowed.join(' ')).toContain('uncached fetch at lib/services.tsx')
+    expect(conservative).toContain('lib/services.tsx')
+  })
+
+  it('falls back when a call target is computed', async () => {
+    const { narrowed, conservative } = await narrowedTaintOf(
+      {
+        'lib/services.tsx': SERVICES,
+        'page.tsx': `
+          import { cachedProduct } from './lib/services'
+          export default async function Page({ params }) {
+            const table = { cachedProduct }
+            return <div>{(await table[params.mode]('a')).slug}</div>
+          }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(conservative).toContain('page.tsx')
+    expect(narrowed.join(' ')).toContain('uncached fetch at lib/services.tsx')
+  })
+
+  it('never narrows away work that runs at module scope', async () => {
+    // Import-time code runs for every importer whatever export they asked for.
+    const { narrowed } = await narrowedTaintOf(
+      {
+        'lib/boot.tsx': `
+          import { cookies } from 'next/headers'
+          export const sid = cookies().get('sid')
+          export function unrelated() { return 1 }
+        `,
+        'page.tsx': `
+          import { unrelated } from './lib/boot'
+          export default function Page() { return <div>{unrelated()}</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(narrowed.join(' ')).toContain('cookies() at lib/boot.tsx')
+  })
+
+  it('counts exports other than default as entry points', async () => {
+    // `generateMetadata` runs for the same request and makes the same route
+    // dynamic, so seeding only the default export would miss it.
+    const { narrowed } = await narrowedTaintOf(
+      {
+        'page.tsx': `
+          import { cookies } from 'next/headers'
+          export async function generateMetadata() {
+            return { title: (await cookies()).get('t')?.value }
+          }
+          export default function Page() { return <div>hi</div> }
+        `,
+      },
+      'page.tsx',
+    )
+
+    expect(narrowed.join(' ')).toContain('cookies() at page.tsx')
   })
 })

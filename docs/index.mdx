@@ -17,6 +17,9 @@ For a single build:
 - Which dynamic API, uncached read, or route configuration produced that mode?
 - How much of the rendered route is in the static shell?
 - Which first-party modules and packages make up its first-load JavaScript?
+- Which client boundary or barrel import is responsible for that cost?
+- Which shared layout, provider, package, or call site affects the most routes?
+- How much of the build did crust classify, measure, and attribute?
 - Which three findings are most worth investigating first?
 
 Across builds:
@@ -25,6 +28,8 @@ Across builds:
 - Did a cached read become uncached?
 - Did a component leave the static shell?
 - Did first-load JavaScript grow, and which module caused it?
+- Was the movement caused by application source or build configuration?
+- Which other routes share the same root cause?
 - Is the regression certain enough to fail CI?
 
 ## The failure it exists to catch
@@ -62,6 +67,9 @@ what postpones, and it fails quietly.
   <Card title="Shell engine" icon="layer-group" href="/docs/concepts/shell-engine">
     Predicted versus actual static shell, and the call site that broke it.
   </Card>
+  <Card title="Trace client JavaScript" icon="diagram-project" href="/docs/concepts/attribution">
+    Source-map attribution, client-boundary cost, barrel drag, and import chains.
+  </Card>
   <Card title="Add CI" icon="circle-check" href="/docs/guides/ci">
     Zero-config regression checks, optional ceilings, and a PR comment that updates in place.
   </Card>
@@ -84,16 +92,15 @@ different bundlers, Next majors, or snapshot schemas are not compared. Absolute 
 apply because they describe the current build rather than a delta.
 </Note>
 
-## How it differs
+## What crust delivers
 
-| Tool | Best at | What crust adds |
-|---|---|---|
-| Next DevTools | Debugging the current development session | Production-build history and PR enforcement |
-| `@next/bundle-analyzer` | Visualizing one bundle | Route history, shell composition, and source blame |
-| Speed Insights | Real-user performance | Build-time source attribution |
-| size-limit | Generic byte budgets | App Router routes, rendering modes, cache regressions, and shell ratios |
-
-Route-level regression blame and shell composition, together, is the gap.
+- Production-build explanations connected to components, imports, and call sites
+- Cause-chain evidence, analysis coverage, shared-cause grouping, and actionable client cost
+- Configuration changes kept separate from application regressions
+- Compatible local history with route-level regression blame
+- Static-shell composition verified against emitted HTML
+- First-party client-JavaScript attribution
+- Evidence-backed merge decisions and explicit project budgets
 
 ## Support
 

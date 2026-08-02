@@ -6,19 +6,19 @@ import { spawn } from 'node:child_process'
 import { cac } from 'cac'
 import pc from 'picocolors'
 import { analyzeBuild } from './analyze/analyze.ts'
-import { checkBudgets, kb, pct, readBudgets, signed } from './ci/budgets.ts'
+import { checkBudgets, kb, readBudgets } from './ci/budgets.ts'
 import { renderComment } from './ci/comment.ts'
 import { renderReportHtml } from './report/render.ts'
-import { NOISE_FLOOR_BYTES, diffSnapshots, type RouteAliases } from './diff/diff.ts'
-import { modeLabel as modeName } from './diff/mode.ts'
-import { findingsFor, type Finding } from './findings/findings.ts'
+import { diffSnapshots, type RouteAliases } from './diff/diff.ts'
+import { latestCompatibleBaseline } from './diff/compatible.ts'
 import { findWorkspaceRoot } from './core/workspace.ts'
 import { SnapshotStore } from './store/store.ts'
 import { fetchHistory, pushHistory } from './store/history-branch.ts'
 import { runSynthetic } from './synthetic/run.ts'
+import { renderDiffTerminal, renderSnapshotTerminal } from './terminal-ui/views.tsx'
 import type { Snapshot } from './store/snapshot.ts'
 
-const VERSION = '0.1.1'
+const VERSION = '0.1.2'
 const cli = cac('crust')
 
 interface CommonOptions {
@@ -33,27 +33,59 @@ cli
   .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
   .option('--dist-dir <dir>', 'Build output directory', { default: '.next' })
   .option('--json [file]', 'Write the snapshot as JSON instead of a table')
+  .option('--routes', 'Include the complete route table')
+  .option('--verbose', 'Include routes, shell notes, unknowns, and warnings')
+  .option('--report [file]', 'Also write an HTML report', { default: false })
   .option('--no-save', 'Do not write a snapshot into .perf/')
-  .action(async (options: CommonOptions & { json?: string | boolean; save?: boolean }) => {
+  .action(async (options: CommonOptions & {
+    json?: string | boolean
+    routes?: boolean
+    verbose?: boolean
+    report?: string | boolean
+    save?: boolean
+  }) => {
     const snapshot = await analyzeBuild({
       cwd: options.cwd,
       ...(options.distDir ? { distDir: options.distDir } : {}),
       toolVersion: VERSION,
     })
 
+    const root = await findWorkspaceRoot(resolve(options.cwd))
+    const store = new SnapshotStore(root)
+    const [stored, budgets, aliases] = await Promise.all([
+      store.list(),
+      readBudgets(root),
+      readAliases(root),
+    ])
+    const base = latestCompatibleBaseline(snapshot, stored)
+    const diff = base ? diffSnapshots(base, snapshot, aliases) : null
+    const breaches = checkBudgets(snapshot, budgets, diff)
+
+    let snapshotPath: string | null = null
+    if (options.save !== false) snapshotPath = await store.write(snapshot)
+
+    let reportPath: string | null = null
+    if (options.report) {
+      const out = resolve(typeof options.report === 'string' ? options.report : 'crust-report.html')
+      await writeFile(out, renderReportHtml(await withHistory(snapshot, options.cwd)), 'utf8')
+      reportPath = relative(process.cwd(), out) || out
+    }
+
     if (options.json) {
       const json = JSON.stringify(snapshot, null, 2)
       if (typeof options.json === 'string') await writeFile(options.json, json + '\n', 'utf8')
       else console.log(json)
     } else {
-      printSnapshot(snapshot)
+      console.log(renderSnapshotTerminal(snapshot, {
+        diff,
+        breaches,
+        showRoutes: options.routes ?? false,
+        verbose: options.verbose ?? false,
+        reportPath,
+      }))
     }
 
-    if (options.save !== false) {
-      const store = new SnapshotStore(await findWorkspaceRoot(resolve(options.cwd)))
-      const path = await store.write(snapshot)
-      if (!options.json) console.log(pc.dim(`\nsnapshot -> ${relative(process.cwd(), path)}`))
-    }
+    if (snapshotPath && !options.json) console.log(pc.dim(`\nsnapshot -> ${relative(process.cwd(), snapshotPath)}`))
   })
 
 cli
@@ -69,7 +101,7 @@ cli
     }
 
     const diff = diffSnapshots(base, head, aliases)
-    printDiff(diff)
+    console.log(renderDiffTerminal(diff))
   })
 
 cli
@@ -228,7 +260,7 @@ cli
 
 async function withHistory(snapshot: Snapshot, cwd: string): Promise<Snapshot> {
   const store = new SnapshotStore(await findWorkspaceRoot(resolve(cwd)))
-  const trends = await store.routeHistory(30)
+  const trends = await store.routeHistory(30, snapshot)
   if (trends.size === 0) return snapshot
   const history: NonNullable<Snapshot['history']> = {}
   for (const [routeId, points] of trends) {
@@ -259,186 +291,6 @@ async function readAliases(root: string): Promise<RouteAliases> {
     return JSON.parse(await readFile(join(root, '.perf', 'aliases.json'), 'utf8')) as RouteAliases
   } catch {
     return {}
-  }
-}
-
-/* ── output ────────────────────────────────────────────────────────────── */
-
-function printSnapshot(snapshot: Snapshot): void {
-  console.log(
-    `${pc.bold('crust')} ${snapshot.buildId}  ${pc.dim(`next ${snapshot.nextVersion} · ${snapshot.bundler} · ${snapshot.routes.length} routes`)}`,
-  )
-  console.log()
-
-  printFindings(findingsFor(snapshot))
-
-  const width = Math.max(6, ...snapshot.routes.map((r) => r.pattern.length))
-  console.log(pc.dim(`${'Route'.padEnd(width)}  ${'First load'.padStart(11)}  ${'Shell'.padStart(6)}  Mode`))
-
-  for (const route of snapshot.routes) {
-    const ratio = route.shell?.actual?.shellRatio
-    const shell = ratio === undefined || ratio === null ? pc.dim('   -  ') : pct(ratio).padStart(6)
-    console.log(
-      `${route.pattern.padEnd(width)}  ${kb(route.firstLoadBytes).padStart(11)}  ${shell}  ${modeLabel(route.renderingMode)}`,
-    )
-
-    if (route.renderingModeReason) console.log(pc.dim(`${' '.repeat(width)}    ↳ ${route.renderingModeReason}`))
-
-    for (const hole of route.shell?.predictedHoles.slice(0, 3) ?? []) {
-      console.log(pc.dim(`${' '.repeat(width)}    ✂ <${hole.component}> - ${hole.reason}`))
-    }
-  }
-
-  // The same unresolvable component appears once per route that renders it.
-  const unknowns = [...new Set(snapshot.routes.flatMap((r) => r.shell?.unknown ?? []))]
-  if (unknowns.length > 0) {
-    console.log()
-    console.log(pc.yellow(`${unknowns.length} thing(s) reported as unknown rather than guessed:`))
-    for (const u of unknowns.slice(0, 5)) console.log(pc.dim(`  ${u}`))
-    if (unknowns.length > 5) console.log(pc.dim(`  … ${unknowns.length - 5} more (see --json)`))
-  }
-
-  printWarnings(snapshot)
-}
-
-/**
- * The first thing on screen, before the route table. Someone running this for the
- * first time has no baseline and therefore no regressions to look at; what they
- * have is a build and a question, and the question is which three things to fix.
- * A table of every route answers a different question, so it comes second.
- */
-function printFindings(findings: Finding[]): void {
-  if (findings.length === 0) return
-
-  const top = findings.slice(0, 3)
-  console.log(pc.bold(`Fix first`))
-  console.log()
-
-  top.forEach((finding, i) => {
-    const where = finding.route ? `${pc.cyan(finding.route)} ` : ''
-    console.log(`  ${pc.bold(`${i + 1}.`)} ${where}${finding.headline}`)
-    if (finding.detail) console.log(pc.dim(`     ↳ ${finding.detail}`))
-    console.log(pc.dim(`     → ${finding.action}`))
-    if (i < top.length - 1) console.log()
-  })
-
-  if (findings.length > 3) {
-    console.log()
-    console.log(pc.dim(`  ${findings.length - 3} more finding(s) - see \`crust report\`.`))
-  }
-  console.log()
-}
-
-/**
- * A project without production source maps produces one warning per chunk per
- * route - 673 of them on a 25-route app, all saying the same thing. Printing that
- * list buries every other warning and teaches people to skip the section, so the
- * repeated ones collapse into a single line that names the fix.
- */
-function printWarnings(snapshot: Snapshot): void {
-  if (snapshot.warnings.length === 0) return
-
-  const noMaps = snapshot.warnings.filter((w) => w.includes('no source map emitted'))
-  const rest = snapshot.warnings.filter((w) => !w.includes('no source map emitted'))
-
-  console.log()
-  if (noMaps.length > 0) {
-    // Current snapshots already contain one warning per chunk. The extraction
-    // keeps reports made from older snapshots (which prefixed a route) correct.
-    const chunks = new Set(noMaps.map(chunkFromSourceMapWarning)).size
-    console.log(pc.yellow(`${chunks} chunk(s) shipped without source maps, so per-file attribution is unavailable.`))
-    console.log(pc.dim('  Route sizes and shell analysis are unaffected. To enable attribution, set'))
-    console.log(pc.dim('  productionBrowserSourceMaps: true in next.config and rebuild.'))
-  }
-
-  if (rest.length > 0) {
-    if (noMaps.length > 0) console.log()
-    console.log(pc.yellow(`${rest.length} warning(s):`))
-    for (const w of rest.slice(0, 5)) console.log(pc.dim(`  ${w}`))
-    if (rest.length > 5) console.log(pc.dim(`  … ${rest.length - 5} more`))
-  }
-}
-
-function chunkFromSourceMapWarning(warning: string): string {
-  const reason = ': no source map emitted for this chunk'
-  const beforeReason = warning.endsWith(reason) ? warning.slice(0, -reason.length) : warning
-  const routeSeparator = beforeReason.lastIndexOf(': ')
-  return routeSeparator === -1 ? beforeReason : beforeReason.slice(routeSeparator + 2)
-}
-
-function printDiff(diff: ReturnType<typeof diffSnapshots>): void {
-  console.log(`${pc.bold('crust diff')}  ${pc.dim(`${diff.base.buildId} -> ${diff.head.buildId}`)}`)
-
-  for (const reason of diff.incomparable) console.log(pc.yellow(`  ! ${reason}`))
-  console.log()
-
-  const changed = diff.routes.filter((r) => r.status !== 'unchanged')
-  if (changed.length === 0) {
-    console.log(pc.green('No route changed size, shell composition, rendering mode or caching.'))
-    return
-  }
-
-  for (const route of changed) {
-    const delta =
-      Math.abs(route.firstLoadDelta) > NOISE_FLOOR_BYTES
-        ? route.firstLoadDelta > 0
-          ? pc.red(signed(route.firstLoadDelta))
-          : pc.green(signed(route.firstLoadDelta))
-        : pc.dim('-')
-    const flag = route.severity === 'regression' ? pc.red(' ▼') : route.severity === 'improvement' ? pc.green(' ▲') : ''
-    console.log(`${pc.bold(route.pattern)}${flag}  ${kb(route.firstLoadAfter)}  ${delta}`)
-
-    // Mode first: it is the coarsest statement about the route, and a drop here
-    // usually explains every other number under it.
-    if (route.modeChange) {
-      const label = `${modeName(route.modeChange.before)} -> ${modeName(route.modeChange.after)}`
-      console.log(route.modeChange.direction === 'regression' ? pc.red(`    ${label}`) : pc.green(`    ${label}`))
-    }
-
-    if (route.shellRatioBefore !== null && route.shellRatioAfter === null) {
-      console.log(pc.red(`    shell ${pct(route.shellRatioBefore)} -> none emitted`))
-    } else if (route.shellRatioDelta !== null && route.shellRatioDelta !== 0) {
-      const label = `shell ${pct(route.shellRatioBefore ?? 0)} -> ${pct(route.shellRatioAfter ?? 0)}`
-      console.log(route.shellRatioDelta < 0 ? pc.red(`    ${label}`) : pc.green(`    ${label}`))
-    }
-
-    if (route.cacheChange?.revalidate) {
-      const { before, after } = route.cacheChange.revalidate
-      console.log(pc.yellow(`    revalidate ${before}s -> ${after}s`))
-    }
-
-    if (route.cause) {
-      const line =
-        route.cause.kind === 'unknown'
-          ? pc.yellow(`    cause: unknown - ${route.cause.what}`)
-          : `    cause: ${route.cause.what}`
-      console.log(line)
-      if (route.cause.component) console.log(pc.dim(`    introduced by <${route.cause.component}>`))
-    }
-
-    for (const mod of route.modules.slice(0, 5)) {
-      console.log(pc.dim(`    ${signed(mod.delta).padStart(10)}  ${mod.file}`))
-    }
-    for (const hole of route.newHoles.slice(0, 3)) {
-      console.log(pc.red(`    ✂ <${hole.component}> left the shell - ${hole.reason}`))
-    }
-  }
-}
-
-function modeLabel(mode: string): string {
-  switch (mode) {
-    case 'STATIC':
-      return pc.green('static')
-    case 'PARTIALLY_STATIC':
-      return pc.cyan('partial')
-    case 'ISR':
-      return pc.blue('isr')
-    case 'DYNAMIC':
-      return pc.yellow('dynamic')
-    case 'ROUTE_HANDLER':
-      return pc.dim('handler')
-    default:
-      return pc.dim('unknown')
   }
 }
 

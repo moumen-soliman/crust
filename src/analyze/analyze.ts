@@ -13,9 +13,32 @@ import {
 } from '../manifests/read.ts'
 import { predictShell, type ShellRuleSet } from '../shell/predict.ts'
 import { readActualShell } from '../shell/verify.ts'
-import { SCHEMA_VERSION, type RouteSnapshot, type Snapshot } from '../store/snapshot.ts'
+import {
+  SCHEMA_VERSION,
+  type BarrelCost,
+  type CauseChain,
+  type ClientBoundary,
+  type Coverage,
+  type RouteSnapshot,
+  type Snapshot,
+} from '../store/snapshot.ts'
 import { createChunkAttributor, mergeAttribution, type ChunkAttributor } from './attribution.ts'
-import { buildModuleGraph, createResolver, layoutChainFor, propagateDynamicTaint, type ImportOverrides } from './module-graph.ts'
+import { sharedCausesFor } from './blast.ts'
+import { buildBytesCause, buildCauseChain } from './cause.ts'
+import { readBuildConfig } from './config.ts'
+import { computeCoverage } from './coverage.ts'
+import { barrelCosts, boundaryCosts } from './shape.ts'
+import {
+  baseReason,
+  buildModuleGraph,
+  createResolver,
+  layoutChainFor,
+  propagateDynamicTaint,
+  reachableTaint,
+  type ImportOverrides,
+  type ModuleGraph,
+  type Reachability,
+} from './module-graph.ts'
 
 export interface AnalyzeOptions {
   cwd: string
@@ -156,8 +179,43 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
     sourceSignature: sourceSignature(routes),
     routes,
     modules: allModules,
+    coverage: computeCoverage(routes),
+    sharedCauses: sharedCausesFor(routes, { packageNames: await readPackageNames(index) }),
+    config: readBuildConfig({
+      resolved: await readResolvedConfig(distDir),
+      // Attribution needs maps; a build without them is a different kind of
+      // build, not a build whose files happen to be smaller.
+      sourceMaps: routes.some((route) => Object.keys(route.modules).length > 0),
+    }),
     warnings,
   }
+}
+
+/**
+ * Workspace package directory -> declared name, for labelling shared causes.
+ *
+ * Bounded work: a handful of `package.json` files that the source index already
+ * found. Falling back to the directory would be honest but unhelpful - nobody
+ * files a ticket against `packages/ui`, they file it against `@repo/ui`.
+ */
+async function readPackageNames(index: ProjectFileIndex): Promise<Record<string, string>> {
+  const names: Record<string, string> = {}
+
+  for (const file of index.files) {
+    if (!file.endsWith('package.json')) continue
+    const dir = file.slice(0, Math.max(0, file.length - '/package.json'.length))
+    if (!dir) continue
+    try {
+      const raw = await readFile(join(index.root, file), 'utf8')
+      const name = (JSON.parse(raw) as { name?: string }).name
+      if (typeof name === 'string') names[dir] = name
+    } catch {
+      // A malformed or unreadable manifest just means this package goes
+      // unlabelled; it is not a reason to fail the analysis.
+    }
+  }
+
+  return names
 }
 
 interface RouteContext {
@@ -209,13 +267,21 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
   // Module graph and shell prediction need the page's source; without it the
   // route still reports byte totals, just no attribution or prediction.
   let dynamicReasons: string[] = []
-  let clientBoundaryRoots: string[] = []
+  let clientBoundaries: ClientBoundary[] = []
+  let barrels: BarrelCost[] = []
   let shell: RouteSnapshot['shell'] = null
+  let routeRootComponent: string | null = null
+  let conservativeModules = 0
+  let causeGraph: ModuleGraph | null = null
+  let causeReach: Reachability | null = null
+  let layouts: string[] = []
+  let routeConfig: Record<string, string | number | boolean> = {}
 
   if (pageFileAbs && pageFile) {
     const graph = await buildModuleGraph(pageFileAbs, ctx.index, ctx.resolver, ctx.overrides)
 
-    for (const layout of layoutChainFor(pageFile, ctx.index)) {
+    layouts = layoutChainFor(pageFile, ctx.index)
+    for (const layout of layouts) {
       const layoutAbs = join(ctx.index.root, layout)
       const layoutGraph = await buildModuleGraph(layoutAbs, ctx.index, ctx.resolver, ctx.overrides)
       for (const [file, node] of layoutGraph.nodes) if (!graph.nodes.has(file)) graph.nodes.set(file, node)
@@ -223,9 +289,35 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
 
     warnings.push(...graph.warnings)
 
+    // Segment config from the page and every layout above it. A layout's
+    // `revalidate` governs the pages beneath it, so reading only the page would
+    // report a deliberate ISR window as an unexplained mode.
+    routeConfig = { ...graph.nodes.get(pageFile)?.facts.routeConfig }
+    for (const layout of layouts) {
+      for (const [key, value] of Object.entries(graph.nodes.get(layout)?.facts.routeConfig ?? {})) {
+        routeConfig[`${layout}:${key}`] = value
+      }
+    }
+
     const taint = propagateDynamicTaint(graph)
-    dynamicReasons = [...new Set((taint.get(pageFile) ?? []).slice(0, 8))]
-    clientBoundaryRoots = [...graph.nodes.values()].filter((n) => n.isClientBoundaryRoot).map((n) => n.file)
+
+    // Module-level taint is the safe answer but blames imports the route never
+    // calls. Narrowing withholds only the reasons it can prove unreachable from
+    // the entry's own exports, and falls back to the module-level answer for any
+    // module it could not follow - so this can lose a false positive, never a
+    // real one.
+    const reach = reachableTaint(graph, [pageFile, ...layouts])
+    const moduleLevel = taint.get(pageFile) ?? []
+    const narrowed = moduleLevel.filter((reason) => reach.reachable.has(baseReason(reason)))
+    conservativeModules = reach.conservative.length
+
+    dynamicReasons = [...new Set(narrowed.slice(0, 8))]
+    causeGraph = graph
+    causeReach = reach
+    const attributed = Object.fromEntries(firstParty)
+    clientBoundaries = boundaryCosts(graph, attributed)
+    barrels = barrelCosts(graph, pageFile, attributed)
+    routeRootComponent = graph.nodes.get(pageFile)?.facts.defaultExportName ?? null
 
     const prediction = predictShell(graph, taint, pageFile, ctx.ruleSet)
     const actual = await readActualShell(ctx.distDir, ctx.pattern)
@@ -250,6 +342,51 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
     ? { mode: 'ROUTE_HANDLER' as const, reason: null }
     : renderingModeFor(ctx, dynamicReasons, shell?.actual ?? null)
 
+  // A fully dynamic route has no shell artifact to name the missing component.
+  // The build proves the route opted out, the taint graph names the call site,
+  // and the route's default export is the component that introduced that work.
+  // Record that evidence together so diff/CI can say `<CoursePage>` rather than
+  // stopping at a service file. This is deliberately gated on the emitted mode;
+  // module-level taint alone is too coarse to condemn a component.
+  if (mode === 'DYNAMIC' && shell && routeRootComponent && dynamicReasons[0] && !shell.predictedHoles.some((hole) => hole.boundary === '<route>')) {
+    shell.predictedHoles.unshift({ component: routeRootComponent, boundary: '<route>', reason: dynamicReasons[0] })
+    shell.predictedStatic = shell.predictedStatic.filter((name) => name !== routeRootComponent)
+  }
+
+  const causes: CauseChain[] = []
+  if (causeGraph && causeReach && pageFile && !isRouteHandler) {
+    // The emitted mode is what makes a dynamic chain `verified` rather than
+    // `inferred`: source can show the call, only the build can show that Next
+    // acted on it.
+    const confirmedByArtifact = mode === 'DYNAMIC' || mode === 'PARTIALLY_STATIC'
+
+    for (const reason of dynamicReasons) {
+      const path = causeReach.reachable.get(baseReason(reason))
+      if (!path) continue
+      causes.push(
+        buildCauseChain({
+          route: ctx.pattern,
+          graph: causeGraph,
+          entryFile: pageFile,
+          reason,
+          path,
+          confirmedByArtifact,
+        }),
+      )
+    }
+
+    // Only the modules big enough to be worth a chain. Explaining a 300-byte
+    // helper buries the barrel that actually cost the route its budget.
+    const heaviest = [...firstParty]
+      .filter(([, bytes]) => bytes >= BYTES_WORTH_EXPLAINING)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_BYTES_CAUSES)
+
+    for (const [file, bytes] of heaviest) {
+      causes.push(buildBytesCause({ route: ctx.pattern, graph: causeGraph, entryFile: pageFile, file, bytes }))
+    }
+  }
+
   return {
     id: pageFile ?? ctx.entry,
     pattern: ctx.pattern,
@@ -266,11 +403,23 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
     modules: Object.fromEntries([...firstParty].sort((a, b) => b[1] - a[1])),
     dependencies: Object.fromEntries([...dependencies].sort((a, b) => b[1] - a[1])),
     dynamicReasons,
-    clientBoundaryRoots,
+    causes,
+    clientBoundaries,
+    barrels,
+    layouts,
+    // Chunks this route did not bring in on its own. Recorded by name so the
+    // blast radius can group routes that load the same one.
+    sharedChunks: chunks.filter((chunk) => !conventionOwned.has(chunk) && chunks.length > 1),
+    config: routeConfig,
     shell,
     warnings,
+    conservativeModules,
   }
 }
+
+/** A chain costs a reader attention; below this the answer is not worth one. */
+const BYTES_WORTH_EXPLAINING = 4096
+const MAX_BYTES_CAUSES = 5
 
 /**
  * Agreement is deliberately coarse: whether the predictor found the same number of

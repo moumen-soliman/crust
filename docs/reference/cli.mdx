@@ -18,13 +18,22 @@ at the detected workspace root.
 Analyse a production build and record a snapshot.
 
 ```bash
-npx @moumensoliman/crust analyze [--json [file]] [--no-save]
+npx @moumensoliman/crust analyze [--routes] [--verbose] [--report [file]] [--json [file]] [--no-save]
 ```
 
 | Flag | Meaning |
 |---|---|
+| `--routes` | Include the complete route table. |
+| `--verbose` | Include routes, shell notes, unresolved relationships, and warnings. |
+| `--report [file]` | Also write the HTML report. Defaults to `crust-report.html`. |
 | `--json [file]` | Emit the snapshot as JSON. With no path, prints to stdout. |
 | `--no-save` | Do not write into `.perf/`. |
+
+By default, `analyze` compares against the newest local snapshot with the same snapshot schema,
+bundler, Next.js major, and at least one matching route identity. Use `diff [ref]` when you need an
+explicit baseline. Its concise view includes build health, measurable analysis confidence,
+actionable regressions, the largest first-party contributor, shared causes, and trimmed cause
+chains. `--verbose` expands the coverage denominators and unresolved evidence.
 
 ## diff
 
@@ -34,7 +43,9 @@ Compare this build against a stored snapshot. Exits non-zero if no baseline is f
 npx @moumensoliman/crust diff [ref]
 ```
 
-`ref` accepts a build id, a git SHA, a branch name, or `HEAD~3`. Defaults to `HEAD~1`.
+`ref` accepts a build id, a git SHA, a branch name, or `HEAD~3`. Defaults to `HEAD~1`. Material
+configuration changes that make the builds unsafe to compare appear as comparison warnings and
+suppress enforceable route-level conclusions.
 
 ## ci
 
@@ -63,7 +74,14 @@ Write a self-contained HTML report.
 npx @moumensoliman/crust report [--out crust-report.html] [--open]
 ```
 
-No external requests: styles, script and data are inlined.
+No external requests: styles, script and data are inlined. The report supports:
+
+- search across route patterns, components, and source files
+- filters for dynamic, partially static, heavy, and unattributed routes
+- grouping by layout or workspace package
+- full cause and import chains with evidence labels
+- shared-cause blast radius that filters the affected routes
+- PR-ready shared-cause explanations
 
 ## manifest
 

@@ -41,6 +41,38 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
     expect(home?.shell?.actual?.shellRatio).toBe(1)
   })
 
+  it('carries the cause chain from the route to the call that made it dynamic', async () => {
+    // The chain the roadmap asks for, pinned against real build output rather
+    // than a hand-built graph: route, the component a reviewer would recognise,
+    // every binding in between, and the call at the end.
+    const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-cc', toolVersion: 'test' })
+    const product = snapshot.routes.find((r) => r.pattern === '/products/[slug]')
+    const chain = product?.causes.find((cause) => cause.detail === 'uncached fetch')
+
+    expect(chain?.component).toBe('ProductGallery')
+    expect(chain?.evidence).toBe('verified')
+    expect(chain?.site).toBe('fixtures/basic/lib/http.ts:3')
+    expect(chain?.links.map((link) => link.binding)).toEqual([
+      'ProductPage',
+      'ProductGallery',
+      'getProduct',
+      'fetchJson',
+    ])
+  })
+
+  it('measures how much of the build it could account for', async () => {
+    const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-cc', toolVersion: 'test' })
+
+    expect(snapshot.coverage.routesClassified).toBe(snapshot.coverage.routesTotal)
+    expect(snapshot.coverage.shellsMeasured).toBe(snapshot.coverage.shellsEmitted)
+    // Source maps are on in the fixture, so most bytes trace somewhere. The
+    // exact share moves with Next's runtime; the point is that it is measured
+    // rather than assumed, and that confidence follows it.
+    expect(snapshot.coverage.clientBytesAttributed).toBeGreaterThan(0)
+    expect(snapshot.coverage.confidence).toBeGreaterThan(0.5)
+    expect(snapshot.coverage.confidence).toBeLessThanOrEqual(1)
+  })
+
   it('attributes client bytes to the barrel-imported components the route never renders', async () => {
     // `app/page.tsx` imports only `Hero` from `components/index.ts`, but the
     // barrel drags the client components in. This is the defect the tool exists
@@ -58,7 +90,14 @@ describe.skipIf(!built('.next-turbo'))('turbopack adapter', () => {
   it('produces the same route table as webpack does', async () => {
     const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-turbo', toolVersion: 'test' })
     expect(snapshot.bundler).toBe('turbopack')
-    expect(snapshot.routes.map((r) => r.pattern).sort()).toEqual(['/', '/dashboard', '/products/[slug]'])
+    expect(snapshot.routes.map((r) => r.pattern).sort()).toEqual([
+      '/',
+      '/api/ping',
+      '/dashboard',
+      '/docs/[...slug]',
+      '/files/[[...path]]',
+      '/products/[slug]',
+    ])
   })
 
   it('resolves first-party sources despite root-anchored source paths', async () => {

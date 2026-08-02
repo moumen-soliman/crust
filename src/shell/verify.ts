@@ -47,26 +47,17 @@ async function findShellHtml(distDir: string, pattern: string): Promise<string |
   const appDir = join(distDir, 'server', 'app')
   const direct = pattern === '/' ? 'index.html' : `${pattern.replace(/^\//, '')}.html`
 
-  const candidates: string[] = []
-  if (!pattern.includes('[')) {
-    candidates.push(direct)
-  } else {
-    // Substitute concrete params: look for siblings of the bracketed segment.
-    const dir = join(appDir, dirname_(pattern.replace(/^\//, '')))
-    let entries: string[] = []
-    try {
-      entries = (await readdir(dir, { withFileTypes: true })).filter((e) => e.isFile() && e.name.endsWith('.html')).map((e) => e.name)
-    } catch {
-      entries = []
-    }
-    // Prefer any concrete param over the bracketed fallback.
-    const bracketed = `${basename_(pattern)}.html`
-    for (const name of entries.sort()) {
-      if (name === bracketed) continue
-      candidates.push(toPosix(join(relative(appDir, dir), name)))
-    }
-    candidates.push(toPosix(join(relative(appDir, dir), bracketed)))
-  }
+  // Static routes have one unambiguous output path, so avoid walking the tree.
+  // Dynamic routes can substitute params at *any* depth (`/[locale]/x/[id]`),
+  // which cannot be found by looking only beside the final bracketed segment.
+  const candidates = pattern.includes('[')
+    ? (await htmlFiles(appDir)).filter((file) => matchesPattern(pattern, file))
+    : [direct]
+
+  // Concrete generated params are real shells. Bracket-bearing fallbacks are
+  // often zero-byte placeholders, and even when non-empty are less representative
+  // than a concrete route. Keep ordering deterministic for repeatable snapshots.
+  candidates.sort((a, b) => Number(a.includes('[')) - Number(b.includes('[')) || a.localeCompare(b))
 
   for (const candidate of candidates) {
     const full = join(appDir, candidate)
@@ -79,6 +70,46 @@ async function findShellHtml(distDir: string, pattern: string): Promise<string |
   }
   return null
 }
+
+async function htmlFiles(root: string, dir = root): Promise<string[]> {
+  let entries
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  const files: string[] = []
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) files.push(...await htmlFiles(root, full))
+    else if (entry.isFile() && entry.name.endsWith('.html')) files.push(toPosix(relative(root, full)))
+  }
+  return files
+}
+
+function matchesPattern(pattern: string, htmlFile: string): boolean {
+  const expected = segments(pattern)
+  const candidate = segments(htmlFile.replace(/\.html$/, '').replace(/(?:^|\/)index$/, ''))
+
+  const match = (pi: number, ci: number): boolean => {
+    if (pi === expected.length) return ci === candidate.length
+    const segment = expected[pi]!
+    if (/^\[\[\.\.\..+\]\]$/.test(segment)) {
+      return match(pi + 1, ci) || (ci < candidate.length && match(pi, ci + 1))
+    }
+    if (/^\[\.\.\..+\]$/.test(segment)) {
+      return ci < candidate.length && (match(pi + 1, ci + 1) || match(pi, ci + 1))
+    }
+    if (ci >= candidate.length) return false
+    if (/^\[[^\]]+\]$/.test(segment)) return match(pi + 1, ci + 1)
+    return segment === candidate[ci] && match(pi + 1, ci + 1)
+  }
+
+  return match(0, 0)
+}
+
+const segments = (path: string): string[] => path.replace(/^\//, '').split('/').filter(Boolean)
 
 /**
  * How much of the rendered route made it into the shell.
@@ -129,14 +160,4 @@ function countOccurrences(haystack: string, needle: string): number {
     index = haystack.indexOf(needle, index + needle.length)
   }
   return count
-}
-
-const dirname_ = (p: string): string => {
-  const i = p.lastIndexOf('/')
-  return i === -1 ? '' : p.slice(0, i)
-}
-
-const basename_ = (p: string): string => {
-  const i = p.lastIndexOf('/')
-  return i === -1 ? p : p.slice(i + 1)
 }

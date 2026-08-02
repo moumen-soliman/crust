@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { shardPath, shortHash } from '../core/hash.ts'
 import { mergeBase, revList } from '../core/git.ts'
+import { normalizeSnapshot } from './normalize.ts'
 import { SCHEMA_VERSION, type Snapshot } from './snapshot.ts'
 
 export const STORE_DIR = '.perf'
@@ -55,7 +56,9 @@ export class SnapshotStore {
         join(this.dir, 'modules', `${shardPath(raw.modulesRef)}.json`),
       )) ?? {}
     }
-    return raw
+    // Everything past this point may have been written by an older crust, so
+    // this is the only place that has to know it.
+    return normalizeSnapshot(raw)
   }
 
   /** Every snapshot on disk, newest commit first. */
@@ -174,8 +177,18 @@ export class SnapshotStore {
    * Uses the index when available, scans otherwise; both paths return the same
    * shape so callers never know which one ran.
    */
-  async routeHistory(limit = 30): Promise<Map<string, { buildId: string; bytes: number; shellRatio: number | null }[]>> {
-    const snapshots = (await this.list()).slice(0, limit).reverse()
+  async routeHistory(limit = 30, compatibleWith?: Snapshot): Promise<Map<string, { buildId: string; bytes: number; shellRatio: number | null }[]>> {
+    const routeIds = compatibleWith ? new Set(compatibleWith.routes.map((route) => route.id)) : null
+    const nextMajor = compatibleWith?.nextVersion.split('.')[0]
+    const snapshots = (await this.list())
+      .filter((snapshot) => !compatibleWith || (
+        snapshot.schemaVersion === compatibleWith.schemaVersion &&
+        snapshot.bundler === compatibleWith.bundler &&
+        snapshot.nextVersion.split('.')[0] === nextMajor &&
+        snapshot.routes.some((route) => routeIds!.has(route.id))
+      ))
+      .slice(0, limit)
+      .reverse()
     const out = new Map<string, { buildId: string; bytes: number; shellRatio: number | null }[]>()
     for (const s of snapshots) {
       for (const route of s.routes) {

@@ -101,6 +101,7 @@ function routeFindings(route: RouteSnapshot, coverage: Coverage): Finding[] {
   if (route.renderingMode === 'DYNAMIC') {
     const reason = route.dynamicReasons[0] ?? null
     const parsed = reason ? parseReason(reason) : null
+    const root = route.shell?.predictedHoles.find((hole) => hole.boundary === '<route>')
     found.push({
       // A dynamic route that is dynamic because of one uncached fetch is more
       // fixable - and more likely accidental - than one reading cookies, which is
@@ -109,7 +110,7 @@ function routeFindings(route: RouteSnapshot, coverage: Coverage): Finding[] {
       kind: 'dynamic',
       route: route.pattern,
       headline: 'renders on every request - nothing is served statically',
-      detail: reason ? shortReason(reason) : null,
+      detail: reason ? `${shortReason(reason)}${root ? ` - in <${root.component}>` : ''}` : null,
       action: parsed?.kind === 'cache'
         ? `Cache that read (\`use cache\`, or \`fetch(…, { next: { revalidate } })\`) and the route can prerender.`
         : parsed?.api

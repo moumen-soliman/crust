@@ -1,7 +1,7 @@
 {
   "name": "@moumensoliman/crust",
-  "version": "0.1.1",
-  "description": "Production-build regression analysis for Next.js App Router: route modes, bundle attribution, static-shell composition, and source blame.",
+  "version": "0.1.2",
+  "description": "Production-build regression analysis for Next.js App Router: cause chains, shared blast radius, bundle attribution, static-shell composition, and source blame.",
   "license": "MIT",
   "author": "Moumen Soliman",
   "homepage": "https://crust.moumen.dev/",
@@ -16,7 +16,9 @@
     "nextjs",
     "app-router",
     "performance",
-    "bundle-analyzer",
+    "build-analysis",
+    "regression-detection",
+    "bundle-attribution",
     "partial-prerendering",
     "cache-components",
     "ci"
@@ -78,13 +80,16 @@
     "cac": "^6.7.14",
     "es-module-lexer": "^1.7.0",
     "get-tsconfig": "^4.14.0",
+    "ink": "^6.8.0",
     "oxc-parser": "^0.142.0",
     "oxc-resolver": "^11.24.2",
     "picocolors": "^1.1.1",
+    "react": "^19.2.8",
     "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "@types/react": "^19.2.18",
     "playwright": "^1.62.1",
     "tsup": "^8.4.0",
     "typescript": "^5.8.0",

@@ -1,6 +1,6 @@
 ---
-title: "Attribution"
-description: "How bytes in a chunk are traced back to the file that produced them."
+title: "Attribution and cause chains"
+description: "How routes are connected to components, imports, client boundaries, barrels, and source lines."
 ---
 
 ## Route to chunk
@@ -70,3 +70,28 @@ Every byte lands in exactly one of:
 - **unattributed** - no mapping covers it, or the chunk shipped without a map
 
 The last bucket is reported, not hidden. Knowing how much cannot be explained is the point.
+
+## Route to source line
+
+Byte attribution answers *what shipped*. Cause chains answer *why the route reached it*. crust
+preserves binding names while walking components, imports, and first-party calls:
+
+```text
+/courses/[slug]
+→ <CoursePage>
+→ _GetCourseData · packages/core/src/services/Course.ts
+→ fetchJson · packages/core/src/services/index.ts
+→ uncached fetch at packages/core/src/services/index.ts:29
+```
+
+Direct imports, aliases, default exports, named exports, and barrel re-exports remain explicit hops.
+If a unique path cannot be proven, the chain stops at the unresolved segment. Conclusions are
+labelled **verified**, **inferred**, or **unknown**, while separate coverage counts show classified
+routes, measured shells, attributed bytes, and conservative fallbacks.
+
+## Client cost and shared causes
+
+Client boundaries are charged for their reachable subtree. Barrel cost includes only modules that
+become unreachable when that barrel is removed. Shared layouts, boundaries, packages, barrels,
+chunks, and call sites are grouped once with every affected route, so one root cause does not become
+twenty repeated findings.

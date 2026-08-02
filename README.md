@@ -43,19 +43,24 @@
   maps, with separate webpack and Turbopack adapters.
 - **Regression blame** - compares builds and identifies rendering-mode drops, cache regressions,
   shell shrinkage, and first-load growth.
+- **Cause chains and confidence** - follows routes through components and imports to call sites,
+  labels the evidence, and reports measurable analysis coverage.
+- **Shared causes and client cost** - groups one root cause across affected routes and measures
+  client-boundary subtrees and barrel-import drag.
+- **Configuration-aware comparison** - separates framework and route configuration changes from
+  application regressions.
 - **CI enforcement** - fails strict regressions without configuration and supports explicit size,
   growth, and shell-ratio budgets.
 - **Durable history** - stores one snapshot per build and can synchronize baselines through an
   orphan `perf-history` branch.
-- **Reports without a service** - produces a self-contained HTML report and an optional in-app
-  panel. No account or hosted dashboard is required.
+- **Reports without a service** - produces a searchable, filterable self-contained HTML report and
+  an optional in-app panel. No account or hosted dashboard is required.
 
 **Next DevTools explains the current page. crust explains what became worse, why, and whether the
 PR should merge.**
 
-`@next/bundle-analyzer` has no history. Speed Insights has no source attribution. size-limit tools
-do not understand routes or React Server Component boundaries. Next's build output can say that a
-route is partially prerendered, but not which deep import caused its shell to shrink.
+crust connects build artifacts, source relationships, and compatible snapshots so a rendering or
+client-JavaScript change can be traced back to the component, import, and call site responsible.
 
 The in-app panel, runtime collector, ingest endpoint, synthetic runner, and OpenTelemetry spans are
 deliberately secondary. The core workflow needs only source code and a production build.
@@ -106,31 +111,33 @@ npx @moumensoliman/crust analyze
 The first thing it prints is the three things worth fixing, each with the call site and what to do
 about it - not a wall of routes:
 
+```text
+crust — 25 routes                                  Next 16.2.12 · turbopack
+
+BUILD HEALTH
+7 static · 11 dynamic · 7 handlers
+Median first load: 2.3 MB
+4 routes changed since the previous build
+Analysis confidence: 94% (25/25 routes classified)
+CI → fail (1 breach)
+
+FIX FIRST
+1. /courses/[slug] became dynamic
+   Cause: uncached fetch at packages/core/src/services/index.ts:29
+   Introduced by: <CoursePage>
+   Shell: 100% → unavailable
+
+LARGEST CLIENT CONTRIBUTOR
+packages/ui/src/icons/PackagesThumbnails.tsx — 220.8 kB
+
+3 regressions · 1 improvement
+Routes → crust analyze --routes
+Report → crust analyze --report
 ```
-crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
 
-Fix first
-
-  1. /dashboard only 39% of this route is in the static shell
-     ↳ cookies() at app/dashboard/page.tsx:18 - in <Theme>
-     → <Theme> is postponed by that call. Cache it, or accept the hole if the data must be per-request.
-
-  2. /products/[slug] only 45% of this route is in the static shell
-     ↳ uncached fetch at lib/http.ts:3 - in <ProductGallery>
-     → Add `use cache` above that read to pull <ProductGallery> back into the shell.
-
-  3. / 543 kB of JavaScript on first load
-     ↳ 296 kB of it (55%) could not be traced to any source
-     → Source maps are on and these bytes still map to no first-party file, so they are
-       framework or vendor internals. There is no import here to remove.
-
-Route              First load   Shell  Mode
-/                    543.2 kB    100%  static
-/dashboard           527.4 kB     39%  partial
-                    ↳ cookies() at app/dashboard/page.tsx:18
-                    ✂ <Theme> - cookies() at app/dashboard/page.tsx:18
-/products/[slug]     543.2 kB     45%  partial
-```
+`analyze` automatically compares against the latest compatible local snapshot. Add `--routes` for
+the complete inventory, `--verbose` for coverage details and analysis gaps, or `--report` to write
+the full HTML report without dumping it into the terminal.
 
 Then, after a change:
 
@@ -173,6 +180,9 @@ A self-contained HTML report - no integration, no server, one file you can open 
 ```bash
 npx @moumensoliman/crust report --open
 ```
+
+Search by route, component, or source file; filter and group routes; expand cause chains; and select
+a shared cause to see every affected route or copy a concise explanation into a review.
 
 ### CI
 
@@ -250,7 +260,7 @@ totals and shell ratios are kept forever.
 
 | Command | Purpose |
 |---|---|
-| `crust analyze` | Analyze a production build, print prioritized findings, and save a snapshot |
+| `crust analyze` | Explain build health and changes, then save a snapshot; add `--routes` or `--report` for detail |
 | `crust diff [ref]` | Compare the current build with a build id, Git ref, branch, or ancestor |
 | `crust ci [ref]` | Enforce regressions and budgets; optionally write a PR comment |
 | `crust report` | Generate a self-contained HTML report |
@@ -413,7 +423,7 @@ The decision rule is intentionally conservative:
 These are permanent. They are written here before the first user arrives, on purpose.
 
 - **Not a runtime APM.** No error tracking, no distributed tracing, no alerting.
-- **Not a Lighthouse or PageSpeed replacement.**
+- **No composite performance score.** Every result stays tied to measurable build or runtime evidence.
 - **Not multi-framework.** Next.js App Router only. Pages Router is detect-and-warn.
 - **Not a hosted service.** No accounts, no SaaS dashboard.
 - **Not a bundler.** It reads build output; it never changes how your app builds in production.

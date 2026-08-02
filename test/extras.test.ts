@@ -2,54 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { treemapLayout, renderSparklineSvg } from '../src/report/viz.ts'
+import { treemapLayout, renderSparklineSvg, renderTreemapSvg } from '../src/report/viz.ts'
+import { renderReportBody, renderReportStyles } from '../src/report/render.ts'
 import { diffSnapshots } from '../src/diff/diff.ts'
 import { SnapshotStore } from '../src/store/store.ts'
 import { createIngestHandler } from '../src/ingest/handler.ts'
 import { CrustSpanAggregator } from '../src/otel/spans.ts'
+import { route, snapshot as base } from './factories.ts'
 import type { RouteSnapshot, Snapshot } from '../src/store/snapshot.ts'
 
-function route(overrides: Partial<RouteSnapshot> = {}): RouteSnapshot {
-  return {
-    id: 'app/page.tsx',
-    pattern: '/',
-    filePath: 'app/page.tsx',
-    renderingMode: 'STATIC',
-    renderingModeReason: null,
-    firstLoadBytes: 100_000,
-    routeBytes: 10_000,
-    sharedBytes: 90_000,
-    unattributedBytes: 0,
-    modules: {},
-    dependencies: {},
-    dynamicReasons: [],
-    clientBoundaryRoots: [],
-    shell: null,
-    warnings: [],
-    ...overrides,
-  }
-}
 
 function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
-  return {
-    schemaVersion: 1,
+  return base({
     toolVersion: 'test',
     buildId: Math.random().toString(16).slice(2, 18).padEnd(16, '0'),
     createdAt: new Date().toISOString(),
-    gitSha: null,
-    committedAt: null,
-    parentSha: null,
-    branch: 'main',
-    dirty: false,
-    nextVersion: '16.2.12',
-    nodeMajor: 22,
-    bundler: 'webpack',
-    sourceSignature: 'sig',
-    routes: [route()],
-    modules: {},
-    warnings: [],
     ...overrides,
-  }
+  })
 }
 
 describe('treemapLayout', () => {
@@ -85,6 +54,48 @@ describe('treemapLayout', () => {
     expect(treemapLayout([], 100, 100)).toEqual([])
     expect(treemapLayout([{ label: 'a', value: 0 }], 100, 100)).toEqual([])
   })
+
+  it('labels every tile and maps size onto the OKLCH color ramp', () => {
+    const svg = renderTreemapSvg(
+      [
+        { label: 'packages/ui/src/Large.tsx', value: 100_000 },
+        { label: 'packages/ui/src/Tiny.tsx', value: 100 },
+      ],
+      180,
+      70,
+    )
+
+    expect(svg).toContain('oklch(')
+    expect(svg).toContain('--tm-size:1.000')
+    expect(svg).toContain('--tm-size:0.000')
+    expect(svg).toContain('aria-label="packages/ui/src/Large.tsx — 97.7 kB"')
+    expect(svg).toContain('aria-label="packages/ui/src/Tiny.tsx — 0.1 kB"')
+    expect(svg.match(/class="tm-label(?: tm-index)?"/g)).toHaveLength(2)
+  })
+
+  it('includes the largest contributors and unattributed bytes in bundle composition', () => {
+    const modules = Object.fromEntries(Array.from({ length: 25 }, (_, index) => [`src/m${index}.ts`, 1_000 - index]))
+    const body = renderReportBody(
+      snapshot({
+        routes: [route({ modules, dependencies: { giant: 50_000 }, unattributedBytes: 20_000 })],
+      }),
+    )
+
+    expect(body).toContain('giant — 48.8 kB')
+    expect(body).toContain('(unattributed) — 19.5 kB')
+    expect(body).toContain('smaller <i aria-hidden="true"></i> larger')
+  })
+
+  it('keeps bundle composition discoverable under every attributed route', () => {
+    const body = renderReportBody(
+      snapshot({ routes: [route({ modules: { 'src/only.ts': 12_000 } })] }),
+    )
+
+    expect(body).toContain('Open any route to inspect its cause chains, shell exits, and bundle composition.')
+    expect(body).toContain('<span class="disclosure" aria-hidden="true">›</span>')
+    expect(body).toContain('<b>Bundle composition</b>')
+    expect(body).toContain('src/only.ts — 11.7 kB')
+  })
 })
 
 describe('renderSparklineSvg', () => {
@@ -94,8 +105,21 @@ describe('renderSparklineSvg', () => {
   })
 
   it('colors a growth trend as bad', () => {
-    expect(renderSparklineSvg([100, 100, 150])).toContain('var(--bad)')
-    expect(renderSparklineSvg([150, 150, 100])).toContain('var(--static)')
+    expect(renderSparklineSvg([100, 100, 150])).toContain('var(--red)')
+    expect(renderSparklineSvg([150, 150, 100])).toContain('var(--green)')
+    expect(renderSparklineSvg([100, 100, 100])).toContain('var(--faint)')
+  })
+
+  // The stroke names used to be `--bad` / `--static` / `--dim`, which the
+  // stylesheet has never defined: `stroke` was invalid at computed-value time
+  // and every sparkline in the report drew nothing but its end dot. Asserting
+  // the names exist stops the pair drifting apart again.
+  it('only names custom properties the report stylesheet defines', () => {
+    const styles = renderReportStyles()
+    const used = [...renderSparklineSvg([100, 100, 150]).matchAll(/var\((--[a-z-]+)\)/g)].map((m) => m[1]!)
+
+    expect(used.length).toBeGreaterThan(0)
+    for (const name of new Set(used)) expect(styles).toContain(`${name}:`)
   })
 })
 

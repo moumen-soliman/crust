@@ -40,6 +40,7 @@ const TABS: CodeTab[] = [
       <>
         crust <span className="text-muted">4a802397 · next 16.2 · turbopack</span>
       </>,
+      <span className="text-green">92% confidence · 3/3 routes classified</span>,
       <></>,
       <span className="text-blue">Fix first</span>,
       <></>,
@@ -138,6 +139,22 @@ const FEATURES = [
     title: 'Durable history',
     body: 'Conflict-free snapshots on an orphan branch, with route identity that survives URL changes and squash-merged commits.',
   },
+  {
+    title: 'Complete cause chains',
+    body: 'Follow a route through components, bindings and imports to the exact call site, with verified, inferred or unknown evidence.',
+  },
+  {
+    title: 'Shared causes',
+    body: 'Group layouts, client boundaries, barrels, packages and call sites once with every route they affect.',
+  },
+  {
+    title: 'Actionable client cost',
+    body: 'Measure complete client-boundary subtrees and the modules a barrel import uniquely drags into a route.',
+  },
+  {
+    title: 'Measurable confidence',
+    body: 'See classified routes, measured shells, attributed bytes and conservative fallbacks behind every confidence line.',
+  },
 ]
 
 const CERTAINTY = [
@@ -152,7 +169,7 @@ const CERTAINTY = [
 const SECONDARY = [
   {
     title: 'Self-contained report',
-    body: 'One HTML file with summary figures, route detail, module attribution and shell composition. No server or account.',
+    body: 'One searchable HTML file with route filters, grouping, cause chains, module attribution and shell composition. No server or account.',
   },
   {
     title: 'Optional in-app panel',
@@ -345,7 +362,11 @@ export default function Home() {
                 </div>
                 <div className="mb-2 flex gap-2 text-muted text-pretty">
                   <span className="mt-2 block size-[5px] shrink-0 rounded-full bg-faint" />
-                  <span className="text-red">1 failing check · exit 1</span>
+                  <span>
+                    <span className="text-green">verified evidence</span>
+                    {' · '}
+                    <span className="text-red">1 failing check · exit 1</span>
+                  </span>
                 </div>
               </div>
             </div>

@@ -15,18 +15,36 @@ determinable is reported as `unknown` rather than resolved to a plausible answer
 - A boundary child that resolves to no source file - usually a dependency's component
 - `export const dynamic = …` computed at runtime rather than written as a literal
 
-## Where the prediction is deliberately coarse
+## Function-level tracing with a conservative fallback
 
-Taint propagation is **module-level**: if a file transitively reaches something dynamic, the file is
-tainted. That is coarser than function-level, but it errs toward reporting dynamism, never toward
-claiming something is static when it is not.
+crust tracks imported bindings to exported declarations and follows resolvable first-party calls.
+If a route imports `cachedProduct` and `liveProduct` from one module but calls only
+`cachedProduct`, it does not inherit the uncached read from the unused function.
+
+Calls become conservative at module granularity when the target is computed, read through a
+namespace, passed opaquely, or otherwise cannot be narrowed to one export. The cause chain stops at
+that segment, marks the evidence as `unknown`, and coverage reports the module as conservatively
+analysed.
 
 <Warning>
-Module-level taint must not condemn a component outright. Inferring that a component is dynamic
-because its *file* imports something dynamic reported `<RootLayout>` as a hole on every route of a
-real 25-route app - true under module granularity, and useless. Transitive taint decides boundary
-children; it does not condemn a component on its own.
+The conservative fallback must not condemn a component merely because its file imports something
+dynamic. That mistake reported `<RootLayout>` as a hole on every route of a real 25-route app.
+Function reachability decides what the entry actually calls; unresolved work remains visible
+instead of silently becoming component blame.
 </Warning>
+
+## Analysis coverage
+
+The terminal and report expose the denominators behind their confidence line:
+
+- classified routes / measurable routes
+- measured emitted shells / emitted shells
+- attributed client JavaScript / total client JavaScript
+- unresolved component relationships
+- modules that required file-granularity analysis
+
+The first three ratios produce the displayed confidence percentage. Unresolved relationships and
+conservative modules remain separate counts because they have no honest total denominator.
 
 ## Rendering mode
 

@@ -1,3 +1,4 @@
+import { compareConfig, type ConfigChange } from '../analyze/config.ts'
 import type { RouteSnapshot, Snapshot } from '../store/snapshot.ts'
 import { compareModes, revalidateSeconds, type ModeChange } from './mode.ts'
 import { parseReason, reasonKey, shortReason } from './reason.ts'
@@ -77,6 +78,12 @@ export interface Diff {
   routes: RouteDelta[]
   /** True when the two snapshots are not safely comparable. */
   incomparable: string[]
+  /**
+   * What changed about the build rather than about the code. Reported on its
+   * own so a reviewer can tell "someone turned on Cache Components" apart from
+   * "someone broke twenty routes" - which look identical in the route table.
+   */
+  configChanges: ConfigChange[]
 }
 
 /**
@@ -97,18 +104,21 @@ export const NOISE_FLOOR_BYTES = 512
 export function diffSnapshots(base: Snapshot, head: Snapshot, aliases: RouteAliases = {}): Diff {
   const incomparable: string[] = []
 
-  // Comparing across bundlers or Next majors produces differences that are real
-  // but have nothing to do with the change under review, and reporting them as a
-  // regression is how a CI check trains people to ignore it.
-  if (base.bundler !== head.bundler) {
-    incomparable.push(`bundler changed: ${base.bundler} -> ${head.bundler}`)
-  }
-  if (major(base.nextVersion) !== major(head.nextVersion)) {
-    incomparable.push(`Next major changed: ${base.nextVersion} -> ${head.nextVersion}`)
-  }
+  // Schema first. A record written by an older crust is missing whatever has
+  // been added since, and everything below assumes the current shape - the
+  // store normalises reads so this cannot crash, but saying so up front is what
+  // makes the rest of the function safe to read.
   if (base.schemaVersion !== head.schemaVersion) {
-    incomparable.push(`snapshot schema changed: v${base.schemaVersion} -> v${head.schemaVersion}`)
+    incomparable.push(
+      `snapshot schema changed: v${base.schemaVersion} -> v${head.schemaVersion} - re-run \`crust analyze\` on the baseline commit`,
+    )
   }
+
+  // Comparing across bundlers, Next majors or rule sets produces differences
+  // that are real but have nothing to do with the change under review, and
+  // reporting them as a regression is how a CI check trains people to ignore it.
+  const configChanges = compareConfig(base, head)
+  incomparable.push(...configChanges.filter((change) => change.incomparable).map((change) => change.summary))
 
   // Keyed on file path, not URL pattern: patterns change during refactors and the
   // history would silently restart (plan §6). Aliases remap old ids onto new ones
@@ -126,7 +136,7 @@ export function diffSnapshots(base: Snapshot, head: Snapshot, aliases: RouteAlia
     (a, b) => rank[a.severity] - rank[b.severity] || Math.abs(b.firstLoadDelta) - Math.abs(a.firstLoadDelta),
   )
 
-  return { base, head, routes, incomparable }
+  return { base, head, routes, incomparable, configChanges }
 }
 
 function compareRoute(before: RouteSnapshot | undefined, after: RouteSnapshot | undefined): RouteDelta {
@@ -371,5 +381,3 @@ function newHoles(before: RouteSnapshot | undefined, after: RouteSnapshot | unde
     .filter((h) => !known.has(h.component))
     .map((h) => ({ component: h.component, reason: h.reason }))
 }
-
-const major = (version: string): string => version.split('.')[0] ?? version
