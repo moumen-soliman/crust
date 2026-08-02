@@ -9,3 +9,4 @@ dist/
 .perf/
 docs/phase-0-findings.md
 docs/decisions.md
+docs/historical-visibility.md
