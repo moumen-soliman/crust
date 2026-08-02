@@ -11,32 +11,58 @@ import { renderSparklineSvg, renderTreemapSvg } from './viz.ts'
  * React version is a support burden the widget does not need.
  */
 
+/* ─────────────────────────────────────────────────────────
+ * ENTRANCE STORYBOARD
+ *
+ *    0ms   panel surface is already there
+ *   40ms   header + summary figures rise 4px into place
+ *  100ms   route rows begin, staggered 18ms apart
+ *          (capped at 12 rows — past that the tail reads as lag, not rhythm)
+ *
+ * Motion is 4px and 260ms. Anything larger on a devtool panel reads as a
+ * transition between screens rather than content settling.
+ * ───────────────────────────────────────────────────────── */
+const ENTER = {
+  header: 40, // header and figures
+  rows: 100, // first route row
+  stagger: 18, // between rows
+  maxStagger: 12, // rows that stagger before the rest arrive together
+  duration: 260,
+}
+
 export function renderReportStyles(): string {
   return `
 :host, :root { color-scheme: light dark; }
 
 .crust {
-  /* OKLCH throughout: equal L steps read as equal brightness, and hue stays put
-     across the light/dark pair instead of drifting the way HSL ramps do. */
+  /* Achromatic by design: every neutral is C=0, so nothing carries a hue cast
+     and the four status colors are the only chroma on the surface. OKLCH keeps
+     equal L steps reading as equal brightness across the light/dark pair. */
   --bg: oklch(1 0 0);
-  --panel: oklch(0.976 0.003 265);
-  --fg: oklch(0.22 0.012 265);
-  --dim: oklch(0.52 0.016 265);
-  --line: oklch(0.922 0.005 265);
-  --accent: oklch(0.55 0.17 255);
-  --static: oklch(0.58 0.15 150);
-  --partial: oklch(0.6 0.12 210);
-  --dynamic: oklch(0.62 0.14 70);
-  --bad: oklch(0.56 0.19 25);
-  --shadow: 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 12px oklch(0 0 0 / 0.06);
+  --surface: oklch(0.985 0 0);
+  --fg: oklch(0.205 0 0);
+  --muted: oklch(0.556 0 0);
+  --faint: oklch(0.708 0 0);
+  --border: oklch(0.922 0 0);
 
-  /* Type scale: 11 / 12 / 13 / 17. Four steps, no one-off sizes. */
+  --blue: oklch(0.58 0.22 254);
+  --green: oklch(0.62 0.17 149);
+  --amber: oklch(0.68 0.15 72);
+  --red: oklch(0.58 0.24 27);
+
+  /* Shadows are reserved for surfaces that genuinely float. Structure inside the
+     page is hairlines — a shadow between a table row and its neighbour would be
+     depth that doesn't exist. */
+  --shadow: 0 2px 4px oklch(0 0 0 / 0.04), 0 12px 32px oklch(0 0 0 / 0.10);
+
+  /* 11 / 12 / 13 / 14 / 22 — five steps, no one-off sizes. */
   --t-label: 11px;
   --t-meta: 12px;
   --t-body: 13px;
-  --t-title: 17px;
+  --t-lead: 14px;
+  --t-title: 22px;
 
-  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: var(--t-body);
   line-height: 1.5;
   font-synthesis: none;
@@ -48,91 +74,122 @@ export function renderReportStyles(): string {
 
 @media (prefers-color-scheme: dark) {
   .crust {
-    --bg: oklch(0.17 0.008 265);
-    --panel: oklch(0.212 0.011 265);
-    --fg: oklch(0.93 0.006 265);
-    --dim: oklch(0.7 0.016 265);
-    --line: oklch(0.29 0.012 265);
-    --accent: oklch(0.72 0.14 255);
-    --static: oklch(0.78 0.16 150);
-    --partial: oklch(0.78 0.12 205);
-    --dynamic: oklch(0.81 0.13 80);
-    --bad: oklch(0.72 0.16 22);
-    --shadow: 0 1px 2px oklch(0 0 0 / 0.4), 0 4px 14px oklch(0 0 0 / 0.35);
+    --bg: oklch(0 0 0);
+    --surface: oklch(0.145 0 0);
+    --fg: oklch(0.94 0 0);
+    --muted: oklch(0.708 0 0);
+    --faint: oklch(0.556 0 0);
+    --border: oklch(0.269 0 0);
+
+    --blue: oklch(0.65 0.19 254);
+    --green: oklch(0.74 0.18 150);
+    --amber: oklch(0.79 0.15 78);
+    --red: oklch(0.68 0.21 25);
+
+    --shadow: 0 2px 4px oklch(0 0 0 / 0.5), 0 12px 32px oklch(0 0 0 / 0.45);
   }
 }
 
 .crust * { box-sizing: border-box; }
 
+/* ── header ─────────────────────────────────────────────── */
+
+.crust .head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .crust h1 {
-  font-size: var(--t-title);
-  font-weight: 650;
-  line-height: 1.1;
-  letter-spacing: -0.014em;
+  font-size: var(--t-lead);
+  font-weight: 550;
+  line-height: 1.2;
+  letter-spacing: -0.011em;
   text-wrap: balance;
-  margin: 0 0 2px;
+  margin: 0;
 }
-.crust .sub { color: var(--dim); font-size: var(--t-meta); margin-bottom: 16px; text-wrap: pretty; }
+.crust .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--t-meta);
+  color: var(--muted); }
+.crust .sub { color: var(--muted); font-size: var(--t-meta); margin: 4px 0 0; text-wrap: pretty; }
 
-.crust .stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-/* Concentric: the 24px panel has 16px padding, so inner surfaces take 24-16=8. */
-.crust .stat { background: var(--panel); border-radius: 8px; box-shadow: var(--shadow);
-  padding: 9px 11px; min-width: 96px; }
-.crust .stat b { display: block; font-size: var(--t-title); font-weight: 650; line-height: 1.2;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.crust .stat span { color: var(--dim); font-size: var(--t-label); }
+/* Figures sit on hairlines rather than in cards: at five across, five bordered
+   boxes read as five buttons. */
+.crust .stats { display: flex; flex-wrap: wrap; gap: 0 32px;
+  border-block: 1px solid var(--border); padding: 16px 0; margin: 20px 0 0; }
+.crust .stat { min-width: 84px; }
+.crust .stat b { display: block; font-size: var(--t-title); font-weight: 550; line-height: 1.15;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.crust .stat span { display: block; color: var(--muted); font-size: var(--t-meta); margin-top: 3px; }
 
-.crust table { width: 100%; border-collapse: collapse; }
-.crust th { text-align: start; font-weight: 600; color: var(--dim); font-size: var(--t-label);
-  text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px;
-  border-bottom: 1px solid var(--line); }
-.crust td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-/* First-load numbers change between builds, so they must not reflow the column. */
+/* ── table ──────────────────────────────────────────────── */
+
+.crust table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.crust th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-meta);
+  padding: 14px 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.crust td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+/* First-load figures change every build; tabular digits stop the column reflowing. */
 .crust td.num { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .crust tr.route { cursor: pointer; }
-.crust tr.route td { transition-property: background-color; transition-duration: 120ms; }
-.crust tr.route:hover td { background: var(--panel); }
-.crust tr.route:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.crust tr.route td { transition-property: background-color; transition-duration: 100ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+.crust tr.route:hover td { background: var(--surface); }
+.crust tr.route:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 
 .crust code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--t-meta); }
 .crust .path { display: block; max-width: 52ch; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; }
 
-.crust .mode { display: inline-block; font-size: var(--t-label); font-weight: 600;
-  padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
-.crust .m-STATIC { color: var(--static); }
-.crust .m-PARTIALLY_STATIC { color: var(--partial); }
-.crust .m-DYNAMIC { color: var(--dynamic); }
-.crust .m-ISR { color: var(--accent); }
-.crust .m-ROUTE_HANDLER, .crust .m-unknown { color: var(--dim); }
+/* Status as a dot plus a word, not a filled chip: a row of chips competes with
+   the numbers for attention, and the numbers are the point. */
+.crust .mode { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta);
+  color: var(--muted); white-space: nowrap; }
+.crust .mode::before { content: ""; width: 6px; height: 6px; border-radius: 999px;
+  background: currentColor; flex: none; }
+.crust .m-STATIC::before { background: var(--green); }
+.crust .m-PARTIALLY_STATIC::before { background: var(--blue); }
+.crust .m-DYNAMIC::before { background: var(--amber); }
+.crust .m-ISR::before { background: var(--blue); }
+.crust .m-ROUTE_HANDLER::before, .crust .m-unknown::before { background: var(--faint); }
 
-.crust .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden;
+.crust .bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden;
   min-width: 56px; }
-.crust .bar i { display: block; height: 100%; border-radius: 3px; background: var(--static); }
-.crust .bar.low i { background: var(--bad); }
+.crust .bar i { display: block; height: 100%; border-radius: 2px; background: var(--fg); }
+.crust .bar.low i { background: var(--red); }
 
-.crust .detail { display: none; background: var(--panel); }
+/* ── detail ─────────────────────────────────────────────── */
+
+.crust .detail { display: none; }
 .crust .detail.open { display: table-row; }
-.crust .detail td { padding: 12px 14px 16px; }
+.crust .detail td { padding: 4px 10px 20px; background: var(--surface); }
 
-.crust .hole { color: var(--bad); margin: 3px 0; text-wrap: pretty; }
-.crust .mod { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 2px 0; }
-.crust .mod span { color: var(--dim); font-variant-numeric: tabular-nums; }
+.crust .hole { color: var(--red); margin: 4px 0; text-wrap: pretty; }
+.crust .mod { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 3px 0; }
+.crust .mod span { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-.crust .sec { margin-top: 12px; }
-.crust .sec > b { display: block; font-size: var(--t-label); text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--dim); margin-bottom: 5px; }
+.crust .sec { margin-top: 16px; }
+.crust .sec > b { display: block; font-size: var(--t-meta); font-weight: 500;
+  color: var(--muted); margin-bottom: 6px; }
 
-.crust .note { background: var(--panel); border-radius: 8px; box-shadow: var(--shadow);
-  border-inline-start: 3px solid var(--dynamic); padding: 10px 12px; margin-bottom: 14px;
-  color: var(--dim); text-wrap: pretty; }
-.crust .note b { color: var(--fg); }
+.crust .note { border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  padding: 12px 14px; margin: 20px 0 0; color: var(--muted); text-wrap: pretty; }
+.crust .note b { color: var(--fg); font-weight: 550; }
 
-.crust .empty { color: var(--dim); font-style: italic; }
+.crust .empty { color: var(--faint); }
+
+/* ── entrance ───────────────────────────────────────────── */
+
+@keyframes crust-rise { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+
+.crust .head, .crust .sub, .crust .stats, .crust .note {
+  animation: crust-rise ${ENTER.duration}ms cubic-bezier(0.2, 0, 0, 1) ${ENTER.header}ms backwards;
+}
+.crust tr.route {
+  animation: crust-rise ${ENTER.duration}ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  animation-delay: calc(${ENTER.rows}ms + min(var(--i), ${ENTER.maxStagger}) * ${ENTER.stagger}ms);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .crust *, .crust *::before, .crust *::after { transition-duration: 0.01ms !important; }
+  .crust *, .crust *::before, .crust *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 `.trim()
 }
@@ -149,13 +206,15 @@ export function renderReportBody(snapshot: Snapshot): string {
 
   return `
 <div class="crust">
-  <h1>crust · ${escape(snapshot.buildId)}</h1>
-  <div class="sub">
-    next ${escape(snapshot.nextVersion)} · ${escape(snapshot.bundler)} ·
-    ${routes.length} routes ·
-    ${snapshot.gitSha ? `<code>${escape(snapshot.gitSha.slice(0, 8))}</code>` : 'no git'}${snapshot.dirty ? ' (dirty tree)' : ''} ·
-    ${escape(new Date(snapshot.createdAt).toLocaleString())}
+  <div class="head">
+    <h1>crust</h1>
+    <span class="id">${escape(snapshot.buildId)}</span>
   </div>
+  <p class="sub">
+    next ${escape(snapshot.nextVersion)} · ${escape(snapshot.bundler)} ·
+    ${snapshot.gitSha ? `${escape(snapshot.gitSha.slice(0, 8))}` : 'no git'}${snapshot.dirty ? ' · dirty tree' : ''} ·
+    ${escape(new Date(snapshot.createdAt).toLocaleString())}
+  </p>
 
   <div class="stats">
     <div class="stat"><b>${routes.length}</b><span>routes</span></div>
@@ -190,7 +249,7 @@ function renderRoute(route: RouteSnapshot, i: number, history?: Snapshot['histor
   const size = route.renderingMode === 'ROUTE_HANDLER' ? '<span class="empty">—</span>' : kb(route.firstLoadBytes)
 
   return `
-<tr class="route" tabindex="0" role="button" aria-expanded="false" aria-controls="crust-detail-${i}" data-crust-toggle="${i}">
+<tr class="route" style="--i:${i}" tabindex="0" role="button" aria-expanded="false" aria-controls="crust-detail-${i}" data-crust-toggle="${i}">
   <td><code>${escape(route.pattern)}</code></td>
   <td class="num">${size}</td>
   <td>${spark}</td>
@@ -303,8 +362,8 @@ export function renderReportHtml(snapshot: Snapshot): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>crust · ${escape(snapshot.buildId)}</title>
 <style>
-body { margin: 0; padding: 24px; background: #fff; }
-@media (prefers-color-scheme: dark) { body { background: #0f1115; } }
+body { margin: 0; padding: 40px 32px; background: #fff; }
+@media (prefers-color-scheme: dark) { body { background: #000; } }
 ${renderReportStyles()}
 </style>
 </head>

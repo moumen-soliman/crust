@@ -54,64 +54,74 @@ export function mountCrustWidget(options: WidgetOptions = {}): () => void {
   :host { all: initial; }
 
   .launch {
-    font: 650 12px/1 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-    letter-spacing: 0.01em;
-    /* 44px touch target: the pill is visually 32px tall, so the hit area is
-       extended rather than the button being made to look chunky. */
-    min-height: 44px; padding: 0 16px;
+    font: 500 12px/1 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.005em;
+    /* 44px touch target on a 32px-tall pill: the hit area is extended rather
+       than the button made chunky. */
+    min-height: 44px; padding: 0 14px;
+    display: inline-flex; align-items: center; gap: 7px;
     cursor: pointer; border: 0; border-radius: 999px;
-    background: oklch(0.22 0.012 265); color: oklch(0.98 0 0);
-    /* Layered transparent shadows read as depth on any page background;
-       a solid border would fight whatever is behind it. */
-    box-shadow: 0 1px 2px oklch(0 0 0 / 0.12), 0 6px 16px oklch(0 0 0 / 0.18);
-    transition-property: scale, background-color;
+    background: oklch(0.205 0 0); color: oklch(1 0 0);
+    /* The launcher genuinely floats over an unknown page, so it earns a shadow;
+       everything inside the panel is separated by hairlines instead. */
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.16), 0 8px 20px oklch(0 0 0 / 0.16);
+    transition-property: scale, opacity;
     transition-duration: 140ms;
     transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
     -webkit-font-smoothing: antialiased;
     user-select: none;
   }
+  .launch:hover { opacity: 0.88; }
   .launch:active { scale: 0.96; }
-  .launch:focus-visible { outline: 2px solid oklch(0.55 0.17 255); outline-offset: 2px; }
+  .launch:focus-visible { outline: 2px solid oklch(0.58 0.22 254); outline-offset: 2px; }
+  .launch svg { width: 12px; height: 12px; flex: none; }
   @media (prefers-color-scheme: dark) {
-    .launch { background: oklch(0.95 0.004 265); color: oklch(0.17 0.008 265); }
+    .launch { background: oklch(1 0 0); color: oklch(0 0 0); }
+    .launch:focus-visible { outline-color: oklch(0.65 0.19 254); }
   }
 
   .panel {
     display: none; position: fixed; ${vertical}: 68px; ${horizontal}: 16px;
-    width: min(780px, calc(100vw - 32px)); max-height: min(72vh, 800px); overflow: auto;
-    /* Concentric: 24px outer radius with 16px padding gives inner surfaces 8px,
-       which is what the report's stat cards and notes already use. */
-    border-radius: 24px; padding: 16px;
+    width: min(820px, calc(100vw - 32px)); max-height: min(74vh, 820px); overflow: auto;
+    /* Concentric: a 12px radius with 20px padding leaves nothing flush to the
+       corner, which is why no surface inside carries its own rounded background. */
+    border-radius: 12px; padding: 20px 24px 24px;
     background: oklch(1 0 0);
-    box-shadow: 0 2px 4px oklch(0 0 0 / 0.06), 0 16px 48px oklch(0 0 0 / 0.22);
+    border: 1px solid oklch(0.922 0 0);
+    box-shadow: 0 2px 4px oklch(0 0 0 / 0.04), 0 16px 48px oklch(0 0 0 / 0.14);
     overscroll-behavior: contain;
   }
-  @media (prefers-color-scheme: dark) { .panel { background: oklch(0.17 0.008 265); } }
-  .panel.open { display: block; }
+  @media (prefers-color-scheme: dark) {
+    .panel { background: oklch(0 0 0); border-color: oklch(0.269 0 0);
+      box-shadow: 0 2px 4px oklch(0 0 0 / 0.5), 0 16px 48px oklch(0 0 0 / 0.6); }
+  }
+  .panel.open { display: block; animation: panel-in 220ms cubic-bezier(0.2, 0, 0, 1); }
+  @keyframes panel-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
 
   .close {
     position: sticky; top: 0; float: inline-end; z-index: 1;
-    width: 40px; height: 40px; margin: -6px -6px 0 0;
+    width: 40px; height: 40px; margin: -8px -12px 0 0;
     display: grid; place-items: center;
-    cursor: pointer; border: 0; border-radius: 999px; background: none;
-    font-size: 18px; line-height: 1; color: oklch(0.52 0.016 265);
+    cursor: pointer; border: 0; border-radius: 6px; background: none;
+    font-size: 15px; line-height: 1; color: oklch(0.556 0 0);
     transition-property: scale, color; transition-duration: 140ms;
     transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   }
-  .close:hover { color: oklch(0.22 0.012 265); }
+  .close:hover { color: oklch(0.205 0 0); }
   .close:active { scale: 0.96; }
-  .close:focus-visible { outline: 2px solid oklch(0.55 0.17 255); outline-offset: -2px; }
-  @media (prefers-color-scheme: dark) { .close:hover { color: oklch(0.93 0.006 265); } }
+  .close:focus-visible { outline: 2px solid oklch(0.58 0.22 254); outline-offset: -2px; }
+  @media (prefers-color-scheme: dark) { .close:hover { color: oklch(0.94 0 0); } }
 
   @media (prefers-reduced-motion: reduce) {
     .launch, .close { transition-duration: 0.01ms; }
     .launch:active, .close:active { scale: 1; }
+    .panel.open { animation-duration: 0.01ms; }
   }
 
   ${renderReportStyles()}
   ${renderLiveStyles()}
 </style>
-<button class="launch" type="button" part="launcher" aria-expanded="false">crust</button>
+<button class="launch" type="button" part="launcher" aria-expanded="false"><svg viewBox="0 0 32 32" aria-hidden="true" fill="currentColor"><path d="M26 5v5H6V5h20Z"/><path d="M26 12.5V27H13a7 7 0 0 1-7-7V12.5h20Z"/></svg>crust</button>
 <div class="panel" role="dialog" aria-modal="false" aria-label="crust performance report">
   <button class="close" type="button" aria-label="Close">×</button>
   <div class="content"><div class="crust"><div class="sub">Loading…</div></div></div>

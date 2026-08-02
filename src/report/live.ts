@@ -58,12 +58,12 @@ export function renderLiveSection(state: CollectorState): string {
 
 export function renderLiveStyles(): string {
   return `
-.crust .live { border-block-end: 1px solid var(--line); padding-block-end: 14px; margin-block-end: 14px; }
-.crust .live .stats { margin-block-end: 8px; }
-.crust .stat.warn b { color: var(--bad); }
-.crust .fill-bar { display: inline-block; width: 120px; height: 6px; border-radius: 3px;
-  background: var(--line); overflow: hidden; vertical-align: middle; }
-.crust .fill-bar i { display: block; height: 100%; border-radius: 3px; background: var(--partial); }
+.crust .live { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 4px; }
+.crust .live .stats { margin-top: 8px; border-top: 0; }
+.crust .stat.warn b { color: var(--red); }
+.crust .fill-bar { display: inline-block; width: 140px; height: 4px; border-radius: 2px;
+  background: var(--border); overflow: hidden; vertical-align: middle; }
+.crust .fill-bar i { display: block; height: 100%; border-radius: 2px; background: var(--blue); }
 `.trim()
 }
 
