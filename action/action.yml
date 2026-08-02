@@ -1,0 +1,63 @@
+name: crust
+description: Route-level bundle and static-shell regression checks for Next.js App Router.
+author: Moumen Soliman
+
+inputs:
+  working-directory:
+    description: Directory containing the Next.js project.
+    default: '.'
+  dist-dir:
+    description: Build output directory.
+    default: '.next'
+  baseline:
+    description: Git ref to compare against.
+    default: 'main'
+  comment:
+    description: Post the report as a PR comment.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # A fresh checkout has no .perf/ history; the orphan branch is the baseline.
+    - name: Fetch snapshot history
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npx crust history fetch || true
+
+    - name: Run crust
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        npx crust ci "${{ inputs.baseline }}" \
+          --dist-dir "${{ inputs.dist-dir }}" \
+          --comment "$RUNNER_TEMP/crust-comment.md"
+
+    # Same-repo pushes only: a fork PR's GITHUB_TOKEN is read-only on the base
+    # repo, so this reports and skips there instead of failing the check.
+    - name: Publish snapshot history
+      if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npx crust history push || true
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs')
+          const body = fs.readFileSync(process.env.RUNNER_TEMP + '/crust-comment.md', 'utf8')
+          const { owner, repo } = context.repo
+          const issue_number = context.issue.number
+
+          // Update the existing report instead of stacking a new comment on every
+          // push — a PR with thirty pushes should still have one crust comment.
+          const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
+            .data.find((c) => c.body.includes('<!-- crust-report -->'))
+
+          if (existing) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body })
+          }

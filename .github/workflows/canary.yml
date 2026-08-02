@@ -1,0 +1,28 @@
+name: Next canary
+
+# Manifest shapes, flight payload format and artifact locations are undocumented
+# and move on minor releases (R3). Learning about it here rather than from a user
+# issue is the difference between a project that feels alive and one that feels
+# dead — so this failing is expected sometimes, and is the point.
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter crust-fixture-basic add next@canary
+      - run: pnpm --filter crust-fixture-basic exec next build --webpack
+      - run: CRUST_FIXTURE_MODE=cc pnpm --filter crust-fixture-basic exec next build --webpack
+      - run: CRUST_FIXTURE_MODE=turbo pnpm --filter crust-fixture-basic exec next build --turbopack
+      - run: node src/cli.ts analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
+      - run: node src/cli.ts analyze --cwd fixtures/basic --dist-dir .next-turbo --no-save
