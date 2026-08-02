@@ -121,9 +121,9 @@ export default function Home() {
           crust
         </a>
         <div className="nav-links">
-          <a href="https://docs.crust.dev">Docs</a>
-          <a href="https://docs.crust.dev/concepts/shell-engine">Shell engine</a>
-          <a href="https://docs.crust.dev/reference/cli">CLI</a>
+          <a href="https://docs.crust.moumen.dev">Docs</a>
+          <a href="https://docs.crust.moumen.dev/concepts/shell-engine">Shell engine</a>
+          <a href="https://docs.crust.moumen.dev/reference/cli">CLI</a>
         </div>
         <a className="nav-right" href="https://github.com/moumensoliman/crust">
           GitHub
@@ -147,10 +147,10 @@ export default function Home() {
             snapshot per build — so a regression traces back to the commit and the import that caused it.
           </p>
           <div className="actions">
-            <a className="btn btn-primary" href="https://docs.crust.dev/quickstart">
+            <a className="btn btn-primary" href="https://docs.crust.moumen.dev/quickstart">
               Read the docs
             </a>
-            <a className="btn btn-cmd" href="https://docs.crust.dev/quickstart">
+            <a className="btn btn-cmd" href="https://docs.crust.moumen.dev/quickstart">
               <span className="chev">›</span> npx crust analyze
             </a>
           </div>
@@ -273,10 +273,10 @@ export default function Home() {
         <h2>Find out what your shell actually contains</h2>
         <p>crust reads a production build. It refuses to measure dev output, because dev numbers are fiction.</p>
         <div className="actions">
-          <a className="btn btn-primary" href="https://docs.crust.dev/quickstart">
+          <a className="btn btn-primary" href="https://docs.crust.moumen.dev/quickstart">
             Get started
           </a>
-          <a className="btn btn-cmd" href="https://docs.crust.dev/reference/cli">
+          <a className="btn btn-cmd" href="https://docs.crust.moumen.dev/reference/cli">
             <span className="chev">›</span> npx crust report --open
           </a>
         </div>
@@ -285,7 +285,7 @@ export default function Home() {
       <footer>
         <div className="foot pad">
           <Mark size={14} />
-          <a href="https://docs.crust.dev">Docs</a>
+          <a href="https://docs.crust.moumen.dev">Docs</a>
           <span className="sep">/</span>
           <a href="https://github.com/moumensoliman/crust">GitHub</a>
           <span className="sep">/</span>

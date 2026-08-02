@@ -12,7 +12,7 @@
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",
-    "href": "https://crust.dev"
+    "href": "https://crust.moumen.dev"
   },
   "appearance": {
     "default": "system"
@@ -27,7 +27,7 @@
     "primary": {
       "type": "button",
       "label": "Get started",
-      "href": "https://docs.crust.dev/quickstart"
+      "href": "https://docs.crust.moumen.dev/quickstart"
     }
   },
   "navigation": {
