@@ -1,5 +1,6 @@
 node_modules/
 dist/
+*.tgz
 *.tsbuildinfo
 
 # Next.js build output in fixtures

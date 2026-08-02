@@ -6,7 +6,7 @@ const TABS: CodeTab[] = [
     name: 'terminal',
     lines: [
       <>
-        <span className="c-dim">$</span> next build <span className="c-dim">&amp;&amp;</span> npx crust diff main
+        <span className="c-dim">$</span> next build <span className="c-dim">&amp;&amp;</span> npx @moumen/crust diff main
       </>,
       <></>,
       <>
@@ -151,7 +151,7 @@ export default function Home() {
               Read the docs
             </a>
             <a className="btn btn-cmd" href="https://docs.crust.moumen.dev/quickstart">
-              <span className="chev">›</span> npx crust analyze
+              <span className="chev">›</span> npx @moumen/crust analyze
             </a>
           </div>
         </div>
@@ -277,7 +277,7 @@ export default function Home() {
             Get started
           </a>
           <a className="btn btn-cmd" href="https://docs.crust.moumen.dev/reference/cli">
-            <span className="chev">›</span> npx crust report --open
+            <span className="chev">›</span> npx @moumen/crust report --open
           </a>
         </div>
       </section>

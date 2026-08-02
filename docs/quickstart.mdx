@@ -10,24 +10,20 @@ description: "From a production build to prioritized findings, a snapshot, and a
 - A **production** build. crust refuses to measure `next dev` — dev output is unminified,
   unbundled and HMR-laden, so any number taken from it is fiction.
 
-<Warning>
-crust is pre-alpha and the package in this repository is still private. The `npx crust` commands
-below document the intended first-release workflow; the existing unscoped npm package with that
-name is unrelated. Until publication, build this repository and run
-`node /path/to/crust/dist/cli.js`.
-</Warning>
+Install `@moumen/crust` as a development dependency, or use `npx` directly. The package is scoped;
+the executable and the product are both named `crust`.
 
 ## 1. Build, then analyze
 
 <CodeGroup>
 ```bash npm
 next build
-npx crust analyze
+npx @moumen/crust analyze
 ```
 
 ```bash pnpm
 next build
-pnpm dlx crust analyze
+pnpm dlx @moumen/crust analyze
 ```
 </CodeGroup>
 
@@ -70,7 +66,7 @@ editing a shared history file.
 ## 2. See it visually
 
 ```bash
-npx crust report --open
+npx @moumen/crust report --open
 ```
 
 A single self-contained HTML file: summary figures, the route table, and per-route detail with the
@@ -82,7 +78,7 @@ After a change, rebuild and diff:
 
 ```bash
 next build
-npx crust diff main
+npx @moumen/crust diff main
 ```
 
 ```text

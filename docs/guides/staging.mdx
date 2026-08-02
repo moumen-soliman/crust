@@ -6,7 +6,7 @@ description: "An ingest endpoint that cannot be vandalised, and measurements you
 ## Ingest endpoint
 
 ```ts app/api/__crust/ingest/route.ts
-import { createIngestHandler } from 'crust/ingest'
+import { createIngestHandler } from '@moumen/crust/ingest'
 
 export const POST = createIngestHandler({
   secret: process.env.CRUST_INGEST_SECRET!,
@@ -36,7 +36,7 @@ the server.
 ## Synthetic runs
 
 ```bash
-npx crust synthetic https://staging.example.com / /products/1 \
+npx @moumen/crust synthetic https://staging.example.com / /products/1 \
   --iterations 5 --cpu 4 --network fast-3g
 ```
 
@@ -74,7 +74,7 @@ Deliberately minimal — your APM may already cover this.
 
 ```ts instrumentation.ts
 import { registerOTel } from '@vercel/otel'
-import { CrustSpanAggregator } from 'crust/otel'
+import { CrustSpanAggregator } from '@moumen/crust/otel'
 
 export function register() {
   registerOTel({ serviceName: 'my-app', spanProcessors: [new CrustSpanAggregator()] })

@@ -4,10 +4,9 @@ The plan (§12) left these open. Building answered them.
 
 ## Name
 
-`crust`. Both `husk` and `crust` are taken on npm — `husk` is an active-ish package last touched
-in 2022, `crust` an empty placeholder from 2023 — so first publish is scoped (`@<handle>/crust`)
-with the binary still named `crust`, per the plan's fallback. No `next-*` name, per Vercel's
-trademark guidance.
+The product and binary are `crust`. The unscoped npm name was published and then unpublished by
+someone else, so the package is `@moumen/crust` while the installed executable remains `crust`.
+No `next-*` name, per Vercel's trademark guidance.
 
 ## Adapter `onBuildComplete` — not needed
 

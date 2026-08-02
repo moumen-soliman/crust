@@ -14,7 +14,7 @@
  * server internals):
  *
  *   import { registerOTel } from '@vercel/otel'
- *   import { CrustSpanAggregator } from 'crust/otel'
+ *   import { CrustSpanAggregator } from '@moumen/crust/otel'
  *
  *   const aggregator = new CrustSpanAggregator()
  *   export function register() {

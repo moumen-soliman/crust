@@ -1,10 +1,30 @@
 {
-  "name": "crust",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Route-level performance analyzer for Next.js App Router: bundle attribution, shell composition, and regression blame.",
+  "name": "@moumen/crust",
+  "version": "0.1.0",
+  "description": "Production-build regression analysis for Next.js App Router: route modes, bundle attribution, static-shell composition, and source blame.",
   "license": "MIT",
+  "author": "Moumen Soliman",
+  "homepage": "https://crust.moumen.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moumen-soliman/crust.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moumen-soliman/crust/issues"
+  },
+  "keywords": [
+    "nextjs",
+    "app-router",
+    "performance",
+    "bundle-analyzer",
+    "partial-prerendering",
+    "cache-components",
+    "ci"
+  ],
   "type": "module",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "engines": {
     "node": ">=20"
   },
@@ -46,6 +66,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "prepack": "pnpm build",
+    "prepublishOnly": "pnpm typecheck && pnpm test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -69,6 +91,9 @@
     "vitest": "^3.1.0"
   },
   "packageManager": "pnpm@10.33.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "playwright": ">=1.40"
   },

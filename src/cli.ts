@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { spawn } from 'node:child_process'

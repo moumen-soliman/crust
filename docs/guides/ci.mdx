@@ -6,11 +6,6 @@ description: "Automatic regression checks, optional ceilings, an updating PR com
 The PR comment is the point. Every comment is read by every reviewer, in context, at the moment it
 matters.
 
-<Warning>
-The package is still private during pre-alpha. This page documents the intended first-release
-workflow; the composite action expects the published crust CLI to be available through `npx`.
-</Warning>
-
 ## The action
 
 ```yaml .github/workflows/crust.yml
@@ -113,8 +108,8 @@ route deltas are printed.
 A fresh CI checkout has no `.perf/` directory, so the baseline lives on an orphan branch:
 
 ```bash
-npx crust history fetch   # pull snapshots into .perf/
-npx crust history push    # publish this build's snapshot
+npx @moumen/crust history fetch   # pull snapshots into .perf/
+npx @moumen/crust history push    # publish this build's snapshot
 ```
 
 An orphan branch shares no history with your code, so it can grow and be truncated freely without
@@ -129,9 +124,9 @@ Diffs still work from whatever snapshots the branch already holds.
 ## Run the check without the action
 
 ```bash
-npx crust history fetch
-npx crust ci main --comment crust-comment.md
-npx crust history push
+npx @moumen/crust history fetch
+npx @moumen/crust ci main --comment crust-comment.md
+npx @moumen/crust history push
 ```
 
 This is useful on other CI providers. `--comment` writes Markdown only; posting it is the CI
@@ -140,7 +135,7 @@ provider's responsibility.
 ## Retention
 
 ```bash
-npx crust prune
+npx @moumen/crust prune
 ```
 
 Full fidelity for the newest 50 builds, then one snapshot per commit, then module detail dropped

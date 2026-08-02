@@ -6,7 +6,7 @@ description: "Workspace roots, per-package tsconfig paths, and where snapshots l
 crust is built for workspaces. Point it at the **app**, not the repo root:
 
 ```bash
-npx crust analyze --cwd apps/web
+npx @moumen/crust analyze --cwd apps/web
 ```
 
 The workspace root is discovered by walking up for a lockfile or `pnpm-workspace.yaml`, stopping at
