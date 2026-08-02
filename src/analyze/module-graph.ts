@@ -211,7 +211,7 @@ export function propagateDynamicTaint(graph: ModuleGraph): Map<string, string[]>
     for (const f of node.facts.fetches) {
       if (f.inFunction && cachedFunctions.has(f.inFunction)) continue
       if (f.caching === 'default' || f.caching === 'no-store') {
-        reasons.push(`uncached fetch at ${node.file}:${f.line}`)
+        reasons.push(`${UNCACHED_FETCH}${node.file}:${f.line}`)
       }
     }
     if (reasons.length > 0) direct.set(node.file, reasons)
@@ -232,17 +232,92 @@ export function propagateDynamicTaint(graph: ModuleGraph): Map<string, string[]>
   while (queue.length > 0) {
     const file = queue.shift()!
     const reasons = tainted.get(file) ?? []
+
+    // `use cache` is a cache boundary, so a module that puts one in front of
+    // everything it exports stops *cache* taint: an uncached `fetchJson` helper
+    // wrapped by a cached `getProduct` one file up is cached by the time an
+    // importer can observe it. Verified against two real builds of the same
+    // fixture — the emitted shell is 100% static with the directive and 45%
+    // without it, and before this the predictor said 45% both times.
+    //
+    // It stops nothing else. A cache cannot cache `cookies()`; Next rejects a
+    // dynamic API inside `use cache` at build time, and if one is written anyway
+    // the route still reads request state. Containing that would let a directive
+    // silently hide the exact failure this tool exists to report, so dynamic-API
+    // taint propagates through a contained module untouched.
+    const escaping = containsCacheTaint(graph.nodes.get(file))
+      ? reasons.filter((r) => !isUncachedFetch(r))
+      : reasons
+    if (escaping.length === 0) continue
+
     for (const importer of importers.get(file) ?? []) {
-      const existing = tainted.get(importer)
-      const inherited = reasons.map((r) => (r.includes(' via ') ? r : `${r} via ${file}`))
-      if (!existing) {
-        tainted.set(importer, inherited)
+      const inherited = escaping.map((r) => (r.includes(' via ') ? r : `${r} via ${file}`))
+      const merged = tainted.get(importer) ?? []
+
+      // Union, not first-writer-wins. A module that reads `cookies()` itself and
+      // also imports an uncached fetch has two independent reasons to be dynamic,
+      // and dropping the second because the first arrived earlier means fixing
+      // the one crust reported leaves the route dynamic for a reason it never
+      // mentioned. Requeue only on a genuine addition, or the walk never settles.
+      let added = false
+      for (const reason of inherited) {
+        if (merged.length >= MAX_REASONS_PER_FILE) break
+        if (merged.includes(reason)) continue
+        merged.push(reason)
+        added = true
+      }
+
+      if (added) {
+        tainted.set(importer, merged)
         queue.push(importer)
       }
     }
   }
 
   return tainted
+}
+
+/**
+ * Merging turns taint into a union, and on a wide graph a shared utility can
+ * otherwise accumulate every reason in the app. Only the first handful is ever
+ * reported, so this bounds the work rather than the answer. Which reasons survive
+ * past the cap depends on walk order — deterministic for a given graph, but
+ * arbitrary — so the cap sits well above what any caller reads.
+ */
+const MAX_REASONS_PER_FILE = 32
+
+/**
+ * Reason strings are read back by `src/diff/reason.ts` to classify a change. The
+ * prefix lives here because this is where it is written; that parser is a
+ * consumer, and the analyzer must not depend on the diff layer to understand its
+ * own output.
+ */
+const UNCACHED_FETCH = 'uncached fetch at '
+
+const isUncachedFetch = (reason: string): boolean => reason.startsWith(UNCACHED_FETCH)
+
+/**
+ * Whether this module caches everything an importer can reach through it.
+ *
+ * True only when every single value it exports is a `use cache` function: then
+ * the sole way in is through a cache, so whatever the module imports is cached
+ * by the time it is observed. This governs *cache* taint only — see the call
+ * site for why a dynamic API is never contained.
+ *
+ * The bar is deliberately all-or-nothing. One uncached export is enough to let
+ * taint through, because module granularity cannot tell which export the
+ * importer actually called — and the safe direction of that error is to keep
+ * propagating. `export *` disqualifies a module outright: it exports names this
+ * file cannot enumerate, so "every export is cached" is unknowable rather than
+ * true.
+ */
+function containsCacheTaint(node: ModuleNode | undefined): boolean {
+  if (!node) return false
+  const exports = node.facts.exports
+  if (exports.length === 0 || exports.includes('*')) return false
+
+  const cached = new Set(node.facts.useCacheSites.map((s) => s.name))
+  return exports.every((name) => cached.has(name))
 }
 
 /** `app/products/[slug]/page.tsx` -> the layout chain above it, nearest last. */

@@ -23,6 +23,12 @@ export interface SourceFacts {
   fetches: FetchRef[]
   /** `'use cache'` directives, by the function they annotate when known. */
   useCacheSites: SiteRef[]
+  /**
+   * Value bindings this module exports. `'*'` when it re-exports a namespace,
+   * which makes the export list unknowable from this file alone. Used to decide
+   * whether a module can contain taint rather than pass it upwards.
+   */
+  exports: string[]
   components: ComponentFacts[]
   /** Parse failures and constructs we refuse to interpret. */
   unresolved: string[]
@@ -80,6 +86,7 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
     dynamicApis: [],
     fetches: [],
     useCacheSites: [],
+    exports: [],
     components: [],
     unresolved: [],
   }
@@ -126,6 +133,7 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
 
       case 'ExportNamedDeclaration':
         collectRouteConfig(node, facts)
+        if (node.exportKind !== 'type') facts.exports.push(...exportedNames(node))
         // `export { Hero } from './Hero'` is an edge in the module graph just as
         // much as an import is. Missing it means barrel files — the exact
         // structure that causes the over-inclusion this tool exists to find —
@@ -140,6 +148,9 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         break
 
       case 'ExportAllDeclaration':
+        // Whatever the other module exports, this one now exports too — and this
+        // file cannot say what that is.
+        facts.exports.push('*')
         if (node.source?.value) {
           facts.imports.push({ specifier: String(node.source.value), names: ['*'], line: at(node.start).line })
         }
@@ -149,6 +160,7 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         const decl = node.declaration
         const name = decl?.id?.name ?? decl?.name
         if (typeof name === 'string') facts.defaultExportName = name
+        facts.exports.push(typeof name === 'string' ? name : 'default')
         break
       }
 
@@ -306,6 +318,32 @@ function jsxName(opening: OxcNode | undefined): string | null {
   // `<React.Suspense>` — take the property so it matches the bare form.
   if (name.type === 'JSXMemberExpression') return name.property?.name ?? null
   return null
+}
+
+/**
+ * The names an `export` statement introduces, in any of its spellings:
+ * `export function f`, `export const a = 1, b = 2`, `export { a, b }`, and
+ * `export { a } from './x'`. Type-only specifiers are skipped — they are erased
+ * before any bundler sees them and can carry no runtime behaviour.
+ */
+function exportedNames(node: OxcNode): string[] {
+  const names: string[] = []
+
+  const decl = node.declaration
+  if (decl) {
+    if (typeof decl.id?.name === 'string') names.push(decl.id.name)
+    for (const d of decl.declarations ?? []) {
+      if (typeof d.id?.name === 'string') names.push(d.id.name)
+    }
+  }
+
+  for (const spec of node.specifiers ?? []) {
+    if (spec.exportKind === 'type') continue
+    const name = spec.exported?.name ?? spec.local?.name
+    if (typeof name === 'string') names.push(name)
+  }
+
+  return names
 }
 
 /* ── declarations ──────────────────────────────────────────────────────── */

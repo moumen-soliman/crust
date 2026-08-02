@@ -7,7 +7,9 @@ import { analyzeBuild } from './analyze/analyze.ts'
 import { checkBudgets, kb, pct, readBudgets, signed } from './ci/budgets.ts'
 import { renderComment } from './ci/comment.ts'
 import { renderReportHtml } from './report/render.ts'
-import { diffSnapshots, type RouteAliases } from './diff/diff.ts'
+import { NOISE_FLOOR_BYTES, diffSnapshots, type RouteAliases } from './diff/diff.ts'
+import { modeLabel as modeName } from './diff/mode.ts'
+import { findingsFor, type Finding } from './findings/findings.ts'
 import { findWorkspaceRoot } from './core/workspace.ts'
 import { SnapshotStore } from './store/store.ts'
 import { fetchHistory, pushHistory } from './store/history-branch.ts'
@@ -79,14 +81,21 @@ cli
 
     const root = await findWorkspaceRoot(resolve(options.cwd))
     const budgets = await readBudgets(root)
-    const breaches = budgets ? checkBudgets(head, budgets, diff) : []
+    const breaches = checkBudgets(head, budgets, diff)
 
     const comment = renderComment(head, diff, breaches)
     if (options.comment) await writeFile(options.comment, comment + '\n', 'utf8')
     else console.log(comment)
 
-    if (!budgets) {
-      console.error(pc.yellow('\nNo .perf/budgets.json found — nothing to enforce, so nothing failed.'))
+    if (!base) {
+      console.error(
+        pc.yellow(`\nNo baseline snapshot for "${ref ?? 'main'}" — regressions cannot be detected on this run.`),
+      )
+      console.error(pc.dim('  Run `crust history fetch`, or `crust analyze` on the base branch.'))
+    } else if (!budgets) {
+      // Regression rules need no thresholds and already ran; only the ceilings are
+      // missing. Saying "nothing was enforced" here would be false.
+      console.error(pc.dim('\nNo .perf/budgets.json — size and shell ceilings are unset; regression checks still ran.'))
     }
     if (breaches.length > 0) process.exitCode = 1
   })
@@ -259,6 +268,8 @@ function printSnapshot(snapshot: Snapshot): void {
   )
   console.log()
 
+  printFindings(findingsFor(snapshot))
+
   const width = Math.max(6, ...snapshot.routes.map((r) => r.pattern.length))
   console.log(pc.dim(`${'Route'.padEnd(width)}  ${'First load'.padStart(11)}  ${'Shell'.padStart(6)}  Mode`))
 
@@ -286,6 +297,34 @@ function printSnapshot(snapshot: Snapshot): void {
   }
 
   printWarnings(snapshot)
+}
+
+/**
+ * The first thing on screen, before the route table. Someone running this for the
+ * first time has no baseline and therefore no regressions to look at; what they
+ * have is a build and a question, and the question is which three things to fix.
+ * A table of every route answers a different question, so it comes second.
+ */
+function printFindings(findings: Finding[]): void {
+  if (findings.length === 0) return
+
+  const top = findings.slice(0, 3)
+  console.log(pc.bold(`Fix first`))
+  console.log()
+
+  top.forEach((finding, i) => {
+    const where = finding.route ? `${pc.cyan(finding.route)} ` : ''
+    console.log(`  ${pc.bold(`${i + 1}.`)} ${where}${finding.headline}`)
+    if (finding.detail) console.log(pc.dim(`     ↳ ${finding.detail}`))
+    console.log(pc.dim(`     → ${finding.action}`))
+    if (i < top.length - 1) console.log()
+  })
+
+  if (findings.length > 3) {
+    console.log()
+    console.log(pc.dim(`  ${findings.length - 3} more finding(s) — see \`crust report\`.`))
+  }
+  console.log()
 }
 
 /**
@@ -324,17 +363,46 @@ function printDiff(diff: ReturnType<typeof diffSnapshots>): void {
 
   const changed = diff.routes.filter((r) => r.status !== 'unchanged')
   if (changed.length === 0) {
-    console.log(pc.green('No route changed size or shell composition.'))
+    console.log(pc.green('No route changed size, shell composition, rendering mode or caching.'))
     return
   }
 
   for (const route of changed) {
-    const arrow = route.firstLoadDelta > 0 ? pc.red(signed(route.firstLoadDelta)) : pc.green(signed(route.firstLoadDelta))
-    console.log(`${pc.bold(route.pattern)}  ${kb(route.firstLoadAfter)}  ${arrow}`)
+    const delta =
+      Math.abs(route.firstLoadDelta) > NOISE_FLOOR_BYTES
+        ? route.firstLoadDelta > 0
+          ? pc.red(signed(route.firstLoadDelta))
+          : pc.green(signed(route.firstLoadDelta))
+        : pc.dim('—')
+    const flag = route.severity === 'regression' ? pc.red(' ▼') : route.severity === 'improvement' ? pc.green(' ▲') : ''
+    console.log(`${pc.bold(route.pattern)}${flag}  ${kb(route.firstLoadAfter)}  ${delta}`)
 
-    if (route.shellRatioDelta !== null && route.shellRatioDelta !== 0) {
+    // Mode first: it is the coarsest statement about the route, and a drop here
+    // usually explains every other number under it.
+    if (route.modeChange) {
+      const label = `${modeName(route.modeChange.before)} -> ${modeName(route.modeChange.after)}`
+      console.log(route.modeChange.direction === 'regression' ? pc.red(`    ${label}`) : pc.green(`    ${label}`))
+    }
+
+    if (route.shellRatioBefore !== null && route.shellRatioAfter === null) {
+      console.log(pc.red(`    shell ${pct(route.shellRatioBefore)} -> none emitted`))
+    } else if (route.shellRatioDelta !== null && route.shellRatioDelta !== 0) {
       const label = `shell ${pct(route.shellRatioBefore ?? 0)} -> ${pct(route.shellRatioAfter ?? 0)}`
       console.log(route.shellRatioDelta < 0 ? pc.red(`    ${label}`) : pc.green(`    ${label}`))
+    }
+
+    if (route.cacheChange?.revalidate) {
+      const { before, after } = route.cacheChange.revalidate
+      console.log(pc.yellow(`    revalidate ${before}s -> ${after}s`))
+    }
+
+    if (route.cause) {
+      const line =
+        route.cause.kind === 'unknown'
+          ? pc.yellow(`    cause: unknown — ${route.cause.what}`)
+          : `    cause: ${route.cause.what}`
+      console.log(line)
+      if (route.cause.component) console.log(pc.dim(`    introduced by <${route.cause.component}>`))
     }
 
     for (const mod of route.modules.slice(0, 5)) {

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "crust",
+  "description": "Route-level bundle attribution, static shell composition and regression blame for Next.js App Router.",
+  "colors": {
+    "primary": "#171717",
+    "light": "#ffffff",
+    "dark": "#000000"
+  },
+  "favicon": "/docs/logo/icon.svg",
+  "logo": {
+    "light": "/docs/logo/light.svg",
+    "dark": "/docs/logo/dark.svg",
+    "href": "https://crust.moumen.dev"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/moumen-soliman/crust"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get started",
+      "href": "https://docs.crust.moumen.dev/docs/quickstart"
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting started",
+        "pages": [
+          "docs/index",
+          "docs/quickstart",
+          "docs/support"
+        ]
+      },
+      {
+        "group": "Concepts",
+        "pages": [
+          "docs/concepts/shell-engine",
+          "docs/concepts/regressions",
+          "docs/concepts/attribution",
+          "docs/concepts/build-identity",
+          "docs/concepts/unknowns"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "docs/guides/ci",
+          "docs/guides/widget",
+          "docs/guides/runtime",
+          "docs/guides/staging",
+          "docs/guides/monorepos"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "docs/reference/cli",
+          "docs/reference/budgets",
+          "docs/reference/files"
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/moumen-soliman/crust"
+    }
+  }
+}

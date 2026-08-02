@@ -3,7 +3,8 @@ title: "Budgets"
 description: "The shape of .perf/budgets.json."
 ---
 
-Place the file at the **workspace root**. Nothing is enforced until it exists.
+Place the file at the **workspace root**. It adds project-specific ceilings; automatic
+rendering-mode, cache, and shell-disappearance regressions do not require this file.
 
 ```json .perf/budgets.json
 {
@@ -15,7 +16,8 @@ Place the file at the **workspace root**. Nothing is enforced until it exists.
   "defaultMinShellRatio": 0.6,
   "minShellRatio": {
     "/checkout": 0.8
-  }
+  },
+  "allowRegression": ["/admin/[...slug]"]
 }
 ```
 
@@ -42,6 +44,12 @@ Place the file at the **workspace root**. Nothing is enforced until it exists.
 
 <ParamField path="minShellRatio" type="Record<string, number>">
   Per-route shell floors. Overrides the default.
+</ParamField>
+
+<ParamField path="allowRegression" type="string[]">
+  URL patterns exempt from automatic rendering-mode, cache, and shell-disappearance regressions.
+  Use this when making a route less static is intentional. Explicit `firstLoadBytes`, `maxGrowth`,
+  and shell-ratio limits continue to apply.
 </ParamField>
 
 ## Choosing the axes
@@ -71,3 +79,13 @@ site that postponed a component:
 
 When no source map is available, blame falls back to the unattributed total and says so rather than
 naming the largest thing it happens to know about.
+
+## Behavior without a comparable baseline
+
+`firstLoadBytes` and `minShellRatio` describe the current build and still run without a baseline.
+`maxGrowth` requires a delta and is skipped.
+
+The same rule applies when the bundler, Next.js major, or snapshot schema changed: absolute
+ceilings still run, while growth and automatic regression checks do not.
+
+See [regressions and certainty](/docs/concepts/regressions) for the full comparison model.

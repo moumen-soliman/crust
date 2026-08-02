@@ -1,6 +1,6 @@
 ---
-title: "The in-app widget"
-description: "A floating panel in your running app, eliminated from production builds."
+title: "The in-app panel"
+description: "An optional view of crust data in a running production build, eliminated when its gate is off."
 ---
 
 ## 1. Write the manifest
@@ -17,12 +17,12 @@ builds only — never in the build you deploy.
 
 ## 2. Mount it
 
-```tsx components/CrustDevtools.tsx
+```tsx components/CrustPanel.tsx
 'use client'
 
 import { useEffect } from 'react'
 
-export function CrustDevtools() {
+export function CrustPanel() {
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_CRUST) return
 
@@ -46,6 +46,11 @@ NEXT_PUBLIC_CRUST=1 next build && next start
 ```
 
 A `crust` pill appears in the corner.
+
+<Note>
+The panel is a secondary surface for data produced by the build analyzer and runtime collector. It
+is not required for `analyze`, `diff`, `ci`, snapshot history, or the HTML report.
+</Note>
 
 ## Why it is built this way
 

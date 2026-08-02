@@ -9,7 +9,7 @@ import { startCollector } from 'crust/collector'
 const dispose = startCollector()
 ```
 
-Gate it exactly like [the widget](/guides/widget). When the panel is open it shows the live values
+Gate it exactly like [the in-app panel](/docs/guides/widget). When the panel is open it shows the live values
 for the current page.
 
 ## What it collects
@@ -27,7 +27,7 @@ for the current page.
     dimensions.
   </Card>
   <Card title="Streaming waterfall" icon="water">
-    When each Suspense boundary actually filled — [shell engine layer 3](/concepts/shell-engine).
+    When each Suspense boundary actually filled — [shell engine layer 3](/docs/concepts/shell-engine).
   </Card>
 </CardGroup>
 
@@ -63,5 +63,5 @@ the main thread moves the numbers it reports.
 startCollector({ ingestUrl: '/api/__crust/ingest', route: '/products/[slug]' })
 ```
 
-On `pagehide` the collector beacons a compact sample. See [staging](/guides/staging) for the
+On `pagehide` the collector beacons a compact sample. See [staging](/docs/guides/staging) for the
 endpoint.

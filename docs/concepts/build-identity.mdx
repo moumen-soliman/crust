@@ -30,7 +30,7 @@ content-hashed by both bundlers, so it changes exactly when the output does.
 
 ## Run identity
 
-A build can be measured many times. Each [synthetic run](/guides/staging) gets a sortable id and an
+A build can be measured many times. Each [synthetic run](/docs/guides/staging) gets a sortable id and an
 environment fingerprint:
 
 ```text
@@ -51,7 +51,7 @@ Trends are keyed on the **page file path**, not the URL pattern:
 ```
 
 Patterns change during refactors, and keying on them would silently restart the history. When a
-file itself moves, [`.perf/aliases.json`](/reference/files#aliases-json) stitches it back.
+file itself moves, [`.perf/aliases.json`](/docs/reference/files#aliases-json) stitches it back.
 
 ## Orphaned history
 

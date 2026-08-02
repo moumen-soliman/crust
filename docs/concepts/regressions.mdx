@@ -1,0 +1,100 @@
+---
+title: "Regressions and certainty"
+description: "What crust calls a regression, what fails automatically, and when it refuses to judge."
+---
+
+crust separates **regressions** from **ceilings**.
+
+A regression compares this build with the project's own baseline: a route became less static, a
+read stopped being cached, a shell disappeared, or first-load JavaScript grew. A ceiling describes
+one build in isolation: a route may not exceed 250 kB or fall below a 60% shell ratio.
+
+That distinction determines which checks need configuration.
+
+## Automatic regression checks
+
+As soon as a comparable baseline exists, `crust ci` fails without a budget file when:
+
+1. a route moves down the rendering-mode scale
+2. a new uncached-read reason appears
+3. a route that previously emitted a measurable shell emits none
+
+```text
+static → ISR → partial → dynamic
+```
+
+`ROUTE_HANDLER` is not on this scale because a handler has no page shell. `unknown` is not on the
+scale because placing it anywhere would turn missing evidence into a claim.
+
+## Explicit ceilings
+
+These rules require `.perf/budgets.json` because crust cannot know the right limits for another
+project:
+
+- maximum first-load bytes globally or per route
+- maximum percentage growth against a baseline
+- minimum static-shell ratio globally or per route
+
+Ceilings still run when there is no baseline or when two baselines are incomparable. They describe
+the current build, so no delta is needed.
+
+## When crust does not call a regression
+
+### A newly added route
+
+Its baseline size is mathematically zero, but calling its entire bundle “growth” would make every
+new page a regression. New routes are reported as additions and can still breach an absolute
+first-load ceiling.
+
+### An unknown rendering mode
+
+If either side is `unknown`, the change is shown but has no direction and does not fail the
+rendering-mode check.
+
+### Incomparable builds
+
+crust does not compute enforceable deltas when any of these changed:
+
+- bundler
+- Next.js major version
+- snapshot schema version
+
+The PR comment names the incompatibility and omits route-level causes. Comparing across those
+boundaries would attribute framework or measurement changes to the application PR.
+
+### Byte noise
+
+Chunk filenames are content-hashed, so tiny byte changes can appear even when behavior did not.
+crust records exact totals but does not classify a first-load delta of 512 bytes or less as a
+regression.
+
+## Intentional downgrades
+
+Use `allowRegression` when making a route less static is deliberate:
+
+```json .perf/budgets.json
+{
+  "allowRegression": ["/account", "/admin/[...slug]"]
+}
+```
+
+The exemption applies only to crust's automatic mode, cache, and shell-disappearance checks.
+Explicit `firstLoadBytes`, `maxGrowth`, and shell-ratio ceilings continue to apply.
+
+<Warning>
+Keep exemptions route-specific. A global switch would let one intentional dynamic page disable
+protection for the rest of the application.
+</Warning>
+
+## How a cause is selected
+
+For each regressed route, crust prefers evidence in this order:
+
+1. a newly postponed component with a call site
+2. a newly introduced uncached read
+3. the reason for a rendering-mode drop
+4. the largest changed first-party module
+5. `unknown`, with the missing evidence stated
+
+It does not substitute the largest framework package when no application module can be proven.
+Blame that looks precise but cannot be acted on is worse than an explicit unknown.

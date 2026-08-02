@@ -1,0 +1,11 @@
+# Everything that is not published documentation.
+src/
+test/
+spike/
+fixtures/
+site/
+action/
+dist/
+.perf/
+docs/phase-0-findings.md
+docs/decisions.md

@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "From a production build to a report in two commands."
+description: "From a production build to prioritized findings, a snapshot, and a baseline."
 ---
 
 ## Requirements
@@ -9,6 +9,13 @@ description: "From a production build to a report in two commands."
 - Node 20+
 - A **production** build. crust refuses to measure `next dev` — dev output is unminified,
   unbundled and HMR-laden, so any number taken from it is fiction.
+
+<Warning>
+crust is pre-alpha and the package in this repository is still private. The `npx crust` commands
+below document the intended first-release workflow; the existing unscoped npm package with that
+name is unrelated. Until publication, build this repository and run
+`node /path/to/crust/dist/cli.js`.
+</Warning>
 
 ## 1. Build, then analyze
 
@@ -27,16 +34,38 @@ pnpm dlx crust analyze
 ```text
 crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
 
+Fix first
+
+  1. /dashboard only 39% of this route is in the static shell
+     ↳ cookies() at app/dashboard/page.tsx:18 — in <Theme>
+     → <Theme> is postponed by that call. Isolate it inside Suspense, or accept the
+       hole when the data must be per-request.
+
+  2. /products/[slug] only 45% of this route is in the static shell
+     ↳ uncached fetch at lib/http.ts:3 — in <ProductGallery>
+     → Add `use cache` above that read to pull <ProductGallery> back into the shell.
+
 Route              First load   Shell  Mode
 /                    543.2 kB    100%  static
 /dashboard           527.4 kB     39%  partial
                     ↳ cookies() at app/dashboard/page.tsx:18
                     ✂ <Theme> — cookies() at app/dashboard/page.tsx:18
-/products/[slug]     543.2 kB    100%  partial
+/products/[slug]     543.2 kB     45%  partial
 ```
 
-The snapshot is written to `.perf/` — one file per build, so two branches recording builds never
-conflict.
+The findings come first because a new project has no baseline yet. The complete route table follows
+so you can inspect every route, including ones that need no action.
+
+The snapshot is written to `.perf/` using one file per build. Two branches can record builds without
+editing a shared history file.
+
+### Reading the columns
+
+- **First load** is the JavaScript downloaded on the first visit, including shared root chunks.
+- **Shell** is the share of visible rendered output outside pending Suspense boundaries.
+- **Mode** is `static`, `partial`, `isr`, `dynamic`, or `handler`.
+- Indented `↳` lines name the reason for a mode or hole.
+- `✂` names a component that was postponed out of the shell.
 
 ## 2. See it visually
 
@@ -56,10 +85,23 @@ next build
 npx crust diff main
 ```
 
+```text
+crust diff  cfdcf50068722687 -> 4a80239769ea8b93
+
+/products/[slug] ▼  543.2 kB  —
+    static -> partial
+    shell 100% -> 45%
+    cause: uncached fetch at lib/http.ts:3
+    introduced by <ProductGallery>
+```
+
 <Tip>
 `crust diff` accepts a build id, a git SHA, a branch name, or `HEAD~3`. History is walked
 topologically, so a snapshot recorded later on another branch is never mistaken for an ancestor.
 </Tip>
+
+The two builds must use the same bundler, Next.js major, and snapshot schema. If they do not, crust
+names the incompatibility and refuses to assign a cause.
 
 ## Unlock per-file attribution
 
@@ -84,10 +126,10 @@ would rather not ship them.
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Add the CI check" icon="circle-check" href="/guides/ci">
-    Budgets, a PR comment, and snapshot history on an orphan branch.
+  <Card title="Understand regressions" icon="code-compare" href="/docs/concepts/regressions">
+    Automatic checks, explicit ceilings, comparability, and intentional exceptions.
   </Card>
-  <Card title="Run it in your app" icon="window-maximize" href="/guides/widget">
-    A floating panel in your running app, gated out of production builds.
+  <Card title="Add the CI check" icon="circle-check" href="/docs/guides/ci">
+    Regression enforcement, budgets, a PR comment, and history on an orphan branch.
   </Card>
 </CardGroup>

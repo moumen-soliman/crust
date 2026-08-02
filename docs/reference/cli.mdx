@@ -3,8 +3,15 @@ title: "CLI"
 description: "Every command, every flag."
 ---
 
-All commands accept `--cwd <dir>` (default: current directory) pointing at the **Next.js app**, and
-most accept `--dist-dir <dir>` (default: `.next`).
+Commands that analyze a build accept:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--cwd <dir>` | Current directory | Directory containing the Next.js application |
+| `--dist-dir <dir>` | `.next` | Build-output directory, relative to `cwd` |
+
+This keeps monorepo usage explicit: point `--cwd` at the app, while snapshots and budgets are stored
+at the detected workspace root.
 
 ## analyze
 
@@ -31,14 +38,22 @@ npx crust diff [ref]
 
 ## ci
 
-Check budgets and print a PR comment. **Exits non-zero on a breach.**
+Check automatic regressions and configured budgets, then print a PR comment. **Exits non-zero on a
+breach.**
 
 ```bash
 npx crust ci [ref] [--comment <file>]
 ```
 
-Defaults to comparing against `main`. Without `.perf/budgets.json` nothing is enforced and nothing
-fails. See [budgets](/reference/budgets).
+Defaults to comparing against `main`.
+
+Without `.perf/budgets.json`, rendering-mode drops, newly uncached reads, and shell disappearance
+still fail when the baseline is comparable. A budget file adds byte, growth, and shell-ratio
+ceilings. See [regressions](/docs/concepts/regressions) and
+[budgets](/docs/reference/budgets).
+
+If no baseline exists, crust analyzes and snapshots the current build but warns that regressions
+cannot be detected. Absolute ceilings still apply.
 
 ## report
 
@@ -52,7 +67,7 @@ No external requests: styles, script and data are inlined.
 
 ## manifest
 
-Write the snapshot where the [in-app widget](/guides/widget) can fetch it.
+Write the snapshot where the [in-app panel](/docs/guides/widget) can fetch it.
 
 ```bash
 npx crust manifest [--out public/crust-manifest.json]
@@ -107,8 +122,8 @@ npx crust list
 
 | Code | Meaning |
 |---|---|
-| `0` | Success, or no budgets configured |
-| `1` | Budget breach, or `diff` found no baseline |
+| `0` | Success; no automatic regression or configured ceiling was breached |
+| `1` | Regression or budget breach, or `diff` found no baseline |
 
 Any unsupported project — Next outside 15–16, a dev-only build, a Pages Router app — throws with a
 message naming the reason rather than emitting numbers it cannot stand behind.

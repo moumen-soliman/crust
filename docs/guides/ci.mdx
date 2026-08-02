@@ -1,10 +1,15 @@
 ---
 title: "CI and pull requests"
-description: "Budgets, a PR comment that updates in place, and snapshot history on an orphan branch."
+description: "Automatic regression checks, optional ceilings, an updating PR comment, and durable history."
 ---
 
 The PR comment is the point. Every comment is read by every reviewer, in context, at the moment it
 matters.
+
+<Warning>
+The package is still private during pre-alpha. This page documents the intended first-release
+workflow; the composite action expects the published crust CLI to be available through `npx`.
+</Warning>
 
 ## The action
 
@@ -26,18 +31,35 @@ jobs:
         with: { node-version: 22 }
       - run: npm ci
       - run: npx next build
-      - uses: moumensoliman/crust/action@main
+      - uses: moumen-soliman/crust/action@main
         with:
           working-directory: .
           baseline: main
 ```
 
-It fetches snapshot history, runs the check, posts or updates the comment, and publishes the new
-snapshot.
+It fetches snapshot history, runs the check, posts or updates one comment, and publishes the new
+snapshot. The Next production build happens before the action because crust reads its output; the
+action never changes how the application is bundled.
 
-## Budgets
+## What fails without configuration
 
-Create `.perf/budgets.json` at the workspace root. Nothing is enforced until this file exists.
+Once a comparable baseline exists, no budget file is required for strict regressions:
+
+- a route became less static
+- a new uncached read appeared
+- a route stopped emitting a static shell
+
+Those are statements about direction against the project's own previous build, not guessed
+thresholds. `crust ci` exits non-zero when one is detected.
+
+<Note>
+New routes are not regressions. A transition involving `unknown` is reported but not assigned a
+direction. Different bundlers, Next.js majors, or snapshot schemas are not compared.
+</Note>
+
+## Add project-specific ceilings
+
+Create `.perf/budgets.json` at the workspace root for limits crust cannot choose for you:
 
 ```json .perf/budgets.json
 {
@@ -49,40 +71,40 @@ Create `.perf/budgets.json` at the workspace root. Nothing is enforced until thi
   "defaultMinShellRatio": 0.6,
   "minShellRatio": {
     "/checkout": 0.8
-  }
+  },
+  "allowRegression": ["/admin/[...slug]"]
 }
 ```
 
 <Note>
-Both axes are covered on purpose. A check that only guards bytes will happily pass a PR that
-silently halved your static shell — which is the regression nothing else catches.
+`allowRegression` exempts only automatic rendering-mode, cache, and shell-disappearance checks for
+the named route. Explicit byte, growth, and shell-ratio ceilings still apply.
 </Note>
 
-See the [budgets reference](/reference/budgets) for every field.
+See the [regression model](/docs/concepts/regressions) for the certainty rules and the
+[budgets reference](/docs/reference/budgets) for every field.
 
 ## The comment
 
 ```text
-### crust: 2 budget breaches
+### crust: `/products/[slug]` is no longer static
 
-**Budget breaches**
+**`/products/[slug]`**
 
-- `/dashboard` — static shell is 39% of the route, below the 60% floor
-  - blame: `cookies() at app/dashboard/page.tsx:18`
-- `/products/[slug]` — static shell is 45% of the route, below the 60% floor
-  - blame: `uncached fetch at lib/http.ts:3`
+- rendering: **static → partial**
+- static shell: **100% → 45%**
+- Cause: `uncached fetch at lib/http.ts:3`
+- Introduced by: `<ProductGallery>`
 
-| Route | First load | Δ | Shell | Δ |
-|---|--:|--:|--:|--:|
-| `/products/[slug]` | 543.2 kB | — | 45% | -55% |
+**Failing check**
 
-**Fell out of the static shell**
-
-- `/products/[slug]` — `<ProductGallery>` — uncached fetch at lib/http.ts:3
+- `/products/[slug]` — rendering mode dropped static -> partial
 ```
 
 The comment carries a hidden `<!-- crust-report -->` marker so the action updates the existing one
-instead of stacking a new comment on every push.
+instead of stacking a new comment on every push. Regressions receive prose and source blame;
+improvements and neutral changes stay behind a disclosure. If the builds are incomparable, no
+route deltas are printed.
 
 `crust ci` exits non-zero on a breach.
 
@@ -103,6 +125,17 @@ polluting `git log` or complicating rebases.
 the base repository, so `history push` reports and exits cleanly rather than failing the check.
 Diffs still work from whatever snapshots the branch already holds.
 </Warning>
+
+## Run the check without the action
+
+```bash
+npx crust history fetch
+npx crust ci main --comment crust-comment.md
+npx crust history push
+```
+
+This is useful on other CI providers. `--comment` writes Markdown only; posting it is the CI
+provider's responsibility.
 
 ## Retention
 

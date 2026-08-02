@@ -111,4 +111,12 @@ export interface Budgets {
   /** Minimum tolerated shell ratio per route, 0..1. */
   minShellRatio?: Record<string, number>
   defaultMinShellRatio?: number
+  /**
+   * Route patterns exempt from the zero-config regression rules (rendering mode,
+   * caching, shell disappearance). Those rules need no threshold to be meaningful
+   * and so are on by default; this is the escape hatch for a downgrade that was
+   * the point of the PR, and it is a list of routes rather than a global switch
+   * so that exempting one page cannot quietly exempt the rest of the app.
+   */
+  allowRegression?: string[]
 }

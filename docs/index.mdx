@@ -1,23 +1,45 @@
 ---
 title: "Introduction"
-description: "What crust measures, and the one thing nothing else catches."
+description: "Production-build explanations and regression blame for Next.js App Router."
 ---
 
-crust builds a static map of a Next.js App Router project from source, joins it to the build
-output, and stores a snapshot per build — so a regression traces back to the commit and the import
-that caused it.
+crust analyzes a production build of a Next.js App Router project, explains the rendering and cache
+story of every route, and stores a snapshot so the next build can be compared with evidence.
+
+**Next DevTools explains the current page. crust explains what became worse, why, and whether the
+PR should merge.**
+
+## What crust answers
+
+For a single build:
+
+- Is this route static, partially static, ISR, dynamic, or a route handler?
+- Which dynamic API, uncached read, or route configuration produced that mode?
+- How much of the rendered route is in the static shell?
+- Which first-party modules and packages make up its first-load JavaScript?
+- Which three findings are most worth investigating first?
+
+Across builds:
+
+- Did a route become less static?
+- Did a cached read become uncached?
+- Did a component leave the static shell?
+- Did first-load JavaScript grow, and which module caused it?
+- Is the regression certain enough to fail CI?
 
 ## The failure it exists to catch
 
 Under Cache Components, removing a cache directive deep in a utility silently shrinks the static
-shell. No build error. No bundle growth. Nothing surfaces it.
+shell. No build error and no bundle growth:
 
 ```text
 crust diff  cfdcf500 → 4a802397
 
-/products/[slug]  543.2 kB  +0.0 kB
+/products/[slug] ▼  543.2 kB  —
+    static → partial
     shell 100% → 45%
-    ✂ <ProductGallery> left the shell — uncached fetch at lib/http.ts:3
+    cause: uncached fetch at lib/http.ts:3
+    introduced by <ProductGallery>
 ```
 
 The call site named there is three frames below the page, in a file the route never mentions.
@@ -31,32 +53,49 @@ what postpones, and it fails quietly.
 ## What it does
 
 <CardGroup cols={2}>
-  <Card title="Analyze" icon="chart-simple" href="/reference/cli#analyze">
-    Route table, first-load JS, server/client boundaries, and why each route is dynamic.
+  <Card title="Analyze a build" icon="chart-simple" href="/docs/quickstart">
+    Prioritized findings, route modes, first-load JS, shell composition, and source-level reasons.
   </Card>
-  <Card title="Diff" icon="code-compare" href="/reference/cli#diff">
-    Per-route deltas naming the module responsible, not just the route that grew.
+  <Card title="Understand regressions" icon="code-compare" href="/docs/concepts/regressions">
+    What fails automatically, what needs a budget, and when crust refuses to compare.
   </Card>
-  <Card title="Shell engine" icon="layer-group" href="/concepts/shell-engine">
+  <Card title="Shell engine" icon="layer-group" href="/docs/concepts/shell-engine">
     Predicted versus actual static shell, and the call site that broke it.
   </Card>
-  <Card title="CI" icon="circle-check" href="/guides/ci">
-    Budgets on bundle size and shell ratio, with a PR comment that updates in place.
+  <Card title="Add CI" icon="circle-check" href="/docs/guides/ci">
+    Zero-config regression checks, optional ceilings, and a PR comment that updates in place.
   </Card>
 </CardGroup>
 
-## Why not the tools you already have
+## What is enforced
 
-| | Route bundles | History and blame | Shell composition |
-|---|---|---|---|
-| `@next/bundle-analyzer` | Yes | No | No |
-| Speed Insights | No | No source attribution | No |
-| size-limit in CI | Not route-aware | Budgets only | No |
-| **crust** | Yes | Yes | Yes |
+With a comparable baseline, crust fails CI without a budget file when:
+
+- a rendering mode moves down the staticness scale
+- an uncached read appears where the baseline had none
+- a route that emitted a static shell stops emitting one
+
+Project-specific ceilings remain explicit. Configure maximum first-load bytes, maximum percentage
+growth, and minimum shell ratios in `.perf/budgets.json`.
+
+<Note>
+An added route is not a regression, `unknown` is never assigned a direction, and builds made with
+different bundlers, Next majors, or snapshot schemas are not compared. Absolute ceilings can still
+apply because they describe the current build rather than a delta.
+</Note>
+
+## How it differs
+
+| Tool | Best at | What crust adds |
+|---|---|---|
+| Next DevTools | Debugging the current development session | Production-build history and PR enforcement |
+| `@next/bundle-analyzer` | Visualizing one bundle | Route history, shell composition, and source blame |
+| Speed Insights | Real-user performance | Build-time source attribution |
+| size-limit | Generic byte budgets | App Router routes, rendering modes, cache regressions, and shell ratios |
 
 Route-level regression blame and shell composition, together, is the gap.
 
 ## Support
 
 Next.js 15 and 16, webpack and Turbopack. Outside that range crust refuses to run rather than emit
-numbers it cannot stand behind. See [support and non-goals](/support).
+numbers it cannot stand behind. See [support and non-goals](/docs/support).
