@@ -1,5 +1,5 @@
 /**
- * Image audit — pure DOM, no network, the highest value-per-line surface in the
+ * Image audit - pure DOM, no network, the highest value-per-line surface in the
  * project (plan §8, Phase 6): every finding maps to a one-line fix.
  */
 
@@ -32,7 +32,7 @@ export function auditImages(lcpElement: Element | null): ImageFinding[] {
         src,
         element: descriptor,
         kind: 'raw-img',
-        message: 'raw <img> — next/image would add sizing, format negotiation and lazy loading',
+        message: 'raw <img> - next/image would add sizing, format negotiation and lazy loading',
       })
     }
 
@@ -67,7 +67,7 @@ export function auditImages(lcpElement: Element | null): ImageFinding[] {
           src,
           element: descriptor,
           kind: 'overdownload',
-          message: `decoded ${img.naturalWidth}px for a ${Math.round(needed)}px slot — ~${wasted}% wasted; check sizes=`,
+          message: `decoded ${img.naturalWidth}px for a ${Math.round(needed)}px slot - ~${wasted}% wasted; check sizes=`,
         })
       }
     }
@@ -77,7 +77,7 @@ export function auditImages(lcpElement: Element | null): ImageFinding[] {
         src,
         element: descriptor,
         kind: 'missing-dimensions',
-        message: 'no intrinsic dimensions — the page shifts when it loads',
+        message: 'no intrinsic dimensions - the page shifts when it loads',
       })
     }
   }

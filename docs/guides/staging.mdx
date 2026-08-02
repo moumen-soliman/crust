@@ -22,7 +22,7 @@ startCollector({ ingestUrl: '/api/__crust/ingest' })
 ```
 
 The handler is authenticated with a constant-time comparison, rate-limited per client, bounded in
-payload size, and **write-only** — a 204 with no body, so there is nothing to probe. `GET` returns
+payload size, and **write-only** - a 204 with no body, so there is nothing to probe. `GET` returns
 405.
 
 <Warning>
@@ -55,8 +55,8 @@ pnpm add -D playwright && pnpm exec playwright install chromium
 
 ### What makes the numbers comparable
 
-- **The first iteration is discarded.** A cold start measures the deployment's morning — server
-  compile caches, CDN misses, JIT warmup — not your code.
+- **The first iteration is discarded.** A cold start measures the deployment's morning - server
+  compile caches, CDN misses, JIT warmup - not your code.
 - **The median is reported**, not the mean. A mean is hostage to a single GC pause.
 - **Throttle and network are pinned** into the run's environment fingerprint.
 - **The collector and widget are off.** A measurement tool competing for the main thread moves the
@@ -64,13 +64,13 @@ pnpm add -D playwright && pnpm exec playwright install chromium
 
 <Warning>
 Staging numbers are relative, never absolute. Smaller instances, different or absent CDN, more cold
-starts, and above all a seeded database at a fraction of production size — an 8 ms query on 500 rows
+starts, and above all a seeded database at a fraction of production size - an 8 ms query on 500 rows
 is 400 ms on 5 million. crust labels the trend "vs. previous build", never "is this fast".
 </Warning>
 
 ## Server spans
 
-Deliberately minimal — your APM may already cover this.
+Deliberately minimal - your APM may already cover this.
 
 ```ts instrumentation.ts
 import { registerOTel } from '@vercel/otel'

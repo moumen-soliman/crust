@@ -25,7 +25,7 @@ interface Located {
  * three frames down in a utility is what pushed a component out of the shell.
  *
  * Two inverted rule sets share this code path (plan §5):
- *   legacy-ppr        static by default; a dynamic API opts out — loudly, at build time
+ *   legacy-ppr        static by default; a dynamic API opts out - loudly, at build time
  *   cache-components  dynamic by default; `use cache` opts in, and failure is silent
  *
  * The silent case is what this is built for: under Cache Components one uncached
@@ -110,7 +110,7 @@ export function predictShell(
     predictedStatic.add(name)
 
     if (located.facts.hasOpaqueChildren && !isLayout(located.file)) {
-      // A layout rendering `{children}` is resolvable by file convention — the
+      // A layout rendering `{children}` is resolvable by file convention - the
       // page below it is the child. Anywhere else, a component held in a variable
       // or arriving as a prop is not lexically resolvable and is reported as such.
       unknown.add(`${name} at ${located.file} renders a component it receives rather than names`)
@@ -133,7 +133,7 @@ export function predictShell(
    * A component sitting inside a `<Suspense>` is not automatically a hole.
    *
    * If everything it reads is cached, the build prerenders it *through* the
-   * boundary and it lands in the shell — verified against real output: adding
+   * boundary and it lands in the shell - verified against real output: adding
    * `use cache` to the fixture's loader takes the route from a 45% shell to 100%
    * while the boundary stays exactly where it was.
    *
@@ -174,7 +174,7 @@ export function predictShell(
     }
   }
 
-  /** Only the component's *own* body — inherited taint is handled by the tree walk. */
+  /** Only the component's *own* body - inherited taint is handled by the tree walk. */
   function ownTaint(located: Located): string | null {
     const node = graph.nodes.get(located.file)
     const api = node?.facts.dynamicApis.find((a) => a.inFunction === located.facts.name)
@@ -187,7 +187,7 @@ export function predictShell(
 
     // Deliberately not inferring taint from imports here. Module-level taint says
     // "this file transitively reaches something dynamic", which is true of a root
-    // layout in almost every real app — it imports a shared service somewhere. On
+    // layout in almost every real app - it imports a shared service somewhere. On
     // a real 25-route codebase that inference reported `<RootLayout>` as a hole on
     // every single route. Transitive taint still drives boundary children, where
     // it is the right granularity; it must not condemn a component outright.
@@ -217,11 +217,11 @@ function firstReason(reasons: string[] | undefined): string | null {
 
 /**
  * Under Cache Components, sitting inside a boundary with nothing cached above is
- * itself the reason — there is no error and no single call site to point at.
+ * itself the reason - there is no error and no single call site to point at.
  */
 function defaultBoundaryReason(ruleSet: ShellRuleSet): string {
   return ruleSet === 'cache-components'
-    ? 'not cached — Cache Components postpones anything without `use cache`'
+    ? 'not cached - Cache Components postpones anything without `use cache`'
     : 'rendered inside a Suspense boundary'
 }
 

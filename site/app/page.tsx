@@ -109,7 +109,7 @@ const WORKFLOW = [
   },
   {
     title: '6. Enforce the result',
-    body: 'One PR comment leads with the worst proven regression. CI fails on strict direction or a project-defined ceiling—not on a guess.',
+    body: 'One PR comment leads with the worst proven regression. CI fails on strict direction or a project-defined ceiling-not on a guess.',
   },
 ]
 
@@ -239,7 +239,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="mt-5 max-w-[46ch] text-small leading-[1.65] text-muted text-pretty">
-            crust explains why every App Router page is static, partial, ISR or dynamic—then keeps
+            crust explains why every App Router page is static, partial, ISR or dynamic-then keeps
             enough build history to tell you what changed and whether the pull request should merge.
           </p>
           <div className="mt-[30px] flex flex-wrap gap-2.5 max-[520px]:flex-col">

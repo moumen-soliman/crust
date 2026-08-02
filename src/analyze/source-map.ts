@@ -5,7 +5,7 @@ import type { ProjectFileIndex } from '../core/workspace.ts'
 /**
  * Locating a chunk's source map.
  *
- * webpack writes `chunk.js` next to `chunk.js.map`. Turbopack does not — it names
+ * webpack writes `chunk.js` next to `chunk.js.map`. Turbopack does not - it names
  * maps independently (`3cqmf8g-py4nf.js` -> `3ixj0_2my9s3k.js.map`), so the
  * sibling guess finds nothing there. Measured cost of getting this wrong:
  * Turbopack attribution reads 17.5% instead of 99.8% (docs/phase-0-findings.md).
@@ -30,7 +30,7 @@ export async function readSourceMap(chunkPath: string, code: string): Promise<st
     try {
       return await readFile(join(chunkPath, '..', decodeURIComponent(url)), 'utf8')
     } catch {
-      // Comment present but the file is missing — fall through to the sibling guess.
+      // Comment present but the file is missing - fall through to the sibling guess.
     }
   }
 
@@ -48,7 +48,7 @@ export async function readSourceMap(chunkPath: string, code: string): Promise<st
  * Why this isn't a prefix or `node_modules` check: Next ships source maps that
  * point into its **own** `src/`, so `!src.includes('node_modules')` reports
  * Next's router and segment cache as the user's application code. The bundlers
- * also disagree on anchoring — webpack emits `webpack://_N_E/./components/x.tsx`
+ * also disagree on anchoring - webpack emits `webpack://_N_E/./components/x.tsx`
  * while Turbopack emits `turbopack:///[project]/<workspace-relative>/x.tsx`,
  * where `[project]` is the inferred workspace root, not the app directory.
  *

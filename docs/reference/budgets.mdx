@@ -64,16 +64,16 @@ All three answer different questions:
 
 <Note>
 Bytes alone is the common mistake. A PR that removes a cache directive can halve your static shell
-while the bundle stays byte-identical — and a bytes-only check passes it.
+while the bundle stays byte-identical - and a bytes-only check passes it.
 </Note>
 
 ## Blame
 
-Each breach carries the largest contributor it can name — your module, a dependency, or the call
+Each breach carries the largest contributor it can name - your module, a dependency, or the call
 site that postponed a component:
 
 ```text
-- `/products/[slug]` — static shell is 45% of the route, below the 60% floor
+- `/products/[slug]` - static shell is 45% of the route, below the 60% floor
   - blame: `uncached fetch at lib/http.ts:3`
 ```
 

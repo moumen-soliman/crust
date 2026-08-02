@@ -52,7 +52,7 @@ runs:
           const issue_number = context.issue.number
 
           // Update the existing report instead of stacking a new comment on every
-          // push — a PR with thirty pushes should still have one crust comment.
+          // push - a PR with thirty pushes should still have one crust comment.
           const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
             .data.find((c) => c.body.includes('<!-- crust-report -->'))
 

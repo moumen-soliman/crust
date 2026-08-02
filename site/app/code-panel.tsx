@@ -10,7 +10,7 @@ export interface CodeTab {
 /**
  * Tabbed code panel. Every tab's content is rendered into the markup and hidden
  * with `hidden`, so the panel is complete in the prerendered shell and switching
- * costs no request — the page it advertises is the page it should model.
+ * costs no request - the page it advertises is the page it should model.
  */
 export function CodePanel({ tabs }: { tabs: CodeTab[] }) {
   const [active, setActive] = useState(0)

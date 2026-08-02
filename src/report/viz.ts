@@ -100,7 +100,7 @@ export function renderTreemapSvg(items: TreemapItem[], width = 720, height = 220
           `<text x="${(cell.x + 5).toFixed(1)}" y="${(cell.y + 28).toFixed(1)}" class="tm-value">${kb(cell.value)}</text>`
         : ''
       return (
-        `<g><title>${escapeXml(cell.label)} — ${kb(cell.value)}</title>` +
+        `<g><title>${escapeXml(cell.label)} - ${kb(cell.value)}</title>` +
         `<rect x="${cell.x.toFixed(1)}" y="${cell.y.toFixed(1)}" width="${Math.max(0, cell.w - 1.5).toFixed(1)}" height="${Math.max(0, cell.h - 1.5).toFixed(1)}" rx="3" fill="${fill}"/>` +
         label +
         '</g>'
@@ -119,7 +119,7 @@ export function renderTreemapSvg(items: TreemapItem[], width = 720, height = 220
 
 /**
  * Per-route trend as a tiny inline SVG. Points are equal-spaced by build, not by
- * time — the question the sparkline answers is "which change moved it", and
+ * time - the question the sparkline answers is "which change moved it", and
  * builds are the unit of change.
  */
 export function renderSparklineSvg(values: number[], width = 96, height = 22): string {

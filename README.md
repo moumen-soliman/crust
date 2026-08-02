@@ -33,21 +33,21 @@
 
 ## Features
 
-- **Production-build analysis** — reads `.next` output instead of measuring unminified, HMR-heavy
+- **Production-build analysis** - reads `.next` output instead of measuring unminified, HMR-heavy
   development builds.
-- **Route explanations** — reports static, partial, ISR, dynamic, and route-handler modes with the
+- **Route explanations** - reports static, partial, ISR, dynamic, and route-handler modes with the
   API or cache decision that produced them.
-- **Static-shell composition** — predicts the shell from source, verifies it against emitted HTML,
+- **Static-shell composition** - predicts the shell from source, verifies it against emitted HTML,
   and names the component and call site behind each hole.
-- **Bundle attribution** — maps route bytes to first-party modules and dependencies through source
+- **Bundle attribution** - maps route bytes to first-party modules and dependencies through source
   maps, with separate webpack and Turbopack adapters.
-- **Regression blame** — compares builds and identifies rendering-mode drops, cache regressions,
+- **Regression blame** - compares builds and identifies rendering-mode drops, cache regressions,
   shell shrinkage, and first-load growth.
-- **CI enforcement** — fails strict regressions without configuration and supports explicit size,
+- **CI enforcement** - fails strict regressions without configuration and supports explicit size,
   growth, and shell-ratio budgets.
-- **Durable history** — stores one snapshot per build and can synchronize baselines through an
+- **Durable history** - stores one snapshot per build and can synchronize baselines through an
   orphan `perf-history` branch.
-- **Reports without a service** — produces a self-contained HTML report and an optional in-app
+- **Reports without a service** - produces a self-contained HTML report and an optional in-app
   panel. No account or hosted dashboard is required.
 
 **Next DevTools explains the current page. crust explains what became worse, why, and whether the
@@ -90,12 +90,12 @@ npx @moumensoliman/crust analyze
 ```
 
 The npm package is `@moumensoliman/crust`; the installed executable remains `crust`. Do not install the
-unscoped `crust` package—it is unrelated. Playwright is an optional peer dependency needed only by
+unscoped `crust` package-it is unrelated. Playwright is an optional peer dependency needed only by
 `crust synthetic`.
 
 ## Quick start
 
-crust reads the output of a **production build**. Run one first — it refuses to measure
+crust reads the output of a **production build**. Run one first - it refuses to measure
 `next dev`, because dev numbers are unminified, unbundled and HMR-laden.
 
 ```bash
@@ -104,7 +104,7 @@ npx @moumensoliman/crust analyze
 ```
 
 The first thing it prints is the three things worth fixing, each with the call site and what to do
-about it — not a wall of routes:
+about it - not a wall of routes:
 
 ```
 crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
@@ -112,11 +112,11 @@ crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
 Fix first
 
   1. /dashboard only 39% of this route is in the static shell
-     ↳ cookies() at app/dashboard/page.tsx:18 — in <Theme>
+     ↳ cookies() at app/dashboard/page.tsx:18 - in <Theme>
      → <Theme> is postponed by that call. Cache it, or accept the hole if the data must be per-request.
 
   2. /products/[slug] only 45% of this route is in the static shell
-     ↳ uncached fetch at lib/http.ts:3 — in <ProductGallery>
+     ↳ uncached fetch at lib/http.ts:3 - in <ProductGallery>
      → Add `use cache` above that read to pull <ProductGallery> back into the shell.
 
   3. / 543 kB of JavaScript on first load
@@ -128,7 +128,7 @@ Route              First load   Shell  Mode
 /                    543.2 kB    100%  static
 /dashboard           527.4 kB     39%  partial
                     ↳ cookies() at app/dashboard/page.tsx:18
-                    ✂ <Theme> — cookies() at app/dashboard/page.tsx:18
+                    ✂ <Theme> - cookies() at app/dashboard/page.tsx:18
 /products/[slug]     543.2 kB     45%  partial
 ```
 
@@ -142,14 +142,14 @@ npx @moumensoliman/crust diff main
 ```
 crust diff  cfdcf50068722687 -> 4a80239769ea8b93
 
-/products/[slug] ▼  543.2 kB  —
+/products/[slug] ▼  543.2 kB  -
     static -> partial
     shell 100% -> 45%
     cause: uncached fetch at lib/http.ts:3
     introduced by <ProductGallery>
 ```
 
-That is the point. No build error was produced and not one byte moved — a `use cache` directive was
+That is the point. No build error was produced and not one byte moved - a `use cache` directive was
 removed three call frames below the page, and 55% of the route stopped being static.
 
 ### Module attribution needs source maps
@@ -168,7 +168,7 @@ don't want maps in production.
 
 ### Seeing it visually
 
-A self-contained HTML report — no integration, no server, one file you can open or attach to a PR:
+A self-contained HTML report - no integration, no server, one file you can open or attach to a PR:
 
 ```bash
 npx @moumensoliman/crust report --open
@@ -187,13 +187,13 @@ as soon as a baseline snapshot exists:
 - a read that was cached stopped being cached
 - a route that emitted a static shell stopped emitting one
 
-Those need no threshold — they are a strict downgrade against your own previous build. Only the
+Those need no threshold - they are a strict downgrade against your own previous build. Only the
 direction is judged, and only when it is certain. A check that fails on a guess is a check that gets
 switched off, so no delta-based regression is enforced when the comparison itself is in doubt:
 
 - if either side of the comparison is `unknown`, the change is reported and not failed
-- if the two builds are not comparable at all — a different bundler, a different Next major, a
-  different snapshot schema — no regression check runs, and the comment says so instead of
+- if the two builds are not comparable at all - a different bundler, a different Next major, a
+  different snapshot schema - no regression check runs, and the comment says so instead of
   attributing a difference it cannot attribute
 - a newly added route is never a regression; there is no baseline for it to be worse than
 
@@ -226,13 +226,13 @@ The comment leads with the one route that got worst, and stays quiet about every
 
 `allowRegression` is the escape hatch for a downgrade that was the point of the PR. It is a list of
 routes rather than a global switch, so exempting one page cannot quietly exempt the rest of the app,
-and it exempts only the zero-config rules above — a `maxGrowth` or `firstLoadBytes` budget is a
+and it exempts only the zero-config rules above - a `maxGrowth` or `firstLoadBytes` budget is a
 number you wrote down, and it keeps applying.
 
 Both axes are covered on purpose: a check that only guards bytes will happily pass a PR that
 silently halved your static shell.
 
-Snapshots live in `.perf/` (one file per build — no merge conflicts) and sync through an orphan
+Snapshots live in `.perf/` (one file per build - no merge conflicts) and sync through an orphan
 `perf-history` branch so a fresh CI checkout has a baseline:
 
 ```bash
@@ -241,7 +241,7 @@ npx @moumensoliman/crust history push
 ```
 
 The bundled GitHub Action ([action/action.yml](action/action.yml)) does both, posts the comment,
-and updates it in place on every push. Fork PRs get the comment but skip the push — their token is
+and updates it in place on every push. Fork PRs get the comment but skip the push - their token is
 read-only on the base repo, by design. `npx @moumensoliman/crust prune` applies the retention ladder: the newest
 50 builds at full fidelity, then one per commit, then module detail dropped after 90 days; route
 totals and shell ratios are kept forever.
@@ -267,7 +267,7 @@ output directory. See the [complete CLI reference](https://docs.crust.moumen.dev
 ## Beyond the build
 
 Everything above works from build output alone, and that is the part to trust first. What follows
-observes a running app. It is genuinely useful and genuinely secondary — none of it is needed for
+observes a running app. It is genuinely useful and genuinely secondary - none of it is needed for
 the analyzer or the CI check, and it is listed last on purpose.
 
 ### The in-app panel
@@ -306,7 +306,7 @@ NEXT_PUBLIC_CRUST=1 next build
 ```
 
 The gate is checked before the dynamic `import()`, so with the variable unset the bundler drops the
-widget entirely — it is never in your production bundle. The panel renders in a shadow root, so it
+widget entirely - it is never in your production bundle. The panel renders in a shadow root, so it
 cannot restyle your app and your CSS cannot break it, and the manifest is only fetched when you
 first open it, so it does not move the numbers it is reporting.
 
@@ -315,7 +315,7 @@ analyze builds only, never in the build you deploy.
 
 ### Runtime measurement
 
-The collector observes real visits — Web Vitals via `PerformanceObserver`, long animation frames,
+The collector observes real visits - Web Vitals via `PerformanceObserver`, long animation frames,
 an image audit, and the streaming waterfall (when each Suspense hole actually filled):
 
 ```tsx
@@ -343,12 +343,12 @@ npx @moumensoliman/crust synthetic https://staging.example.com / /products/1 --c
 ```
 
 The first iteration is discarded (cold start), the median is reported, and runs on different
-machines are never merged into one trend line. Staging numbers are labeled "vs. previous build" —
-never "is this fast" — because a seeded staging database is a fraction of production's size.
+machines are never merged into one trend line. Staging numbers are labeled "vs. previous build" -
+never "is this fast" - because a seeded staging database is a fraction of production's size.
 
 ### Server spans
 
-Minimal by design — most teams' APM already covers this. `crust/otel` exports a span processor
+Minimal by design - most teams' APM already covers this. `crust/otel` exports a span processor
 that plugs into `instrumentation.ts` (a supported API; crust never patches server internals) and
 aggregates render and fetch time by route:
 
@@ -365,9 +365,9 @@ export function register() {
 
 Two optional JSON files in `.perf/`, for the tail the analyzer cannot resolve:
 
-- `aliases.json` — `{ "app/old/page.tsx": "app/new/page.tsx" }` stitches a moved route back onto
+- `aliases.json` - `{ "app/old/page.tsx": "app/new/page.tsx" }` stitches a moved route back onto
   its history.
-- `overrides.json` — `{ "@weird/alias": "packages/ui/src/index.ts" }` answers import specifiers no
+- `overrides.json` - `{ "@weird/alias": "packages/ui/src/index.ts" }` answers import specifiers no
   resolver can settle.
 
 ## How it works
@@ -394,18 +394,18 @@ The decision rule is intentionally conservative:
   <img src="https://crust.moumen.dev/crust-decision-rule.svg" alt="crust decision rule: compare only compatible baselines, never fail on unknown evidence, and enforce proven regressions" />
 </p>
 
-1. **Detect the build** — crust reads the resolved Next.js version, bundler, route manifests,
+1. **Detect the build** - crust reads the resolved Next.js version, bundler, route manifests,
    prerender metadata, client-reference manifests, and emitted shell HTML.
-2. **Build the source graph** — imports, exports, server/client boundaries, dynamic APIs, fetch
+2. **Build the source graph** - imports, exports, server/client boundaries, dynamic APIs, fetch
    caching, Suspense boundaries, and `use cache` directives are extracted without executing the
    application.
-3. **Attribute bytes** — each route's chunks are mapped to workspace files and packages. Any byte
+3. **Attribute bytes** - each route's chunks are mapped to workspace files and packages. Any byte
    that cannot be proven is recorded as unattributed.
-4. **Predict and verify the shell** — source analysis explains *why* a component is postponed;
+4. **Predict and verify the shell** - source analysis explains *why* a component is postponed;
    emitted HTML verifies *what* the production build actually prerendered.
-5. **Record identity** — Git state, lockfile, Next version, Node major, bundler, and resolved config
+5. **Record identity** - Git state, lockfile, Next version, Node major, bundler, and resolved config
    form a build id so unrelated environments are not merged into one trend.
-6. **Compare and enforce** — comparable snapshots produce route-level deltas, blame, automatic
+6. **Compare and enforce** - comparable snapshots produce route-level deltas, blame, automatic
    regression checks, and optional project-defined ceilings.
 
 ## Non-goals

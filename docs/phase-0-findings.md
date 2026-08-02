@@ -12,14 +12,14 @@ node spike/phase0.ts fixtures/basic .next
 ## Verdict
 
 **Phase 1 proceeds as planned.** The kill criterion (≥85% module attribution) passes on both
-bundlers. The shell engine's dependency — readable shell artifacts — is confirmed and turned out to
+bundlers. The shell engine's dependency - readable shell artifacts - is confirmed and turned out to
 need no adapter hook at all.
 
 | Question | Answer |
 |---|---|
 | route → chunk → module → source? | Yes, both bundlers, by different mechanisms |
 | Attribution accuracy | webpack **87.1%**, Turbopack **99.8%** |
-| Usable shell artifacts? | Yes — plain HTML on disk, no `postponedState` needed |
+| Usable shell artifacts? | Yes - plain HTML on disk, no `postponedState` needed |
 | Turbopack viable? | Yes, and *better* than webpack for source attribution |
 
 ## 1. Source-map attribution clears the bar on both bundlers
@@ -32,7 +32,7 @@ Whole-build byte attribution, `productionBrowserSourceMaps: true`:
 | Turbopack | 627.6 kB | 628.9 kB | **99.8%** |
 
 webpack's shortfall is almost entirely one file: `polyfills-*.js` (110 kB) ships with no source map.
-That is a fixed, identifiable cost, not scattered noise — it can be labelled rather than counted as
+That is a fixed, identifiable cost, not scattered noise - it can be labelled rather than counted as
 unknown. Excluding it, webpack is ~99.6%.
 
 **Turbopack beats webpack here.** R4 assumed Turbopack would be the weak side for attribution. For
@@ -47,7 +47,7 @@ Turbopack names source maps independently of their chunk:
 3cqmf8g-py4nf.js   ->   sourceMappingURL=3ixj0_2my9s3k.js.map
 ```
 
-Guessing `chunk + '.map'` — the obvious implementation, and webpack's actual convention — finds
+Guessing `chunk + '.map'` - the obvious implementation, and webpack's actual convention - finds
 nothing and reports **17.5%** attribution on Turbopack. The `sourceMappingURL` comment is the only
 correct link. Reading it takes Turbopack from 17.5% to 99.8%.
 
@@ -74,7 +74,7 @@ The reliable test is whether the path resolves to a file that **actually exists 
 matching the longest suffix first. That is scheme-agnostic and cannot be fooled.
 
 Note Turbopack's `[project]` root is the inferred *workspace* root, not the app directory, whenever
-an outer lockfile exists — so the path prefix is not stable even within one bundler.
+an outer lockfile exists - so the path prefix is not stable even within one bundler.
 
 ## 2. Route → chunk works on both, by opposite mechanisms
 
@@ -83,12 +83,12 @@ first commit.
 
 | | webpack | Turbopack |
 |---|---|---|
-| `static/chunks/app/**` mirrors the route tree | **Yes** | No — flat, content-hashed names |
+| `static/chunks/app/**` mirrors the route tree | **Yes** | No - flat, content-hashed names |
 | `clientModules[src].chunks` populated | Yes | Yes |
-| …but route-scoped | **No — global** | **Yes** |
+| …but route-scoped | **No - global** | **Yes** |
 | Chunk list format | `[id, path, id, path]`, URL-encoded (`%5Bslug%5D`) | flat, `/_next/`-prefixed |
 
-The webpack manifest for `/dashboard` lists `static/chunks/app/page-*.js` — a chunk belonging to a
+The webpack manifest for `/dashboard` lists `static/chunks/app/page-*.js` - a chunk belonging to a
 different route. Its `clientModules` map is the whole app's client module table, so unioning its
 chunk lists **over-attributes**. Turbopack's manifest is genuinely per-route: `/dashboard` reports
 2 chunks where `/` reports 3.
@@ -100,7 +100,7 @@ So:
 - **Turbopack**: route → chunk comes straight from the client-reference-manifest; there is no path
   convention to fall back on.
 
-Neither mechanism is a substitute for the other. Two implementations, one interface — as planned.
+Neither mechanism is a substitute for the other. Two implementations, one interface - as planned.
 
 ### Manifests that do not exist in Next 16
 
@@ -111,11 +111,11 @@ The plan's reading list is out of date:
   empty `pages: { "/_app": [] }`. It carries no App Router route information at all.
 - `app-path-routes-manifest.json` (entry → URL pattern) is the useful one and was not in the plan.
 - Turbopack additionally emits per-route `server/app/<route>/build-manifest.json`, but those contain
-  only `rootMainFiles` — identical for every route, so not useful for attribution.
+  only `rootMainFiles` - identical for every route, so not useful for attribution.
 
 **`next build` no longer prints size columns.** Next 16.2's route table is just route names and
 rendering-mode glyphs. The Phase 1 exit criterion "totals within 5% of `next build` output" has no
-output left to compare against and needs restating — most likely against the sum of on-disk chunk
+output left to compare against and needs restating - most likely against the sum of on-disk chunk
 bytes reachable from a route.
 
 ## 3. Shell artifacts are readable, and need no adapter hook
@@ -133,7 +133,7 @@ writes ordinary HTML to `.next-cc/server/app/**`. For `/products/alpha`:
 
 Everything the plan predicted, confirmed:
 
-- `<Hero>` (`<h1>`) is **in** the shell — the predicted-static component really is prerendered.
+- `<Hero>` (`<h1>`) is **in** the shell - the predicted-static component really is prerendered.
 - The Suspense hole is marked `<!--$?-->`, with the fallback sitting exactly where the hole is.
 - Boundary IDs (`B:0`) are assigned in document order, so they map back to shell positions and to
   the runtime `$RC("B:0","S:0")` swap calls that layer 3 will observe.
@@ -164,13 +164,13 @@ that the entire shell vanished. Layer 2 must diff against a parameterized shell.
 Both client components ship to the home route, which renders neither. `next/image` comes with them,
 pulling the 15.1 kB shared chunk `619-*.js` onto a route that has no images.
 
-This is R1's hard case behaving exactly as feared — and it is also the single clearest demonstration
+This is R1's hard case behaving exactly as feared - and it is also the single clearest demonstration
 of why the tool is worth building. It is a strong candidate for the README's headline example.
 
 ## 5. What real projects changed
 
-Fixtures validated the mechanisms. Two real codebases — a 25-route Turborepo on Next 16.2.6 with
-Turbopack, and a 6-route app on Next 15.5.21 with webpack — found bugs no fixture would have.
+Fixtures validated the mechanisms. Two real codebases - a 25-route Turborepo on Next 16.2.6 with
+Turbopack, and a 6-route app on Next 15.5.21 with webpack - found bugs no fixture would have.
 
 **`searchParams` cannot be detected by identifier.** Matching the bare name flagged
 `url.searchParams`, ordinary function parameters that happen to share the name, and client-side
@@ -184,7 +184,7 @@ to `/`, which every prerendered route starts with. All 25 routes reported as par
 prerender manifest's `srcRoute` names the dynamic pattern exactly and is now used instead.
 
 **Module-level taint must not condemn a component.** Inferring that a component is dynamic because
-its *file* transitively imports something dynamic reported `<RootLayout>` as a hole on every route —
+its *file* transitively imports something dynamic reported `<RootLayout>` as a hole on every route -
 true under module granularity, and useless, since a root layout imports a shared service in
 practically every real app. Transitive taint still decides boundary children, where it is the right
 granularity; it no longer condemns a component outright.
@@ -196,7 +196,7 @@ the plan simply being out of date.
 **Most projects have no production source maps**, so module attribution is unavailable by default.
 Route totals, rendering modes, dynamic-route blame and shell composition all still work; the tool
 reports the gap per chunk instead of guessing. This is a bigger deal for adoption than the fixtures
-suggested — the headline feature needs one config line that most projects do not have.
+suggested - the headline feature needs one config line that most projects do not have.
 
 ## Consequences for the plan
 
@@ -207,7 +207,7 @@ transform, which remains unproven and stays out of Phases 1–4.
 reference manifest and `app-path-routes-manifest.json` replace it. The plan's stated read order
 needs rewriting before Phase 1 code is committed against it.
 
-**Phase 3 gets cheaper and safer.** No adapter hook, no `postponedState`, no undocumented API — just
+**Phase 3 gets cheaper and safer.** No adapter hook, no `postponedState`, no undocumented API - just
 HTML on disk.
 
 **Phase 1 needs a new exit criterion**, since `next build` no longer prints the sizes it was meant to

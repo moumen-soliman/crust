@@ -16,7 +16,7 @@ for the current page.
 
 <CardGroup cols={2}>
   <Card title="Web Vitals" icon="gauge">
-    LCP with its element, CLS by session window, INP, TTFB and FCP — from raw `PerformanceObserver`,
+    LCP with its element, CLS by session window, INP, TTFB and FCP - from raw `PerformanceObserver`,
     with no dependency.
   </Card>
   <Card title="Long animation frames" icon="hourglass">
@@ -27,13 +27,13 @@ for the current page.
     dimensions.
   </Card>
   <Card title="Streaming waterfall" icon="water">
-    When each Suspense boundary actually filled — [shell engine layer 3](/docs/concepts/shell-engine).
+    When each Suspense boundary actually filled - [shell engine layer 3](/docs/concepts/shell-engine).
   </Card>
 </CardGroup>
 
 ## The image audit runs twice
 
-The over-download check needs `naturalWidth`, which is `0` until an image has decoded — and a lazy
+The over-download check needs `naturalWidth`, which is `0` until an image has decoded - and a lazy
 image below the fold has not even started. Auditing once silently drops the most valuable finding on
 exactly the images most likely to be oversized.
 
@@ -41,15 +41,15 @@ So there is an early pass for the structural findings, and a second pass once th
 still loading settle.
 
 ```text
-img alt="hero" — raw <img> — next/image would add sizing, format negotiation and lazy loading
-img alt="hero" — decoded 1600px for a 640px slot — ~60% wasted; check sizes=
-img alt="hero" — no intrinsic dimensions — the page shifts when it loads
+img alt="hero" - raw <img> - next/image would add sizing, format negotiation and lazy loading
+img alt="hero" - decoded 1600px for a 640px slot - ~60% wasted; check sizes=
+img alt="hero" - no intrinsic dimensions - the page shifts when it loads
 ```
 
 ## Observer effect
 
 Everything is passive observation. The state object is shared by reference, so there is no polling
-and no copying, and the only active DOM walk — the image audit — runs after `load` in an idle
+and no copying, and the only active DOM walk - the image audit - runs after `load` in an idle
 callback.
 
 <Note>

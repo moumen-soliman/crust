@@ -87,7 +87,7 @@ npx @moumensoliman/crust history push [--remote origin]
 npx @moumensoliman/crust history fetch [--remote origin]
 ```
 
-`push` reports and exits cleanly when the remote rejects it — a fork PR's token is read-only on the
+`push` reports and exits cleanly when the remote rejects it - a fork PR's token is read-only on the
 base repository, and that is not a failure worth breaking the check over.
 
 ## prune
@@ -125,5 +125,5 @@ npx @moumensoliman/crust list
 | `0` | Success; no automatic regression or configured ceiling was breached |
 | `1` | Regression or budget breach, or `diff` found no baseline |
 
-Any unsupported project — Next outside 15–16, a dev-only build, a Pages Router app — throws with a
+Any unsupported project - Next outside 15–16, a dev-only build, a Pages Router app - throws with a
 message naming the reason rather than emitting numbers it cannot stand behind.

@@ -8,14 +8,14 @@ export interface Finding {
   /** The route pattern this is about, or null for a project-wide finding. */
   route: string | null
   headline: string
-  /** The evidence — a call site, a package name, a number. Null when there is none. */
+  /** The evidence - a call site, a package name, a number. Null when there is none. */
   detail: string | null
   /** What to actually do about it. Never optional: a finding with no action is noise. */
   action: string
 }
 
 /**
- * A first run has no baseline, so it cannot talk about regressions — which is the
+ * A first run has no baseline, so it cannot talk about regressions - which is the
  * tool's real subject. What it can do is answer the question someone actually has
  * the first time they run it: *of everything in this build, what are the three
  * things worth my afternoon?*
@@ -103,12 +103,12 @@ function routeFindings(route: RouteSnapshot, coverage: Coverage): Finding[] {
     const parsed = reason ? parseReason(reason) : null
     found.push({
       // A dynamic route that is dynamic because of one uncached fetch is more
-      // fixable — and more likely accidental — than one reading cookies, which is
+      // fixable - and more likely accidental - than one reading cookies, which is
       // usually a deliberate decision about personalised content.
       severity: RANK.fullyDynamic + (parsed?.kind === 'cache' ? 5 : 0),
       kind: 'dynamic',
       route: route.pattern,
-      headline: 'renders on every request — nothing is served statically',
+      headline: 'renders on every request - nothing is served statically',
       detail: reason ? shortReason(reason) : null,
       action: parsed?.kind === 'cache'
         ? `Cache that read (\`use cache\`, or \`fetch(…, { next: { revalidate } })\`) and the route can prerender.`
@@ -128,12 +128,12 @@ function routeFindings(route: RouteSnapshot, coverage: Coverage): Finding[] {
       kind: 'shell',
       route: route.pattern,
       headline: `only ${Math.round(ratio * 100)}% of this route is in the static shell`,
-      detail: hole ? `${shortReason(hole.reason)} — in <${hole.component}>` : null,
+      detail: hole ? `${shortReason(hole.reason)} - in <${hole.component}>` : null,
       action: parsed?.kind === 'cache'
         ? `Add \`use cache\` above that read to pull <${hole!.component}> back into the shell.`
         : hole
           ? `<${hole.component}> is postponed by that call. Cache it, or accept the hole if the data must be per-request.`
-          : 'The build emitted holes crust could not trace to a call site — run with source maps for the call site.',
+          : 'The build emitted holes crust could not trace to a call site - run with source maps for the call site.',
     })
   }
 
@@ -148,7 +148,7 @@ function routeFindings(route: RouteSnapshot, coverage: Coverage): Finding[] {
       route: route.pattern,
       headline: 'crust could not determine why this route is not prerendered',
       detail: route.renderingModeReason,
-      action: 'Reported as unknown rather than guessed. If this route matters, open an issue with its source — this is a gap in the analyzer.',
+      action: 'Reported as unknown rather than guessed. If this route matters, open an issue with its source - this is a gap in the analyzer.',
     })
   }
 
@@ -162,12 +162,12 @@ function projectFindings(snapshot: Snapshot, coverage: Coverage): Finding[] {
     const worst = coverage.worstRoute
     found.push({
       // Below any real route problem, because it is about crust's own accuracy
-      // rather than about the app — but above `unknown`, because it is the one
+      // rather than about the app - but above `unknown`, because it is the one
       // finding here with a one-line fix that improves every other finding.
       severity: RANK.setup,
       kind: 'setup',
       route: null,
-      headline: 'per-file attribution is degraded — some chunks shipped without source maps',
+      headline: 'per-file attribution is degraded - some chunks shipped without source maps',
       // Deliberately the worst single route rather than a project total. Routes
       // share chunks, so summing `unattributedBytes` across them counts the same
       // bytes once per route that loads them and invents a number larger than the
@@ -196,7 +196,7 @@ function projectFindings(snapshot: Snapshot, coverage: Coverage): Finding[] {
 
 /**
  * The framework runtime. On a small app it is most of first-load JS and it is the
- * heaviest "dependency" on every single route — so blaming it produces a finding
+ * heaviest "dependency" on every single route - so blaming it produces a finding
  * that is simultaneously true, top-ranked, and impossible to act on. Nobody can
  * `next/dynamic` away React. It is reported as the floor it is, and blame moves to
  * the heaviest thing the author actually chose.
@@ -232,7 +232,7 @@ function sizeFinding(route: RouteSnapshot, coverage: Coverage): Finding {
       ...base,
       detail: `${worst.name} is ${(worst.bytes / 1024).toFixed(1)} kB of it${frameworkBytes > 0 ? `, on a ${(frameworkBytes / 1024).toFixed(0)} kB framework baseline` : ''}`,
       action: worst.isDependency
-        ? `Check whether \`${worst.name}\` needs to be in the client bundle — a server component or a \`next/dynamic\` import removes it from first load.`
+        ? `Check whether \`${worst.name}\` needs to be in the client bundle - a server component or a \`next/dynamic\` import removes it from first load.`
         : `\`${worst.name}\` is first-party. If it is only needed after interaction, \`next/dynamic\` takes it out of first load.`,
     }
   }
@@ -246,7 +246,7 @@ function sizeFinding(route: RouteSnapshot, coverage: Coverage): Finding {
       // cost the coverage. Recommending a setting the project already has is how a
       // tool proves it did not look.
       action: coverage.degraded
-        ? 'Set `productionBrowserSourceMaps: true` in next.config and rebuild — until then crust cannot say what those bytes are.'
+        ? 'Set `productionBrowserSourceMaps: true` in next.config and rebuild - until then crust cannot say what those bytes are.'
         : 'These bytes map to no first-party file, so they are framework or vendor internals. There is no import here to remove.',
     }
   }
@@ -263,7 +263,7 @@ function sizeFinding(route: RouteSnapshot, coverage: Coverage): Finding {
 
 const pct = (ratio: number): string => `${Math.round(ratio * 100)}%`
 
-/** The heaviest thing the author chose to add — never the framework itself. */
+/** The heaviest thing the author chose to add - never the framework itself. */
 function heaviestContributor(route: RouteSnapshot): { name: string; bytes: number; isDependency: boolean } | null {
   const candidates = [
     ...Object.entries(route.dependencies)

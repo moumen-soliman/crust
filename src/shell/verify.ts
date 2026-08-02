@@ -6,8 +6,8 @@ import { toPosix } from '../core/workspace.ts'
 /**
  * Layer 2 of the shell engine: read the shell the build actually produced.
  *
- * Deliberately plain HTML parsing. `postponedState` is opaque by contract — the
- * docs are explicit that reading or altering it produces incorrect output — and
+ * Deliberately plain HTML parsing. `postponedState` is opaque by contract - the
+ * docs are explicit that reading or altering it produces incorrect output - and
  * it turns out never to be needed: the prerendered HTML already contains each
  * fallback sitting exactly where its hole is, with boundary ids assigned in
  * document order (docs/phase-0-findings.md §3).
@@ -37,8 +37,8 @@ export async function readActualShell(distDir: string, pattern: string): Promise
 }
 
 /**
- * A route with `generateStaticParams` emits both `products/[slug].html` — the
- * unparameterized fallback, which is **zero bytes** — and `products/alpha.html`,
+ * A route with `generateStaticParams` emits both `products/[slug].html` - the
+ * unparameterized fallback, which is **zero bytes** - and `products/alpha.html`,
  * the real shell. Diffing against the empty one reports that the entire shell
  * vanished on every build, so a parameterized shell is preferred whenever one
  * exists (docs/phase-0-findings.md §3).
@@ -84,7 +84,7 @@ async function findShellHtml(distDir: string, pattern: string): Promise<string |
  * How much of the rendered route made it into the shell.
  *
  * Measured as the share of body text that is not inside a pending boundary, which
- * tracks what a user sees before hydration far better than raw byte counts do —
+ * tracks what a user sees before hydration far better than raw byte counts do -
  * inline scripts and the flight payload dwarf the markup and would swamp any
  * byte-based figure.
  */

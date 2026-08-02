@@ -83,7 +83,7 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
 
   // The framework runtime and polyfills are the bulk of first-load JS on almost
   // every route, so leaving them unattributed means blame can only ever name the
-  // small route-specific modules — naming a 0.2 kB component as the cause of a
+  // small route-specific modules - naming a 0.2 kB component as the cause of a
   // 543 kB budget breach. Attributed once, shared by every route.
   const sharedRootAttribution = { firstParty: new Map<string, number>(), dependencies: new Map<string, number>(), unattributed: 0 }
   for (const chunk of sharedRootChunks) {
@@ -237,7 +237,7 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
     warnings.push(`could not locate the source file for ${ctx.entry}`)
   }
 
-  // Route handlers have no client bundle, no shell and no rendering mode — they
+  // Route handlers have no client bundle, no shell and no rendering mode - they
   // are server functions. Reporting them as "unknown" implies a gap in the
   // analysis when there is nothing there to analyse.
   const isRouteHandler = ctx.entry.endsWith('/route') && !pageFile?.match(/opengraph-image|icon|apple-icon/)
@@ -289,8 +289,8 @@ function renderingModeFor(
   const prerendered = ctx.prerender?.routes[ctx.pattern]
 
   // A prerendered route that shipped pending boundaries is partially static, not
-  // static. The prerender manifest cannot distinguish the two — it lists both the
-  // same way — so the emitted shell is the only thing that actually knows.
+  // static. The prerender manifest cannot distinguish the two - it lists both the
+  // same way - so the emitted shell is the only thing that actually knows.
   if (actual && actual.holes > 0) {
     return { mode: 'PARTIALLY_STATIC', reason: dynamicReasons[0] ?? null }
   }
@@ -324,7 +324,7 @@ async function assertBuildExists(distDir: string): Promise<void> {
     await stat(join(distDir, 'app-path-routes-manifest.json'))
   } catch {
     throw new Error(
-      `No production build found at ${distDir}. crust measures production builds only — dev numbers are unminified, unbundled fiction.`,
+      `No production build found at ${distDir}. crust measures production builds only - dev numbers are unminified, unbundled fiction.`,
     )
   }
 }

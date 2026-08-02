@@ -18,7 +18,7 @@ export interface ChunkRef {
 }
 
 export interface RouteEntry {
-  /** Stable trend key — file path, not URL pattern (plan §6). */
+  /** Stable trend key - file path, not URL pattern (plan §6). */
   id: string
   pattern: string
   filePath: string | null
@@ -57,7 +57,7 @@ export interface BuildAnalysis {
 }
 
 /**
- * One interface, two implementations, from the first commit — never an inline
+ * One interface, two implementations, from the first commit - never an inline
  * `if (bundler === 'turbopack')` branch (R2). Feature asymmetry between the two
  * is expected and gets documented, not hidden.
  */

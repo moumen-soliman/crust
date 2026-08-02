@@ -4,7 +4,7 @@
        Both exist because GitHub renders a README in whichever theme the reader
        chose and serves the mark through <picture>, which resolves against the
        page. A prefers-color-scheme query inside an SVG loaded as an image reads
-       the reader's OS setting instead — not the same thing, and wrong whenever
+       the reader's OS setting instead - not the same thing, and wrong whenever
        the two disagree.
 
        Same geometry as mark.svg; only the ink differs. -->

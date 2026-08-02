@@ -14,7 +14,7 @@ export interface Snapshot {
   createdAt: string
 
   gitSha: string | null
-  /** Author date — survives rebase, unlike commit date. */
+  /** Author date - survives rebase, unlike commit date. */
   committedAt: string | null
   parentSha: string | null
   branch: string | null
@@ -29,7 +29,7 @@ export interface Snapshot {
   routes: RouteSnapshot[]
   /**
    * Optional per-route trend data, embedded by `crust report` / `crust manifest`
-   * from the local store — oldest first. The analyzer never fills this in; a
+   * from the local store - oldest first. The analyzer never fills this in; a
    * snapshot describes one build, and history is the store's concern.
    */
   history?: Record<string, { bytes: number[]; shell: (number | null)[] }>

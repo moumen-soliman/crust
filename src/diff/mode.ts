@@ -7,7 +7,7 @@ export interface ModeChange {
   after: StoredMode
   /**
    * `regression` means the route got less static. `unknown` means one side is a
-   * mode with no place on the scale, so the direction cannot be stated — never
+   * mode with no place on the scale, so the direction cannot be stated - never
    * assumed. Guessing here is how a CI check earns its first false failure.
    */
   direction: 'regression' | 'improvement' | 'unknown'
@@ -17,8 +17,8 @@ export interface ModeChange {
 
 /**
  * How static each mode is, most static first. The scale exists because the four
- * page modes are genuinely ordered — a route moving down it serves less HTML from
- * the edge and more from a render — and that ordering is what makes "this got
+ * page modes are genuinely ordered - a route moving down it serves less HTML from
+ * the edge and more from a render - and that ordering is what makes "this got
  * worse" a fact rather than an opinion.
  *
  * `ROUTE_HANDLER` and `unknown` are deliberately absent. A route handler is a
@@ -53,7 +53,7 @@ export function compareModes(
  * (`renderingModeFor`), so reading it back is round-tripping our own field rather
  * than parsing a foreign format. It stays a string in the snapshot because
  * promoting it to a typed field would bump the schema version, and a bump makes
- * every snapshot already on the history branch incomparable — a steep price for
+ * every snapshot already on the history branch incomparable - a steep price for
  * one integer.
  */
 export function revalidateSeconds(reason: string | null): number | null {

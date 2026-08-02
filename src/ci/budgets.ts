@@ -24,12 +24,12 @@ export async function readBudgets(root: string): Promise<Budgets | null> {
 /**
  * Two kinds of rule live here, and the difference matters.
  *
- * *Thresholds* — how many bytes is too many, how small a shell is too small —
+ * *Thresholds* - how many bytes is too many, how small a shell is too small -
  * cannot be guessed for someone else's app, so they do nothing until a budget
  * file names a number.
  *
- * *Regressions* — a route that was static and is now dynamic, a fetch that was
- * cached and is not — need no threshold. They are a strict downgrade against this
+ * *Regressions* - a route that was static and is now dynamic, a fetch that was
+ * cached and is not - need no threshold. They are a strict downgrade against this
  * project's own previous build, so they are enforced the moment a baseline
  * exists, with no configuration at all. That is the whole claim of the tool: a
  * check that only guards bytes passes a PR that silently halved the static shell.
@@ -65,7 +65,7 @@ export function checkBudgets(snapshot: Snapshot, budgets: Budgets | null, diff: 
   // comparable builds. Across a bundler swap or a Next major the numbers move for
   // reasons that have nothing to do with the change under review, so enforcing
   // them would fail the one PR that is least able to do anything about it. The
-  // ceilings above still apply — they describe this build alone.
+  // ceilings above still apply - they describe this build alone.
   if (!diff || diff.incomparable.length > 0) return breaches
 
   for (const delta of diff.routes) {
@@ -126,7 +126,7 @@ function regressionsFor(delta: RouteDelta): Breach[] {
   }
 
   // A route that had a measurable shell and now emits none is a shell ratio of
-  // zero, but it reads as `null` — the check that guards the ratio never sees it.
+  // zero, but it reads as `null` - the check that guards the ratio never sees it.
   if (delta.shellRatioBefore !== null && delta.shellRatioAfter === null && delta.modeChange === null) {
     breaches.push({
       pattern: delta.pattern,
@@ -142,14 +142,14 @@ function regressionsFor(delta: RouteDelta): Breach[] {
 function causeText(delta: RouteDelta): string | null {
   const cause = delta.cause
   if (!cause) return null
-  if (cause.kind === 'unknown') return `unknown — ${cause.what}`
+  if (cause.kind === 'unknown') return `unknown - ${cause.what}`
   return cause.component ? `${cause.what} (in <${cause.component}>)` : cause.what
 }
 
 /**
  * Blame the biggest thing in the bundle, whichever kind of thing it is. Naming a
  * 0.2 kB source file as the cause of a 543 kB budget breach is technically the
- * largest *module*, and useless — on most real routes the framework and a couple
+ * largest *module*, and useless - on most real routes the framework and a couple
  * of dependencies dominate, and that is the actionable answer.
  */
 function heaviestContributor(route: { modules: Record<string, number>; dependencies: Record<string, number>; unattributedBytes: number }): string | null {
@@ -158,7 +158,7 @@ function heaviestContributor(route: { modules: Record<string, number>; dependenc
     ...Object.entries(route.dependencies).map(([pkg, bytes]): [string, number] => [`${pkg} (dependency)`, bytes]),
   ]
   if (candidates.length === 0) {
-    return route.unattributedBytes > 0 ? `${kb(route.unattributedBytes)} unattributed — no source map` : null
+    return route.unattributedBytes > 0 ? `${kb(route.unattributedBytes)} unattributed - no source map` : null
   }
   const [name, bytes] = candidates.reduce((a, b) => (b[1] > a[1] ? b : a))
   return `${name} (${kb(bytes)})`

@@ -37,7 +37,7 @@ export interface ProjectFileIndex {
   byBasename: ReadonlyMap<string, readonly string[]>
 }
 
-/** Build an index from a known file list — used by tests and by `indexWorkspace`. */
+/** Build an index from a known file list - used by tests and by `indexWorkspace`. */
 export function createIndex(root: string, files: Iterable<string>): ProjectFileIndex {
   const set = new Set(files)
   const byBasename = new Map<string, string[]>()
@@ -54,7 +54,7 @@ const IGNORED = new Set(['node_modules', '.git', 'dist', 'coverage', '.turbo', '
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?|css|scss|sass|json)$/
 
 /**
- * Index once per analysis and reuse. Only source-like extensions are kept — the
+ * Index once per analysis and reuse. Only source-like extensions are kept - the
  * index exists to answer "is this source-map path our code", and a lockfile or a
  * PNG can never be the answer.
  */

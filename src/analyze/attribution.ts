@@ -13,7 +13,7 @@ export interface ChunkAttribution {
   firstParty: Map<string, number>
   /** Bytes attributed to dependencies, keyed by package name. */
   dependencies: Map<string, number>
-  /** Bytes no mapping covers — bundler runtime, or a chunk with no map at all. */
+  /** Bytes no mapping covers - bundler runtime, or a chunk with no map at all. */
   unattributedBytes: number
   /** Set when the chunk shipped without a source map; the bytes are real but blind. */
   reason: string | null
@@ -24,7 +24,7 @@ export interface ChunkAttribution {
  *
  * Mappings are walked in generated-position order and each one owns the bytes from
  * its own position to the next. Regions no mapping covers are counted as
- * unattributed rather than smeared onto the nearest source — knowing how much we
+ * unattributed rather than smeared onto the nearest source - knowing how much we
  * genuinely cannot explain is the point, and a tool that quietly rounds unknowns
  * into confident numbers is worse than one that reports nothing (plan §3).
  */
@@ -94,7 +94,7 @@ export async function attributeChunk(
     }
 
     // Mapped, but to a path with no package name in it. Next ships maps pointing
-    // at its own `../../../src/...`, so these bytes are accounted for — we just
+    // at its own `../../../src/...`, so these bytes are accounted for - we just
     // cannot name the package without guessing. Counting them as unattributed
     // would overstate how blind the analysis is, and naming them `next` would be
     // a guess that happens to be right today.

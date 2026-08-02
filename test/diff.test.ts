@@ -232,7 +232,7 @@ describe('cache regressions', () => {
 
   it('credits a read that started being cached', () => {
     const diff = diffSnapshots(snapshot({ routes: [uncached] }), snapshot({ routes: [cached] }))
-    // Named once, by its call site — not once per import path that reaches it.
+    // Named once, by its call site - not once per import path that reaches it.
     expect(diff.routes[0]?.cacheChange?.resolved).toEqual(['uncached fetch at lib/http.ts:3'])
     expect(diff.routes[0]?.severity).toBe('improvement')
   })
@@ -304,7 +304,7 @@ describe('noise', () => {
     const head = snapshot({ routes: [route({ firstLoadBytes: 100_200 })] })
     const delta = diffSnapshots(base, head).routes[0]
 
-    // The change is real and still recorded — it is just not worth a reviewer's
+    // The change is real and still recorded - it is just not worth a reviewer's
     // attention, and a comment that flags it is a comment people stop reading.
     expect(delta?.status).toBe('changed')
     expect(delta?.severity).toBe('neutral')

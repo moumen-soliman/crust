@@ -8,7 +8,7 @@ prerendered.
 
 It works in layers, each validating the one before it.
 
-## Layer 1 — predict, from source
+## Layer 1 - predict, from source
 
 crust walks the route's server component tree, finds `<Suspense>` boundaries, marks components that
 touch a dynamic API or an uncached read, and propagates that up to the nearest enclosing boundary.
@@ -16,7 +16,7 @@ touch a dynamic API or an uncached read, and propagates that up to the nearest e
 This is the only layer that can name a cause:
 
 ```text
-✂ <Theme> — cookies() at app/dashboard/page.tsx:18
+✂ <Theme> - cookies() at app/dashboard/page.tsx:18
 ```
 
 Two inverted rule sets share this code path, detected from the build's own resolved config rather
@@ -26,7 +26,7 @@ than by parsing `next.config`:
 |---|---|---|
 | Default | Static; a dynamic API opts out | Dynamic; `use cache` opts in |
 | Trigger | Dynamic API call | Absence of caching |
-| Failure mode | Build error — loud | Silent shell shrinkage |
+| Failure mode | Build error - loud | Silent shell shrinkage |
 
 <Note>
 A `<Suspense>` boundary is **not** automatically a hole. If everything under it is cached, the
@@ -34,7 +34,7 @@ build prerenders straight through the boundary. Treating every boundary as a hol
 regression on every route that uses Suspense correctly.
 </Note>
 
-## Layer 2 — verify, against the build output
+## Layer 2 - verify, against the build output
 
 The prediction is checked against the shell HTML the build actually wrote to
 `.next/server/app/**`. React's markers make this plain-text work:
@@ -52,15 +52,15 @@ hole is. Boundary ids are assigned in document order.
 
 <Warning>
 `postponedState` is never parsed. The Next docs are explicit that reading or altering it produces
-incorrect output — and it turns out to be unnecessary, because the shell HTML is already readable.
+incorrect output - and it turns out to be unnecessary, because the shell HTML is already readable.
 </Warning>
 
-A route built with `generateStaticParams` emits both `products/[slug].html` — the unparameterized
-fallback, which is **zero bytes** — and `products/alpha.html`, the real shell. crust diffs against a
+A route built with `generateStaticParams` emits both `products/[slug].html` - the unparameterized
+fallback, which is **zero bytes** - and `products/alpha.html`, the real shell. crust diffs against a
 parameterized shell; diffing the empty one would report that the whole shell vanished on every
 build.
 
-## Layer 3 — observe, at runtime
+## Layer 3 - observe, at runtime
 
 The [runtime collector](/docs/guides/runtime) records when each hole actually filled, by watching for
 React's inline completion scripts:
@@ -73,7 +73,7 @@ Those `B:0` ids are the same ones layer 2 read out of the prerendered shell, so 
 source access at all.
 
 <Note>
-These completions are **not** in the `__next_f` flight payload — that carries the RSC data. A
+These completions are **not** in the `__next_f` flight payload - that carries the RSC data. A
 collector that watches only `__next_f` finds the chunks and never the swaps.
 </Note>
 

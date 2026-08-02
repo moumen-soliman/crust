@@ -35,7 +35,7 @@ export async function conventionChunks(distDir: string, entry: string): Promise<
 
 /**
  * webpack's client reference manifest is the whole app's client module table, not
- * this route's — the manifest emitted for `/dashboard` lists chunks belonging to
+ * this route's - the manifest emitted for `/dashboard` lists chunks belonging to
  * `/`. Unioning it would attribute every client component to every route.
  *
  * A client module genuinely belongs to this route exactly when its own chunk list

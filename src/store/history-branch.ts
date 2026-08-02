@@ -24,12 +24,12 @@ export interface PushHistoryResult {
  * `git log` unreadable and rebases painful. The orphan branch shares no history
  * with the code, so it can grow freely and be truncated freely.
  *
- * The work happens in a temporary worktree, never in the user's checkout — a
+ * The work happens in a temporary worktree, never in the user's checkout - a
  * tool that switches the user's branch to write its own data is broken.
  *
  * Fork policy (open question in the plan, resolved here): pushes work for
  * same-repo branches only. A fork PR's GITHUB_TOKEN is read-only on the base
- * repo, so the push step reports and skips rather than failing the check —
+ * repo, so the push step reports and skips rather than failing the check -
  * the diff still works from any snapshots already on the branch.
  */
 export async function pushHistory(repoRoot: string, options: { remote?: string } = {}): Promise<PushHistoryResult> {
@@ -38,7 +38,7 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
 
   const hasRemote = await git(['remote', 'get-url', remote], repoRoot)
   if (hasRemote === null) {
-    return { pushed: false, branch: HISTORY_BRANCH, detail: `no remote "${remote}" — snapshots stay local` }
+    return { pushed: false, branch: HISTORY_BRANCH, detail: `no remote "${remote}" - snapshots stay local` }
   }
 
   // A worktree needs a commit to attach to; resolve whether the branch exists
@@ -51,7 +51,7 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
   //
   // Checking out `perf-history` locally looks tidier and breaks on the second
   // run: `--orphan` refuses when the branch already exists, and `-B` refuses
-  // when another worktree has it checked out. Nothing needs a local branch —
+  // when another worktree has it checked out. Nothing needs a local branch -
   // `HEAD:perf-history` is the only thing the remote sees.
   const tempBranch = `crust-history-${Date.now().toString(36)}`
 
@@ -93,7 +93,7 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
       return {
         pushed: false,
         branch: HISTORY_BRANCH,
-        detail: 'push rejected — read-only token (fork PR?) or missing permission; snapshots stay local',
+        detail: 'push rejected - read-only token (fork PR?) or missing permission; snapshots stay local',
       }
     }
 
@@ -109,7 +109,7 @@ export async function pushHistory(repoRoot: string, options: { remote?: string }
 
 /**
  * Pull snapshots from the history branch into the local `.perf/` so a fresh CI
- * checkout has a baseline to diff against. Local files win on conflict — the
+ * checkout has a baseline to diff against. Local files win on conflict - the
  * local snapshot was produced by this build and is newer by construction.
  */
 export async function fetchHistory(repoRoot: string, options: { remote?: string } = {}): Promise<PushHistoryResult> {
@@ -118,7 +118,7 @@ export async function fetchHistory(repoRoot: string, options: { remote?: string 
   await git(['fetch', remote, `${HISTORY_BRANCH}:refs/remotes/${remote}/${HISTORY_BRANCH}`], repoRoot)
   const remoteRef = await git(['rev-parse', '--verify', `refs/remotes/${remote}/${HISTORY_BRANCH}`], repoRoot)
   if (!remoteRef) {
-    return { pushed: false, branch: HISTORY_BRANCH, detail: 'no history branch yet — first run records the baseline' }
+    return { pushed: false, branch: HISTORY_BRANCH, detail: 'no history branch yet - first run records the baseline' }
   }
 
   const worktree = await mkdtemp(join(tmpdir(), 'crust-history-'))

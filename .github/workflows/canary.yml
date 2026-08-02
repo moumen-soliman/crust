@@ -3,7 +3,7 @@ name: Next canary
 # Manifest shapes, flight payload format and artifact locations are undocumented
 # and move on minor releases (R3). Learning about it here rather than from a user
 # issue is the difference between a project that feels alive and one that feels
-# dead — so this failing is expected sometimes, and is the point.
+# dead - so this failing is expected sometimes, and is the point.
 on:
   schedule:
     - cron: '0 6 * * *'

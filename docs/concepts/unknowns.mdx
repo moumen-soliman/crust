@@ -8,11 +8,11 @@ determinable is reported as `unknown` rather than resolved to a plausible answer
 
 ## What gets reported as unknown
 
-- A component arriving through `children` or held in a variable, outside a layout — the
+- A component arriving through `children` or held in a variable, outside a layout - the
   `layout.tsx` → `page.tsx` relationship *is* resolvable by file convention, so layouts are not
   flagged
 - A component name defined in more than one file, where the render site cannot disambiguate
-- A boundary child that resolves to no source file — usually a dependency's component
+- A boundary child that resolves to no source file - usually a dependency's component
 - `export const dynamic = …` computed at runtime rather than written as a literal
 
 ## Where the prediction is deliberately coarse
@@ -24,7 +24,7 @@ claiming something is static when it is not.
 <Warning>
 Module-level taint must not condemn a component outright. Inferring that a component is dynamic
 because its *file* imports something dynamic reported `<RootLayout>` as a hole on every route of a
-real 25-route app — true under module granularity, and useless. Transitive taint decides boundary
+real 25-route app - true under module granularity, and useless. Transitive taint decides boundary
 children; it does not condemn a component on its own.
 </Warning>
 
@@ -36,5 +36,5 @@ the reason attached, rather than assuming `DYNAMIC`.
 ## Attribution
 
 A chunk with no source map is reported as unattributed bytes with the reason
-`no source map emitted for this chunk`. Repeated instances collapse into one line naming the fix —
+`no source map emitted for this chunk`. Repeated instances collapse into one line naming the fix -
 a list of 673 identical warnings buries every other warning and teaches people to skip the section.

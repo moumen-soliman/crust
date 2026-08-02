@@ -4,15 +4,15 @@ import { parseSync } from 'oxc-parser'
 /**
  * Facts we extract from source that no manifest contains (plan §4).
  *
- * Everything here is lexically determined. Anything that isn't — a component
+ * Everything here is lexically determined. Anything that isn't - a component
  * arriving through `children`, a `.map()` over a computed list, a third-party
- * component calling a dynamic API internally — is recorded as an `unresolved`
+ * component calling a dynamic API internally - is recorded as an `unresolved`
  * entry rather than guessed at.
  */
 export interface SourceFacts {
   file: string
   isClientComponent: boolean
-  /** Name of the default-exported component — the route's render root. */
+  /** Name of the default-exported component - the route's render root. */
   defaultExportName: string | null
   /** `export const dynamic = 'force-dynamic'` and friends. */
   routeConfig: Record<string, string | number | boolean>
@@ -135,8 +135,8 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         collectRouteConfig(node, facts)
         if (node.exportKind !== 'type') facts.exports.push(...exportedNames(node))
         // `export { Hero } from './Hero'` is an edge in the module graph just as
-        // much as an import is. Missing it means barrel files — the exact
-        // structure that causes the over-inclusion this tool exists to find —
+        // much as an import is. Missing it means barrel files - the exact
+        // structure that causes the over-inclusion this tool exists to find -
         // terminate the graph walk one file too early.
         if (node.source?.value && node.exportKind !== 'type') {
           facts.imports.push({
@@ -148,7 +148,7 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
         break
 
       case 'ExportAllDeclaration':
-        // Whatever the other module exports, this one now exports too — and this
+        // Whatever the other module exports, this one now exports too - and this
         // file cannot say what that is.
         facts.exports.push('*')
         if (node.source?.value) {
@@ -192,7 +192,7 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
       // `searchParams` forces dynamic rendering only as a **page prop**. Matching
       // the bare identifier instead flags every `url.searchParams`, every plain
       // function parameter that happens to share the name, and every client-side
-      // `useSearchParams()` result — which on a real 25-route app tainted nearly
+      // `useSearchParams()` result - which on a real 25-route app tainted nearly
       // every route through one shared string utility.
       if (isPageFile(relPath) && !facts.isClientComponent && destructuresSearchParams(node)) {
         const p = at(node.start)
@@ -234,7 +234,7 @@ export async function readSourceFacts(absPath: string, relPath: string): Promise
  * the elements of its `fallback`, which is precisely backwards: those are the
  * components that fell out of the shell, not the ones that stayed in it.
  *
- * So descent stops at a Suspense element — its contents are recorded against the
+ * So descent stops at a Suspense element - its contents are recorded against the
  * boundary instead.
  */
 function collectJsx(fn: OxcNode, at: (o: number) => Position) {
@@ -267,7 +267,7 @@ function collectJsx(fn: OxcNode, at: (o: number) => Position) {
     }
 
     // `{children}` and `{Component}` are not lexically resolvable. `{title}` is
-    // just a string prop — treating every interpolation as an opaque component
+    // just a string prop - treating every interpolation as an opaque component
     // makes the unknown list mostly noise, which is how a trustworthy signal gets
     // ignored. Only `children` and capitalised identifiers can be components.
     if (current.type === 'JSXExpressionContainer' && current.expression?.type === 'Identifier') {
@@ -315,7 +315,7 @@ function jsxName(opening: OxcNode | undefined): string | null {
   const name = opening?.name
   if (!name) return null
   if (name.type === 'JSXIdentifier') return name.name ?? null
-  // `<React.Suspense>` — take the property so it matches the bare form.
+  // `<React.Suspense>` - take the property so it matches the bare form.
   if (name.type === 'JSXMemberExpression') return name.property?.name ?? null
   return null
 }
@@ -323,7 +323,7 @@ function jsxName(opening: OxcNode | undefined): string | null {
 /**
  * The names an `export` statement introduces, in any of its spellings:
  * `export function f`, `export const a = 1, b = 2`, `export { a, b }`, and
- * `export { a } from './x'`. Type-only specifiers are skipped — they are erased
+ * `export { a } from './x'`. Type-only specifiers are skipped - they are erased
  * before any bundler sees them and can carry no runtime behaviour.
  */
 function exportedNames(node: OxcNode): string[] {
@@ -373,7 +373,7 @@ function collectRouteConfig(node: OxcNode, facts: SourceFacts): void {
 }
 
 /**
- * `fetch(url)` is uncached by default under Cache Components — which is exactly the
+ * `fetch(url)` is uncached by default under Cache Components - which is exactly the
  * silent failure mode the shell engine exists to catch, so the default is recorded
  * explicitly rather than treated as absence of information.
  */
@@ -399,7 +399,7 @@ function fetchCaching(call: OxcNode): FetchRef['caching'] {
 
 const isPageFile = (file: string): boolean => /(?:^|\/)page\.[jt]sx?$/.test(file)
 
-/** `function Page({ searchParams }: Props)` — the only form that forces dynamic rendering. */
+/** `function Page({ searchParams }: Props)` - the only form that forces dynamic rendering. */
 function destructuresSearchParams(fn: OxcNode): boolean {
   for (const param of fn.params ?? []) {
     const pattern = param?.type === 'AssignmentPattern' ? param.left : param
@@ -452,7 +452,7 @@ function walk(node: unknown, fnName: string | null, visit: (node: OxcNode, fnNam
   const current = node as OxcNode
   if (typeof current.type !== 'string') return
 
-  // `const Chart = () => …` — the name lives on the declarator, not the function,
+  // `const Chart = () => …` - the name lives on the declarator, not the function,
   // so carry it down before anything asks the function what it is called.
   if (current.type === 'VariableDeclarator' && current.id?.type === 'Identifier' && isFunctionLike(current.init ?? {})) {
     current.init.__inferredName = current.id.name

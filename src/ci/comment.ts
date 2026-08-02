@@ -8,12 +8,12 @@ type Basis = 'comparable' | 'incomparable' | 'no-baseline'
 
 /**
  * The PR comment is the growth mechanism (plan §8). Every comment is read by every
- * reviewer, in context, at the moment it matters — a better funnel than any blog
+ * reviewer, in context, at the moment it matters - a better funnel than any blog
  * post. So it has to earn its place in the thread.
  *
  * Which means it is ruthless about what it prints. Regressions get prose, with the
- * call site and the component named. Everything else — improvements, routes that
- * moved a few hundred bytes because a chunk hash changed — goes behind a fold or
+ * call site and the component named. Everything else - improvements, routes that
+ * moved a few hundred bytes because a chunk hash changed - goes behind a fold or
  * does not appear at all. A comment that lists every route on every PR is a
  * comment reviewers learn to collapse, and a collapsed comment catches nothing.
  */
@@ -60,7 +60,7 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
     lines.push(`**Failing ${breaches.length === 1 ? 'check' : 'checks'}**`)
     lines.push('')
     for (const breach of breaches.slice(0, 15)) {
-      lines.push(`- \`${breach.pattern}\` — ${breach.message}`)
+      lines.push(`- \`${breach.pattern}\` - ${breach.message}`)
     }
     lines.push('')
   }
@@ -92,7 +92,7 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
 /**
  * One regressed route, in the shape a reviewer can act on without opening the
  * tool: what moved, what caused it, and who introduced it. Every line is
- * conditional — a route whose shell held but whose mode dropped should not print
+ * conditional - a route whose shell held but whose mode dropped should not print
  * an unchanged shell percentage, because a number that never moves is a number
  * people stop reading.
  */
@@ -120,7 +120,7 @@ function routeBlock(route: RouteDelta): string[] {
 
   const cause = route.cause
   if (cause) {
-    lines.push(cause.kind === 'unknown' ? `- Cause: unknown — ${cause.what}` : `- Cause: \`${cause.what}\``)
+    lines.push(cause.kind === 'unknown' ? `- Cause: unknown - ${cause.what}` : `- Cause: \`${cause.what}\``)
     if (cause.component) lines.push(`- Introduced by: \`<${cause.component}>\``)
   }
 
@@ -135,19 +135,19 @@ function routeBlock(route: RouteDelta): string[] {
 }
 
 function routeRow(route: RouteDelta): string {
-  const shellAfter = route.shellRatioAfter === null ? '—' : pct(route.shellRatioAfter)
+  const shellAfter = route.shellRatioAfter === null ? '-' : pct(route.shellRatioAfter)
   const shellDelta =
     route.shellRatioDelta === null || route.shellRatioDelta === 0
-      ? '—'
+      ? '-'
       : `${route.shellRatioDelta > 0 ? '+' : ''}${pct(route.shellRatioDelta)}`
 
   const marker = route.status === 'added' ? ' 🆕' : route.status === 'removed' ? ' 🗑' : ''
-  const delta = route.firstLoadDelta === 0 ? '—' : signed(route.firstLoadDelta)
+  const delta = route.firstLoadDelta === 0 ? '-' : signed(route.firstLoadDelta)
   return `| \`${route.pattern}\`${marker} | ${kb(route.firstLoadAfter)} | ${delta} | ${shellAfter} | ${shellDelta} |`
 }
 
 /**
- * The heading is the only part guaranteed to be read — it is what shows in the
+ * The heading is the only part guaranteed to be read - it is what shows in the
  * notification email and the PR timeline. So it names the single worst thing,
  * with the route, rather than a count of everything that moved.
  */

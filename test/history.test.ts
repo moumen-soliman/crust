@@ -47,7 +47,7 @@ describe('perf-history branch', () => {
     expect(second.pushed).toBe(false)
     expect(second.detail).toMatch(/no new snapshots/)
 
-    // Re-running must work at all — checking out `perf-history` locally would
+    // Re-running must work at all - checking out `perf-history` locally would
     // fail here, because the branch already exists from the first run.
     await addSnapshot(work, 'cd5678')
     const third = await pushHistory(work)

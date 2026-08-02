@@ -12,13 +12,13 @@ description: "What crust writes, what to commit, and the two escape hatches."
   builds/ab/ab3f91c2.json  one file per snapshot
   modules/9f/9f2c81.json   content-addressed module tables
   runs/01J8X…/             synthetic run samples
-  index.db                 derived cache — gitignored, rebuildable
+  index.db                 derived cache - gitignored, rebuildable
 ```
 
 ## Commit `builds/` and `modules/`
 
 One file per snapshot, never a shared append-only log. A `history.jsonl` would conflict every single
-time two branches both record a build — exactly when history is most worth having.
+time two branches both record a build - exactly when history is most worth having.
 
 Module tables are content-addressed separately because module sizes repeat almost identically
 between builds; inlining them would make each snapshot 50–200 kB of near-duplicate data.
@@ -39,7 +39,7 @@ stitches the history back together:
 
 ## overrides.json
 
-Manual answers for specifiers no resolver can settle — computed dynamic imports, exotic
+Manual answers for specifiers no resolver can settle - computed dynamic imports, exotic
 plugin-resolved aliases. Maps a specifier to a workspace-relative file:
 
 ```json .perf/overrides.json
@@ -55,7 +55,7 @@ it could not resolve so you know exactly what to put here.
 
 ## schema.json
 
-Records the snapshot schema version. It is bumped on any change to the stored shapes — a snapshot
+Records the snapshot schema version. It is bumped on any change to the stored shapes - a snapshot
 outlives the tool version that wrote it, and silently reinterpreting old records under new semantics
 is how a history feature starts lying about the past. `crust diff` refuses to compare across schema
 versions.

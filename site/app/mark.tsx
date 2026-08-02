@@ -1,6 +1,6 @@
 /**
  * The mark, inline so it inherits `currentColor` and never flashes on load.
- * Geometry is identical to docs/logo/*.svg — a solid crust laid over the body
+ * Geometry is identical to docs/logo/*.svg - a solid crust laid over the body
  * it covers, breaking clean on three corners.
  */
 export function Mark({ size = 18 }: { size?: number }) {

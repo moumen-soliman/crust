@@ -10,7 +10,7 @@ export interface CollectorState {
   loaf: LoafSample | null
   streaming: StreamingSample | null
   images: ImageFinding[]
-  /** Resources the collector itself loaded — excluded from every total (R7). */
+  /** Resources the collector itself loaded - excluded from every total (R7). */
   startedAt: number
 }
 
@@ -32,7 +32,7 @@ declare global {
  *
  * Observer effect (R7) is the design constraint: everything is passive
  * observation, the state object is shared by reference (no polling, no copies),
- * and the image audit — the only active DOM walk — runs once, after `load`, in
+ * and the image audit - the only active DOM walk - runs once, after `load`, in
  * an idle callback. The widget reads `window.__CRUST_COLLECTOR__` directly.
  */
 export function startCollector(options: CollectorOptions = {}): () => void {
@@ -78,14 +78,14 @@ export function startCollector(options: CollectorOptions = {}): () => void {
     lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true })
     disposers.push(() => lcpObserver.disconnect())
   } catch {
-    // No LCP entry type — the audit runs without LCP-specific findings.
+    // No LCP entry type - the audit runs without LCP-specific findings.
   }
 
   /**
    * The audit runs twice on purpose.
    *
    * The over-download check needs `naturalWidth`, which is 0 until the image has
-   * decoded — and a lazy image below the fold has not even started. Auditing once
+   * decoded - and a lazy image below the fold has not even started. Auditing once
    * silently drops the highest-value finding on exactly the images most likely to
    * be oversized. So: an early pass for the structural findings, then a second
    * pass once the images that were still loading have settled.

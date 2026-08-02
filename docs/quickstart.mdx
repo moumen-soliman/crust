@@ -7,7 +7,7 @@ description: "From a production build to prioritized findings, a snapshot, and a
 
 - Next.js 15 or 16, App Router
 - Node 20+
-- A **production** build. crust refuses to measure `next dev` — dev output is unminified,
+- A **production** build. crust refuses to measure `next dev` - dev output is unminified,
   unbundled and HMR-laden, so any number taken from it is fiction.
 
 Install `@moumensoliman/crust` as a development dependency, or use `npx` directly. The package name differs
@@ -33,19 +33,19 @@ crust cfdcf50068722687  next 16.2.12 · webpack · 3 routes
 Fix first
 
   1. /dashboard only 39% of this route is in the static shell
-     ↳ cookies() at app/dashboard/page.tsx:18 — in <Theme>
+     ↳ cookies() at app/dashboard/page.tsx:18 - in <Theme>
      → <Theme> is postponed by that call. Isolate it inside Suspense, or accept the
        hole when the data must be per-request.
 
   2. /products/[slug] only 45% of this route is in the static shell
-     ↳ uncached fetch at lib/http.ts:3 — in <ProductGallery>
+     ↳ uncached fetch at lib/http.ts:3 - in <ProductGallery>
      → Add `use cache` above that read to pull <ProductGallery> back into the shell.
 
 Route              First load   Shell  Mode
 /                    543.2 kB    100%  static
 /dashboard           527.4 kB     39%  partial
                     ↳ cookies() at app/dashboard/page.tsx:18
-                    ✂ <Theme> — cookies() at app/dashboard/page.tsx:18
+                    ✂ <Theme> - cookies() at app/dashboard/page.tsx:18
 /products/[slug]     543.2 kB     45%  partial
 ```
 
@@ -84,7 +84,7 @@ npx @moumensoliman/crust diff main
 ```text
 crust diff  cfdcf50068722687 -> 4a80239769ea8b93
 
-/products/[slug] ▼  543.2 kB  —
+/products/[slug] ▼  543.2 kB  -
     static -> partial
     shell 100% -> 45%
     cause: uncached fetch at lib/http.ts:3
@@ -114,7 +114,7 @@ Most projects do not have this on, so this is usually the difference between *"t
 2.8 MB"* and *"`packages/features/src/course/…` is 340 kB of it"*.
 
 <Warning>
-Without maps crust still reports every route total and the full shell analysis — it says the
+Without maps crust still reports every route total and the full shell analysis - it says the
 attribution is unavailable rather than guessing. Turn maps on in a dedicated analyze build if you
 would rather not ship them.
 </Warning>

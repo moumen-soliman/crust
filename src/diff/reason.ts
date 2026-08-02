@@ -1,6 +1,6 @@
 /**
- * Reason strings are produced in two places — `propagateDynamicTaint` and the
- * shell predictor's `ownTaint` — in two shapes:
+ * Reason strings are produced in two places - `propagateDynamicTaint` and the
+ * shell predictor's `ownTaint` - in two shapes:
  *
  *   cookies() at app/dashboard/page.tsx:18
  *   uncached fetch at lib/http.ts:3 via lib/products.ts
@@ -12,7 +12,7 @@
 export interface ParsedReason {
   text: string
   /**
-   * `cache` covers anything that stopped being cached — the class of regression
+   * `cache` covers anything that stopped being cached - the class of regression
    * that produces no build error. `dynamic-api` is a deliberate read of request
    * state, which is at least visible in the source diff.
    */

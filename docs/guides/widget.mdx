@@ -12,7 +12,7 @@ npx @moumensoliman/crust manifest --out public/crust-manifest.json
 
 <Warning>
 This file lists every route, source path and component name in your app. Generate it in analyze
-builds only — never in the build you deploy.
+builds only - never in the build you deploy.
 </Warning>
 
 ## 2. Mount it
@@ -56,7 +56,7 @@ is not required for `analyze`, `diff`, `ci`, snapshot history, or the HTML repor
 
 <AccordionGroup>
   <Accordion title="The gate is checked before the import, not inside the module">
-    With the variable unset, the bundler eliminates both dynamic imports entirely — neither the
+    With the variable unset, the bundler eliminates both dynamic imports entirely - neither the
     widget nor the collector reaches your production bundle. A runtime `if` inside the module would
     still ship the code and the manifest.
   </Accordion>

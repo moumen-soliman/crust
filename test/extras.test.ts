@@ -174,7 +174,7 @@ describe('ingest handler', () => {
     expect((await post('x'.repeat(64 * 1024))).status).toBe(413)
   })
 
-  it('refuses GET — write-only', async () => {
+  it('refuses GET - write-only', async () => {
     const response = await handler(new Request('http://staging/api/__crust/ingest', { method: 'GET' }))
     expect(response.status).toBe(405)
   })

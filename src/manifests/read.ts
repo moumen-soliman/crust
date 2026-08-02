@@ -7,7 +7,7 @@ import { runInNewContext } from 'node:vm'
  *
  * Note what is NOT here: `app-build-manifest.json`, which the original plan listed
  * as the route -> client chunk source, does not exist. `build-manifest.json` carries
- * no App Router route data at all — only the shared root files. Route -> chunk comes
+ * no App Router route data at all - only the shared root files. Route -> chunk comes
  * from the per-route client reference manifest and, on webpack, the chunk path
  * convention (docs/phase-0-findings.md).
  */

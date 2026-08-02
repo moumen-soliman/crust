@@ -7,11 +7,11 @@ import { envFingerprint, newRunId, type RunEnv } from '../core/build-id.ts'
  * Synthetic measurement harness (plan §8, Phase 7).
  *
  * The rules that make the numbers comparable:
- *  - fixed route list, fixed CPU and network throttle — pinned into the run's
+ *  - fixed route list, fixed CPU and network throttle - pinned into the run's
  *    env fingerprint, and runs with different fingerprints must never be merged
  *    into one trend line;
  *  - N iterations with the first discarded (cold start warms caches, JIT and
- *    the server) and the median reported — means are hostage to one GC pause;
+ *    the server) and the median reported - means are hostage to one GC pause;
  *  - the widget and collector stay OFF during synthetic runs (R7).
  *
  * Playwright is a peer, resolved at call time: it is a heavy dependency that
@@ -107,7 +107,7 @@ export async function runSynthetic(options: SyntheticOptions): Promise<{ runId: 
         const sample = await page.evaluate(readPageSample)
         await context.close()
 
-        // The first iteration is the cold start — server compile caches, CDN
+        // The first iteration is the cold start - server compile caches, CDN
         // misses, JIT warmup. It measures the deployment's morning, not the code.
         if (i > 0) samples.push(sample)
       }

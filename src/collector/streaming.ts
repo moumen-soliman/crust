@@ -2,25 +2,25 @@
  * Shell engine layer 3: when did each Suspense hole actually fill.
  *
  * React emits a boundary completion as an inline `<script>` containing
- * `$RC("B:0","S:0")` — appended to the document as the stream progresses. It is
+ * `$RC("B:0","S:0")` - appended to the document as the stream progresses. It is
  * **not** part of the `__next_f` flight payload, which carries the RSC data
  * separately. Watching only `__next_f` finds the chunks but never the swaps.
  *
  * Boundary ids are assigned in document order, so `B:0` here is the same `B:0`
- * layer 2 read out of the prerendered shell — the join needs no source access.
+ * layer 2 read out of the prerendered shell - the join needs no source access.
  *
  * Everything sits behind capability checks that degrade to "unavailable" rather
  * than throwing: these are internals and internals move on minor releases (R3).
  */
 
 export interface BoundaryFill {
-  /** `B:0`, `B:1`, … in document order — matches the shell's template ids. */
+  /** `B:0`, `B:1`, … in document order - matches the shell's template ids. */
   boundaryId: string
   /**
    * ms from navigation start when the swap was observed, or null when it had
    * already happened before the collector started. A collector mounted in an
    * effect runs after hydration, so early boundaries are legitimately unobserved
-   * — reporting a fabricated timestamp would be worse than reporting none.
+   * - reporting a fabricated timestamp would be worse than reporting none.
    */
   filledAt: number | null
 }

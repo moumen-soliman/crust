@@ -4,7 +4,7 @@
        carries the rim, so the form reads as a piece of something larger rather
        than a self-contained tile.
 
-       Ink follows the surface it sits on — #111 on light, white on dark — so it
+       Ink follows the surface it sits on - #111 on light, white on dark - so it
        never sinks into the background. Use light.svg / dark.svg where the theme
        is decided by the page rather than the reader's OS (see those files). -->
   <style>

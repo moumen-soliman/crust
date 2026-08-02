@@ -39,7 +39,7 @@ describe('source facts', () => {
 
   it('treats a barrel re-export as a graph edge', async () => {
     const facts = await readSourceFacts(join(FIXTURE, 'components/index.ts'), 'components/index.ts')
-    // `export { Hero } from './Hero'` — missing these ends the walk one file early,
+    // `export { Hero } from './Hero'` - missing these ends the walk one file early,
     // which is exactly where barrel over-inclusion hides.
     expect(facts.imports.map((i) => i.specifier).sort()).toEqual(['./Counter', './Gallery', './Hero'])
   })

@@ -102,7 +102,7 @@ describe('first-run findings', () => {
     )
 
     expect(found[0]?.headline).toBe('only 45% of this route is in the static shell')
-    expect(found[0]?.detail).toBe('uncached fetch at lib/http.ts:3 — in <ProductGallery>')
+    expect(found[0]?.detail).toBe('uncached fetch at lib/http.ts:3 - in <ProductGallery>')
     expect(found[0]?.action).toContain('use cache')
   })
 

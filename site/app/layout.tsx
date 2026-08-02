@@ -3,13 +3,13 @@ import type { ReactNode } from 'react'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'crust — catch Next.js regressions before they merge',
+  title: 'crust - catch Next.js regressions before they merge',
   description:
     'Production-build regression analysis for Next.js App Router. Explain route modes, static-shell composition, bundle attribution, and the source line behind a regression.',
   metadataBase: new URL('https://crust.moumen.dev'),
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'crust — know what became slower before it merges',
+    title: 'crust - know what became slower before it merges',
     description:
       'Compare production builds, catch silent static-shell regressions, and trace the cause to a component, import, and source line.',
     type: 'website',
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'crust — catch Next.js regressions before they merge',
+    title: 'crust - catch Next.js regressions before they merge',
     description: 'Route modes, shell composition, bundle attribution, and regression blame for Next.js App Router.',
   },
   icons: { icon: '/icon.svg' },

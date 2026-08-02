@@ -92,7 +92,7 @@ export class SnapshotStore {
    * and any staleness is resolved by rebuilding, never by trusting it.
    *
    * `node:sqlite` keeps the dependency count at zero; on a Node build without
-   * it, everything falls back to the scan path silently — the index is an
+   * it, everything falls back to the scan path silently - the index is an
    * optimisation, not a capability.
    */
   async rebuildIndex(): Promise<boolean> {
@@ -170,7 +170,7 @@ export class SnapshotStore {
   }
 
   /**
-   * Per-route first-load history, oldest first — feeds the report's sparklines.
+   * Per-route first-load history, oldest first - feeds the report's sparklines.
    * Uses the index when available, scans otherwise; both paths return the same
    * shape so callers never know which one ran.
    */
@@ -236,7 +236,7 @@ export class SnapshotStore {
   /**
    * Retention ladder (plan §6): full fidelity for the newest 50 snapshots, then
    * one snapshot per commit, then module detail dropped after 90 days. Route
-   * totals and shell ratios are kept forever — they are tiny, and they are what
+   * totals and shell ratios are kept forever - they are tiny, and they are what
    * people actually look at a year later.
    */
   async prune(options: { dryRun?: boolean; now?: Date } = {}): Promise<{ kept: number; thinned: number; dropped: number }> {

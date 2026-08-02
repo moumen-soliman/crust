@@ -10,15 +10,15 @@ import { dirname, join } from 'node:path'
  * vandalism, and the manifest already leaks the route table if left unguarded.
  * So the handler is:
  *
- *  - **authenticated** — a shared token, checked in constant time;
- *  - **rate limited** — token bucket per client, in memory (staging boxes are
+ *  - **authenticated** - a shared token, checked in constant time;
+ *  - **rate limited** - token bucket per client, in memory (staging boxes are
  *    single-instance; a distributed limiter would be solving production's
  *    problem on a box the plan says never runs this);
- *  - **write-only** — nothing can be read back through it; the analysis side
+ *  - **write-only** - nothing can be read back through it; the analysis side
  *    reads the files directly;
- *  - **bounded** — oversized and malformed payloads are dropped, not stored.
+ *  - **bounded** - oversized and malformed payloads are dropped, not stored.
  *
- * Server-side store only — never sync staging data back to git (plan §8).
+ * Server-side store only - never sync staging data back to git (plan §8).
  */
 
 export interface IngestOptions {

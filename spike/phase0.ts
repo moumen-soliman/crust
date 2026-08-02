@@ -1,5 +1,5 @@
 /**
- * Phase 0 spike — throwaway, deliberately not part of the package.
+ * Phase 0 spike - throwaway, deliberately not part of the package.
  *
  * Questions it has to answer (plan §8):
  *   1. Can we get route -> chunk -> module -> source file?
@@ -22,7 +22,7 @@ const distDir = join(projectDir, process.argv[3] ?? '.next')
 type SourceBytes = Map<string, number>
 
 async function main() {
-  console.log(`\n# Phase 0 spike — ${relative(process.cwd(), projectDir)}\n`)
+  console.log(`\n# Phase 0 spike - ${relative(process.cwd(), projectDir)}\n`)
   await indexProjectFiles()
 
   await q1RouteToChunk()
@@ -82,7 +82,7 @@ async function chunksByPathConvention(entry: string): Promise<string[]> {
 
 /**
  * Turbopack populates `clientModules[source].chunks`; webpack leaves it empty and
- * relies on the path convention instead. Same manifest, inverted usefulness — the
+ * relies on the path convention instead. Same manifest, inverted usefulness - the
  * clearest example so far of why the two bundlers need one interface and two
  * implementations rather than an inline branch (R2).
  */
@@ -95,7 +95,7 @@ async function chunksFromClientReferenceManifest(entry: string): Promise<string[
     return []
   }
   // The file assigns to `globalThis.__RSC_MANIFEST`; older Next wrote to `self`.
-  // Running it in a vm context beats eval — it can't touch our globals.
+  // Running it in a vm context beats eval - it can't touch our globals.
   const sandbox: { __RSC_MANIFEST?: Record<string, unknown>; self?: { __RSC_MANIFEST?: Record<string, unknown> } } = {}
   sandbox.self = sandbox as { __RSC_MANIFEST?: Record<string, unknown> }
   try {
@@ -166,7 +166,7 @@ async function q2SourceMapAttribution() {
     console.log(`    ${kb(bytes).padStart(9)}  ${prettySource(src)}`)
   }
 
-  // `webpack://_N_E/./x` is project-relative — the app's own code. Next's own
+  // `webpack://_N_E/./x` is project-relative - the app's own code. Next's own
   // internals show up as `webpack://_N_E/../../src/...`, which is why a bare
   // "does it contain node_modules" check misclassifies them as first-party.
   const firstParty = ranked.filter(([s]) => isFirstParty(s))
@@ -205,7 +205,7 @@ async function readSourceMap(file: string, code: string): Promise<string | null>
  * Walk the mappings in generated-position order. Each mapping owns the bytes
  * from its own position up to the next mapping's position. Bytes before the
  * first mapping on a line, or in a chunk region no mapping covers, are counted
- * unattributed rather than smeared onto the nearest source — the whole point is
+ * unattributed rather than smeared onto the nearest source - the whole point is
  * to know how much we genuinely can't explain.
  */
 function attributeChunk(code: string, rawMap: string, out: SourceBytes) {
@@ -272,7 +272,7 @@ async function q3ShellArtifacts() {
   console.log(`  segment RSC files:  ${segments.length}`)
 
   const postponed = files.filter((f) => f.endsWith('.postponed') || f.endsWith('.json.postponed'))
-  console.log(`  postponed state:    ${postponed.length} (never parsed — opaque by contract)`)
+  console.log(`  postponed state:    ${postponed.length} (never parsed - opaque by contract)`)
 
   // Does any prerendered HTML contain a Suspense fallback sitting in its hole?
   for (const f of html) {
@@ -308,7 +308,7 @@ async function q4RouteToSource() {
       try {
         attributeChunk(await readFile(c, 'utf8'), await readFile(c + '.map', 'utf8'), perSource)
       } catch {
-        // No map for this chunk — nothing to attribute.
+        // No map for this chunk - nothing to attribute.
       }
     }
     const own = [...perSource.entries()].filter(([s]) => isFirstParty(s)).sort((a, b) => b[1] - a[1])
@@ -370,7 +370,7 @@ async function indexProjectFiles(): Promise<Set<string>> {
 /**
  * The two bundlers anchor source paths differently. webpack emits
  * `webpack://_N_E/./components/Gallery.tsx` (project-relative). Turbopack emits
- * `turbopack:///[project]/<path>` where `[project]` is whatever root it inferred —
+ * `turbopack:///[project]/<path>` where `[project]` is whatever root it inferred -
  * which is the workspace root, not the app dir, whenever an outer lockfile exists.
  *
  * Rather than special-casing each scheme, take the longest path suffix that names

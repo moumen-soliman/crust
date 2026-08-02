@@ -17,7 +17,7 @@ export interface BuildIdentity {
   nextVersion: string
   nodeMajor: number
   bundler: Bundler
-  /** Hash of the route table + module set — re-links snapshots orphaned by squash merges. */
+  /** Hash of the route table + module set - re-links snapshots orphaned by squash merges. */
   sourceSignature?: string
 }
 
@@ -31,7 +31,7 @@ export interface BuildIdInput {
   /**
    * Content fingerprint used only when there is no git identity to key on.
    * Without it, `gitSha` and `dirtyHash` are both empty and every build of the
-   * same project collapses into one id — so two genuinely different builds would
+   * same project collapses into one id - so two genuinely different builds would
    * overwrite each other's snapshot.
    */
   contentFallback?: string
@@ -89,7 +89,7 @@ export function newRunId(): string {
 }
 
 /**
- * Runs with different env fingerprints must never be merged into one trend line —
+ * Runs with different env fingerprints must never be merged into one trend line -
  * a laptop on battery versus CI looks exactly like a regression that isn't one.
  */
 export interface RunEnv {

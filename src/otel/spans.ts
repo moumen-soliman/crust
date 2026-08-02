@@ -1,8 +1,8 @@
 /**
- * Phase 8 — server spans, deliberately minimal.
+ * Phase 8 - server spans, deliberately minimal.
  *
  * The plan's position stands: build the full OTel integration only if real users
- * ask — their APM may already cover it. What ships here is the join, which is
+ * ask - their APM may already cover it. What ships here is the join, which is
  * the only crust-specific part: grouping Next's own spans by route and timing
  * each Suspense hole's server-side resume, which pairs with shell layer 3.
  *
@@ -10,7 +10,7 @@
  * below match the SDK's ReadableSpan shape, so the processor plugs into any
  * OTel setup without crust taking on the dependency tree.
  *
- * Wire-up, in the app's instrumentation.ts (a supported API — never patch
+ * Wire-up, in the app's instrumentation.ts (a supported API - never patch
  * server internals):
  *
  *   import { registerOTel } from '@vercel/otel'
@@ -36,7 +36,7 @@ export interface SpanLike {
 export interface RouteSpanStats {
   route: string
   count: number
-  /** Milliseconds, running aggregates — bounded memory however long the server lives. */
+  /** Milliseconds, running aggregates - bounded memory however long the server lives. */
   totalMs: number
   maxMs: number
   /** `fetch` spans under this route, by target host. */
@@ -46,7 +46,7 @@ export interface RouteSpanStats {
 export class CrustSpanAggregator {
   private readonly routes = new Map<string, RouteSpanStats>()
 
-  /** SpanProcessor interface — called by the SDK. */
+  /** SpanProcessor interface - called by the SDK. */
   onStart(): void {}
 
   onEnd(span: SpanLike): void {

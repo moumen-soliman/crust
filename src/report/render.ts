@@ -17,7 +17,7 @@ import { renderSparklineSvg, renderTreemapSvg } from './viz.ts'
  *    0ms   panel surface is already there
  *   40ms   header + summary figures rise 4px into place
  *  100ms   route rows begin, staggered 18ms apart
- *          (capped at 12 rows — past that the tail reads as lag, not rhythm)
+ *          (capped at 12 rows - past that the tail reads as lag, not rhythm)
  *
  * Motion is 4px and 260ms. Anything larger on a devtool panel reads as a
  * transition between screens rather than content settling.
@@ -51,11 +51,11 @@ export function renderReportStyles(): string {
   --red: oklch(0.58 0.24 27);
 
   /* Shadows are reserved for surfaces that genuinely float. Structure inside the
-     page is hairlines — a shadow between a table row and its neighbour would be
+     page is hairlines - a shadow between a table row and its neighbour would be
      depth that doesn't exist. */
   --shadow: 0 2px 4px oklch(0 0 0 / 0.04), 0 12px 32px oklch(0 0 0 / 0.10);
 
-  /* 11 / 12 / 13 / 14 / 22 — five steps, no one-off sizes. */
+  /* 11 / 12 / 13 / 14 / 22 - five steps, no one-off sizes. */
   --t-label: 11px;
   --t-meta: 12px;
   --t-body: 13px;
@@ -219,7 +219,7 @@ export function renderReportBody(snapshot: Snapshot): string {
   <div class="stats">
     <div class="stat"><b>${routes.length}</b><span>routes</span></div>
     <div class="stat"><b>${kb(median(routes.map((r) => r.firstLoadBytes)))}</b><span>median first load</span></div>
-    <div class="stat"><b>${avgShell === null ? '—' : pct(avgShell)}</b><span>mean shell</span></div>
+    <div class="stat"><b>${avgShell === null ? '-' : pct(avgShell)}</b><span>mean shell</span></div>
     <div class="stat"><b>${routes.filter((r) => r.renderingMode === 'DYNAMIC').length}</b><span>dynamic</span></div>
     <div class="stat"><b>${routes.reduce((n, r) => n + (r.shell?.predictedHoles.length ?? 0), 0)}</b><span>holes</span></div>
   </div>
@@ -239,14 +239,14 @@ export function renderReportBody(snapshot: Snapshot): string {
 
 function renderRoute(route: RouteSnapshot, i: number, history?: Snapshot['history']): string {
   const trend = history?.[route.id]?.bytes ?? []
-  const spark = trend.length >= 2 ? renderSparklineSvg(trend) : '<span class="empty">—</span>'
+  const spark = trend.length >= 2 ? renderSparklineSvg(trend) : '<span class="empty">-</span>'
   const ratio = route.shell?.actual?.shellRatio ?? null
   const bar =
     ratio === null
-      ? '<span class="empty">—</span>'
+      ? '<span class="empty">-</span>'
       : `<div class="bar${ratio < 0.5 ? ' low' : ''}" title="${pct(ratio)} static"><i style="width:${(ratio * 100).toFixed(1)}%"></i></div>`
 
-  const size = route.renderingMode === 'ROUTE_HANDLER' ? '<span class="empty">—</span>' : kb(route.firstLoadBytes)
+  const size = route.renderingMode === 'ROUTE_HANDLER' ? '<span class="empty">-</span>' : kb(route.firstLoadBytes)
 
   return `
 <tr class="route" style="--i:${i}" tabindex="0" role="button" aria-expanded="false" aria-controls="crust-detail-${i}" data-crust-toggle="${i}">
@@ -271,7 +271,7 @@ function renderDetail(route: RouteSnapshot): string {
   if (holes.length > 0) {
     parts.push(
       `<div class="sec"><b>Out of the shell</b>${holes
-        .map((h) => `<div class="hole">&lt;${escape(h.component)}&gt; — ${escape(h.reason)}</div>`)
+        .map((h) => `<div class="hole">&lt;${escape(h.component)}&gt; - ${escape(h.reason)}</div>`)
         .join('')}</div>`,
     )
   }
@@ -311,7 +311,7 @@ function renderDetail(route: RouteSnapshot): string {
   }
 
   if (route.unattributedBytes > 0) {
-    parts.push(`<div class="sec"><b>Unattributed</b>${kb(route.unattributedBytes)} — no mapping covers these bytes</div>`)
+    parts.push(`<div class="sec"><b>Unattributed</b>${kb(route.unattributedBytes)} - no mapping covers these bytes</div>`)
   }
 
   return parts.join('') || '<span class="empty">Nothing further to report.</span>'
@@ -322,8 +322,8 @@ function renderDetail(route: RouteSnapshot): string {
  * no external assets.
  *
  * The rows carry `role="button"`, which promises keyboard operability that a
- * table row does not provide on its own — only native buttons synthesise a click
- * from Enter and Space — so both keys are handled explicitly.
+ * table row does not provide on its own - only native buttons synthesise a click
+ * from Enter and Space - so both keys are handled explicitly.
  */
 export function renderReportScript(): string {
   return `

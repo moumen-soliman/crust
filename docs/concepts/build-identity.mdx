@@ -25,7 +25,7 @@ The dirty-tree component matters most in practice. Most measuring happens on unc
 keying on the SHA alone makes ten experiments overwrite each other under one identity.
 </Note>
 
-Outside a git repository, a content fingerprint of the emitted chunk filenames stands in — those are
+Outside a git repository, a content fingerprint of the emitted chunk filenames stands in - those are
 content-hashed by both bundlers, so it changes exactly when the output does.
 
 ## Run identity
@@ -56,5 +56,5 @@ file itself moves, [`.perf/aliases.json`](/docs/reference/files#aliases-json) st
 ## Orphaned history
 
 Squash merges destroy the pre-squash SHAs, so ancestry lookup finds nothing. Every snapshot also
-stores a `sourceSignature` — a hash of the route table and module set — so an orphaned baseline can
+stores a `sourceSignature` - a hash of the route table and module set - so an orphaned baseline can
 be re-linked by content.

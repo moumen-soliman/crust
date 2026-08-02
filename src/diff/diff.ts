@@ -28,7 +28,7 @@ export interface RouteDelta {
   /** Set only when something about caching moved. */
   cacheChange: CacheChange | null
 
-  /** Modules that grew, shrank, appeared or vanished — largest absolute change first. */
+  /** Modules that grew, shrank, appeared or vanished - largest absolute change first. */
   modules: ModuleDelta[]
   /** Holes that appeared since the baseline, with the reason the build gave. */
   newHoles: { component: string; reason: string }[]
@@ -80,7 +80,7 @@ export interface Diff {
 }
 
 /**
- * `.perf/aliases.json` — renames the tool cannot infer. Trends are keyed on file
+ * `.perf/aliases.json` - renames the tool cannot infer. Trends are keyed on file
  * path, which survives URL refactors but not file moves; an alias entry
  * (`"app/old/page.tsx": "app/new/page.tsx"`) stitches the history back together.
  */
@@ -194,7 +194,7 @@ function severityOf(d: RouteDelta): RouteDelta['severity'] {
 
   // A route that did not exist in the baseline has a `before` of zero, so its
   // entire size reads as growth and every new page would be announced as a
-  // regression. Nothing got worse — there was nothing to get worse than. An
+  // regression. Nothing got worse - there was nothing to get worse than. An
   // absolute budget can still fail it; that is a ceiling, not a regression.
   if (d.status === 'added') return 'neutral'
 
@@ -223,7 +223,7 @@ function severityOf(d: RouteDelta): RouteDelta['severity'] {
  * Blame in priority order of usefulness to whoever has to fix it: a named call
  * site beats a mode label, and a mode label beats a byte count. When a route
  * changed and none of the evidence names anything, that is reported as `unknown`
- * rather than filled in with the largest module — the largest module on almost
+ * rather than filled in with the largest module - the largest module on almost
  * every route is the framework, which nobody's PR introduced.
  */
 function causeOf(d: RouteDelta, after: RouteSnapshot | undefined): Cause | null {
@@ -259,7 +259,7 @@ function causeOf(d: RouteDelta, after: RouteSnapshot | undefined): Cause | null 
     }
     return {
       kind: 'unknown',
-      what: `became ${d.modeChange.after.toLowerCase()} — no dynamic API or uncached fetch found in source`,
+      what: `became ${d.modeChange.after.toLowerCase()} - no dynamic API or uncached fetch found in source`,
       site: null,
       component: null,
     }
@@ -273,7 +273,7 @@ function causeOf(d: RouteDelta, after: RouteSnapshot | undefined): Cause | null 
   if (Math.abs(d.firstLoadDelta) > NOISE_FLOOR_BYTES) {
     return {
       kind: 'unknown',
-      what: 'no module could be blamed for the change — build without source maps?',
+      what: 'no module could be blamed for the change - build without source maps?',
       site: null,
       component: null,
     }
@@ -361,7 +361,7 @@ function cacheReasons(route: RouteSnapshot): string[] {
 
 /**
  * A component that used to be in the shell and no longer is. Under Cache Components
- * this is the silent failure the shell engine exists to surface — no build error,
+ * this is the silent failure the shell engine exists to surface - no build error,
  * no warning, just a smaller shell.
  */
 function newHoles(before: RouteSnapshot | undefined, after: RouteSnapshot | undefined): RouteDelta['newHoles'] {

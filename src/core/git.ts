@@ -23,7 +23,7 @@ export interface GitContext {
   sha: string | null
   /** Hash of the uncommitted diff, or '' when the tree is clean. */
   dirtyHash: string
-  /** Author date of HEAD as an ISO string — survives rebase, unlike commit date. */
+  /** Author date of HEAD as an ISO string - survives rebase, unlike commit date. */
   committedAt: string | null
   parentSha: string | null
   branch: string | null
@@ -55,7 +55,7 @@ export async function readGitContext(cwd: string): Promise<GitContext> {
   }
 }
 
-/** `git merge-base HEAD <ref>` — the anchor for "since main" comparisons. */
+/** `git merge-base HEAD <ref>` - the anchor for "since main" comparisons. */
 export async function mergeBase(cwd: string, ref: string): Promise<string | null> {
   return git(['merge-base', 'HEAD', ref], cwd)
 }

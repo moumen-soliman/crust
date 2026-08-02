@@ -34,7 +34,7 @@ const CONDITIONS = ['node', 'react-server', 'import', 'require', 'default']
 // `.d.ts` is listed so declaration-only aliases resolve. Types are erased before
 // a bundler ever sees them, so these resolve successfully and are then dropped
 // rather than walked. Without the extension, a package importing its own types
-// through an alias reports hundreds of false "could not resolve" warnings —
+// through an alias reports hundreds of false "could not resolve" warnings -
 // 272 of them on a real workspace.
 const EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.cjs', '.d.ts', '.json']
 
@@ -44,7 +44,7 @@ const EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.cjs', '.d.ts', '.jso
  * A single project-wide resolver is wrong in a monorepo: `packages/core` has its
  * own `paths`, so resolving its `@/types/X` against the app's tsconfig fails for
  * every file in the package. On a real workspace that produced 272 "could not
- * resolve" warnings for imports that are perfectly resolvable — just not from
+ * resolve" warnings for imports that are perfectly resolvable - just not from
  * where we were asking.
  */
 export class ResolverPool {
@@ -90,7 +90,7 @@ export function createResolver(tsconfigPath: string | null): ResolverPool {
 /**
  * Walk the import graph from a route entry, first-party only.
  *
- * Descent stops at `node_modules` — a dependency's internals are not the user's
+ * Descent stops at `node_modules` - a dependency's internals are not the user's
  * code and cannot be acted on, so following them would multiply the work without
  * changing any answer the tool gives.
  *
@@ -99,7 +99,7 @@ export function createResolver(tsconfigPath: string | null): ResolverPool {
  * whole point of blaming a bundle-size regression on a module.
  */
 /**
- * `.perf/overrides.json` — manual answers for specifiers the resolver cannot
+ * `.perf/overrides.json` - manual answers for specifiers the resolver cannot
  * settle (computed dynamic imports, exotic plugin-resolved aliases). Maps a
  * specifier to a workspace-relative file. The plan's position stands: do not
  * chase 100% resolution in code when a ten-line JSON file covers the tail.
@@ -191,8 +191,8 @@ function resolveSpecifier(
  * Files whose *own* code touches a dynamic API or an uncached fetch, plus every
  * file that transitively imports one.
  *
- * Module granularity, not function granularity. That is coarser than ideal — a
- * cached helper sitting in the same file as an uncached one taints both — but it
+ * Module granularity, not function granularity. That is coarser than ideal - a
+ * cached helper sitting in the same file as an uncached one taints both - but it
  * never claims something is static when it isn't, which is the direction that
  * matters. Function-level narrowing is a later refinement, not a correctness fix.
  */
@@ -204,7 +204,7 @@ export function propagateDynamicTaint(graph: ModuleGraph): Map<string, string[]>
     for (const api of node.facts.dynamicApis) {
       reasons.push(`${api.name}() at ${node.file}:${api.line}`)
     }
-    // A `'use cache'` function is cached however its fetches are written — the
+    // A `'use cache'` function is cached however its fetches are written - the
     // directive is the caching, so flagging the fetch inside it would report a
     // regression on the exact pattern the framework is asking people to adopt.
     const cachedFunctions = new Set(node.facts.useCacheSites.map((s) => s.name))
@@ -237,7 +237,7 @@ export function propagateDynamicTaint(graph: ModuleGraph): Map<string, string[]>
     // everything it exports stops *cache* taint: an uncached `fetchJson` helper
     // wrapped by a cached `getProduct` one file up is cached by the time an
     // importer can observe it. Verified against two real builds of the same
-    // fixture — the emitted shell is 100% static with the directive and 45%
+    // fixture - the emitted shell is 100% static with the directive and 45%
     // without it, and before this the predictor said 45% both times.
     //
     // It stops nothing else. A cache cannot cache `cookies()`; Next rejects a
@@ -281,8 +281,8 @@ export function propagateDynamicTaint(graph: ModuleGraph): Map<string, string[]>
  * Merging turns taint into a union, and on a wide graph a shared utility can
  * otherwise accumulate every reason in the app. Only the first handful is ever
  * reported, so this bounds the work rather than the answer. Which reasons survive
- * past the cap depends on walk order — deterministic for a given graph, but
- * arbitrary — so the cap sits well above what any caller reads.
+ * past the cap depends on walk order - deterministic for a given graph, but
+ * arbitrary - so the cap sits well above what any caller reads.
  */
 const MAX_REASONS_PER_FILE = 32
 
@@ -301,12 +301,12 @@ const isUncachedFetch = (reason: string): boolean => reason.startsWith(UNCACHED_
  *
  * True only when every single value it exports is a `use cache` function: then
  * the sole way in is through a cache, so whatever the module imports is cached
- * by the time it is observed. This governs *cache* taint only — see the call
+ * by the time it is observed. This governs *cache* taint only - see the call
  * site for why a dynamic API is never contained.
  *
  * The bar is deliberately all-or-nothing. One uncached export is enough to let
  * taint through, because module granularity cannot tell which export the
- * importer actually called — and the safe direction of that error is to keep
+ * importer actually called - and the safe direction of that error is to keep
  * propagating. `export *` disqualifies a module outright: it exports names this
  * file cannot enumerate, so "every export is cached" is unknowable rather than
  * true.

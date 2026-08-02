@@ -113,7 +113,7 @@ describe('taint containment through `use cache`', () => {
 
   it('does not let a cached wrapper hide a dynamic API from the route', async () => {
     // `cookies()` is not cacheable. Next rejects it inside `use cache` at build
-    // time, so this module is a mistake — but containment must not be what hides
+    // time, so this module is a mistake - but containment must not be what hides
     // it, or a stray directive silently turns "this route reads request state"
     // into "this route is static". Every export here is cached, which is exactly
     // the condition that contains an uncached fetch; the dynamic API must escape
@@ -144,7 +144,7 @@ describe('taint containment through `use cache`', () => {
     //
     // The uncached fetch has to *arrive* at `lib/mixed.tsx` from `lib/http.tsx`
     // for containment to be what stops it. If the reason never reached the module
-    // — because taint stopped merging into a module that already had its own —
+    // - because taint stopped merging into a module that already had its own -
     // this assertion would pass without the filter ever running.
     const files = {
       'lib/http.tsx': UNCACHED_HELPER,

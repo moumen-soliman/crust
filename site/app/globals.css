@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Achromatic OKLCH tokens — same system as the CLI report and the widget.
+ * Achromatic OKLCH tokens - same system as the CLI report and the widget.
  * Mapped into Tailwind via @theme so utilities keep the existing palette.
  */
 :root {

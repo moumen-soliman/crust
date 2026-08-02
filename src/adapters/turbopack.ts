@@ -7,7 +7,7 @@ import type { BundlerAdapter } from './types.ts'
  * Turbopack emits flat, content-hashed chunk names with no relationship to the
  * route tree, so the webpack path convention finds nothing. In exchange its
  * client reference manifest is genuinely route-scoped, so the chunk lists can be
- * unioned directly — the opposite of webpack, where they must be intersected.
+ * unioned directly - the opposite of webpack, where they must be intersected.
  *
  * Stamping is unsupported: there is no custom loader equivalent, and an SWC
  * plugin is Rust with a real build and distribution burden (R4). Attribution

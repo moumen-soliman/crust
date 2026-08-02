@@ -91,13 +91,13 @@ cli
 
     if (!base) {
       console.error(
-        pc.yellow(`\nNo baseline snapshot for "${ref ?? 'main'}" — regressions cannot be detected on this run.`),
+        pc.yellow(`\nNo baseline snapshot for "${ref ?? 'main'}" - regressions cannot be detected on this run.`),
       )
       console.error(pc.dim('  Run `crust history fetch`, or `crust analyze` on the base branch.'))
     } else if (!budgets) {
       // Regression rules need no thresholds and already ran; only the ceilings are
       // missing. Saying "nothing was enforced" here would be false.
-      console.error(pc.dim('\nNo .perf/budgets.json — size and shell ceilings are unset; regression checks still ran.'))
+      console.error(pc.dim('\nNo .perf/budgets.json - size and shell ceilings are unset; regression checks still ran.'))
     }
     if (breaches.length > 0) process.exitCode = 1
   })
@@ -148,12 +148,12 @@ cli
     console.log(
       pc.yellow('  This file lists every route, source path and component name in the app.'),
     )
-    console.log(pc.dim('  Do not ship it to production — generate it only in analyze builds (R8).'))
+    console.log(pc.dim('  Do not ship it to production - generate it only in analyze builds (R8).'))
   })
 
 cli
   // cac matches a command on its first token only, so `history push` as a command
-  // name is never reachable — it silently falls through and does nothing. The
+  // name is never reachable - it silently falls through and does nothing. The
   // action has to be a positional argument.
   .command('history <action>', 'Sync .perf snapshots with the perf-history branch (push | fetch)')
   .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
@@ -200,7 +200,7 @@ cli
       outDir: join(root, '.perf'),
     })
     console.log(`${pc.bold('crust synthetic')} ${runId}  ${pc.dim(`${options.cpu}x cpu · ${options.network} · median of ${Number(options.iterations) - 1}`)}`)
-    console.log(pc.dim('vs. previous build on the same fingerprint — never "is this fast" (R9)'))
+    console.log(pc.dim('vs. previous build on the same fingerprint - never "is this fast" (R9)'))
     console.log()
     for (const r of results) {
       console.log(`${r.route.padEnd(28)} ttfb ${ms(r.median.ttfb)}  fcp ${ms(r.median.fcp)}  lcp ${ms(r.median.lcp)}  ${kb(r.median.transferBytes)}`)
@@ -247,7 +247,7 @@ async function loadPair(ref: string, options: CommonOptions): Promise<{ head: Sn
   const store = new SnapshotStore(root)
   let base = await store.resolve(ref, options.cwd)
 
-  // Squash merges orphan snapshots — the pre-squash SHAs stop existing, so
+  // Squash merges orphan snapshots - the pre-squash SHAs stop existing, so
   // ancestry lookup finds nothing. Fall back to matching by analysed content (R13).
   base ??= await store.findBySourceSignature(head.sourceSignature, head.buildId)
 
@@ -277,7 +277,7 @@ function printSnapshot(snapshot: Snapshot): void {
 
   for (const route of snapshot.routes) {
     const ratio = route.shell?.actual?.shellRatio
-    const shell = ratio === undefined || ratio === null ? pc.dim('   —  ') : pct(ratio).padStart(6)
+    const shell = ratio === undefined || ratio === null ? pc.dim('   -  ') : pct(ratio).padStart(6)
     console.log(
       `${route.pattern.padEnd(width)}  ${kb(route.firstLoadBytes).padStart(11)}  ${shell}  ${modeLabel(route.renderingMode)}`,
     )
@@ -285,7 +285,7 @@ function printSnapshot(snapshot: Snapshot): void {
     if (route.renderingModeReason) console.log(pc.dim(`${' '.repeat(width)}    ↳ ${route.renderingModeReason}`))
 
     for (const hole of route.shell?.predictedHoles.slice(0, 3) ?? []) {
-      console.log(pc.dim(`${' '.repeat(width)}    ✂ <${hole.component}> — ${hole.reason}`))
+      console.log(pc.dim(`${' '.repeat(width)}    ✂ <${hole.component}> - ${hole.reason}`))
     }
   }
 
@@ -324,14 +324,14 @@ function printFindings(findings: Finding[]): void {
 
   if (findings.length > 3) {
     console.log()
-    console.log(pc.dim(`  ${findings.length - 3} more finding(s) — see \`crust report\`.`))
+    console.log(pc.dim(`  ${findings.length - 3} more finding(s) - see \`crust report\`.`))
   }
   console.log()
 }
 
 /**
  * A project without production source maps produces one warning per chunk per
- * route — 673 of them on a 25-route app, all saying the same thing. Printing that
+ * route - 673 of them on a 25-route app, all saying the same thing. Printing that
  * list buries every other warning and teaches people to skip the section, so the
  * repeated ones collapse into a single line that names the fix.
  */
@@ -375,7 +375,7 @@ function printDiff(diff: ReturnType<typeof diffSnapshots>): void {
         ? route.firstLoadDelta > 0
           ? pc.red(signed(route.firstLoadDelta))
           : pc.green(signed(route.firstLoadDelta))
-        : pc.dim('—')
+        : pc.dim('-')
     const flag = route.severity === 'regression' ? pc.red(' ▼') : route.severity === 'improvement' ? pc.green(' ▲') : ''
     console.log(`${pc.bold(route.pattern)}${flag}  ${kb(route.firstLoadAfter)}  ${delta}`)
 
@@ -401,7 +401,7 @@ function printDiff(diff: ReturnType<typeof diffSnapshots>): void {
     if (route.cause) {
       const line =
         route.cause.kind === 'unknown'
-          ? pc.yellow(`    cause: unknown — ${route.cause.what}`)
+          ? pc.yellow(`    cause: unknown - ${route.cause.what}`)
           : `    cause: ${route.cause.what}`
       console.log(line)
       if (route.cause.component) console.log(pc.dim(`    introduced by <${route.cause.component}>`))
@@ -411,7 +411,7 @@ function printDiff(diff: ReturnType<typeof diffSnapshots>): void {
       console.log(pc.dim(`    ${signed(mod.delta).padStart(10)}  ${mod.file}`))
     }
     for (const hole of route.newHoles.slice(0, 3)) {
-      console.log(pc.red(`    ✂ <${hole.component}> left the shell — ${hole.reason}`))
+      console.log(pc.red(`    ✂ <${hole.component}> left the shell - ${hole.reason}`))
     }
   }
 }

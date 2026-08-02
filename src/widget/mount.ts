@@ -145,7 +145,7 @@ export function mountCrustWidget(options: WidgetOptions = {}): () => void {
       content.innerHTML = live + renderReportBody(snapshot)
     } catch (error) {
       loaded = false
-      content.innerHTML = `<div class="crust"><div class="note">Could not load <code>${manifestUrl}</code> — ${String(
+      content.innerHTML = `<div class="crust"><div class="note">Could not load <code>${manifestUrl}</code> - ${String(
         (error as Error).message,
       )}.<br>Generate it with <code>crust manifest --out public/crust-manifest.json</code> after a production build.</div></div>`
     }
