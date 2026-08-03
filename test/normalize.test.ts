@@ -19,7 +19,7 @@ import { snapshot } from './factories.ts'
  */
 const V3_ON_DISK = {
   schemaVersion: 3,
-  toolVersion: '0.1.2',
+  toolVersion: '0.1.3',
   buildId: 'aaaaaaaaaaaaaaaa',
   createdAt: '2026-01-01T00:00:00.000Z',
   gitSha: null,

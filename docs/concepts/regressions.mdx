@@ -6,8 +6,10 @@ description: "What crust calls a regression, what fails automatically, and when 
 crust separates **regressions** from **ceilings**.
 
 A regression compares this build with the project's own baseline: a route became less static, a
-read stopped being cached, a shell disappeared, or first-load JavaScript grew. A ceiling describes
-one build in isolation: a route may not exceed 250 kB or fall below a 60% shell ratio.
+read stopped being cached, a shell disappeared, or first-load JavaScript grew. The first three fail
+CI automatically. JavaScript growth is reported in the diff but fails CI only when `maxGrowth` is
+configured. A ceiling describes one build in isolation: a route may not exceed 250 kB or fall below
+a 60% shell ratio.
 
 That distinction determines which checks need configuration.
 
@@ -82,7 +84,8 @@ completed.
 
 Chunk filenames are content-hashed, so tiny byte changes can appear even when behavior did not.
 crust records exact totals but does not classify a first-load delta of 512 bytes or less as a
-regression.
+regression in diff severity or terminal grouping. This display floor is not a CI threshold;
+JavaScript growth is enforced only through `maxGrowth`.
 
 ## Intentional downgrades
 

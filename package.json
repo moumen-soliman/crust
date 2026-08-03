@@ -1,6 +1,6 @@
 {
   "name": "@moumensoliman/crust",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Production-build regression analysis for Next.js App Router: cause chains, shared blast radius, bundle attribution, static-shell composition, and source blame.",
   "license": "MIT",
   "author": "Moumen Soliman",

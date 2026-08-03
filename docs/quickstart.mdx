@@ -13,6 +13,11 @@ description: "From a production build to prioritized findings, a snapshot, and a
 Install `@moumensoliman/crust` as a development dependency, or use `npx` directly. The package name differs
 from the executable; the product and executable are both named `crust`.
 
+<Warning>
+Do not install the unscoped `crust` package—it is unrelated. The package is
+`@moumensoliman/crust`; the installed executable is `crust`.
+</Warning>
+
 ## 1. Build, then analyze
 
 <CodeGroup>
@@ -53,7 +58,8 @@ Add `--routes` for the full route inventory, `--verbose` for coverage counts and
 `--report` for the HTML report.
 
 The snapshot is written to `.perf/` using one file per build. Two branches can record builds without
-editing a shared history file.
+editing a shared history file. See [snapshot files](/docs/reference/files) for what to commit and
+what remains generated.
 
 ### Reading the columns
 
@@ -74,9 +80,14 @@ and source search; filters and grouping; complete cause chains; and shared-cause
 
 ## 3. Compare against a baseline
 
-After a change, rebuild and diff:
+First record the base branch, then rebuild and diff after your change:
 
 ```bash
+git switch main
+next build
+npx @moumensoliman/crust analyze
+
+git switch -
 next build
 npx @moumensoliman/crust diff main
 ```
@@ -94,6 +105,9 @@ crust diff  cfdcf50068722687 -> 4a80239769ea8b93
 <Tip>
 `crust diff` accepts a build id, a git SHA, a branch name, or `HEAD~3`. History is walked
 topologically, so a snapshot recorded later on another branch is never mistaken for an ancestor.
+For a branch name such as `main`, crust resolves the merge-base commit rather than comparing with
+the latest build at the branch tip. In CI, the [GitHub Action](/docs/guides/ci) fetches shared
+baselines from `perf-history`.
 </Tip>
 
 The two builds must use the same bundler, Next.js major, and snapshot schema. If they do not, crust

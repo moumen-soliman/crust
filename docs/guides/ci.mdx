@@ -11,7 +11,10 @@ matters.
 ```yaml .github/workflows/crust.yml
 name: crust
 
-on: pull_request
+on:
+  pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: write        # push snapshots to perf-history
@@ -32,9 +35,13 @@ jobs:
           baseline: main
 ```
 
-It fetches snapshot history, runs the check, posts or updates one comment, and publishes the new
-snapshot. The Next production build happens before the action because crust reads its output; the
-action never changes how the application is bundled.
+It fetches snapshot history, runs the check, records and publishes the new snapshot, and posts or
+updates one comment on pull requests. Run the workflow on the base branch as well as pull requests
+so future branches have a baseline at their merge base. The Next production build happens before
+the action because crust reads its output; the action never changes how the application is bundled.
+
+Even when the verdict fails, the action publishes the snapshot and posts the comment before
+returning a failed check.
 
 ## What fails without configuration
 
@@ -109,7 +116,7 @@ A fresh CI checkout has no `.perf/` directory, so the baseline lives on an orpha
 
 ```bash
 npx @moumensoliman/crust history fetch   # pull snapshots into .perf/
-npx @moumensoliman/crust history push    # publish this build's snapshot
+npx @moumensoliman/crust history push    # publish snapshots recorded by analyze or ci
 ```
 
 An orphan branch shares no history with your code, so it can grow and be truncated freely without

@@ -18,7 +18,7 @@ import { runSynthetic } from './synthetic/run.ts'
 import { renderDiffTerminal, renderSnapshotTerminal } from './terminal-ui/views.tsx'
 import type { Snapshot } from './store/snapshot.ts'
 
-const VERSION = '0.1.2'
+const VERSION = '0.1.3'
 const cli = cac('crust')
 
 interface CommonOptions {
@@ -114,8 +114,10 @@ cli
     const diff = base ? diffSnapshots(base, head, aliases) : null
 
     const root = await findWorkspaceRoot(resolve(options.cwd))
+    const store = new SnapshotStore(root)
     const budgets = await readBudgets(root)
     const breaches = checkBudgets(head, budgets, diff)
+    await store.write(head)
 
     const comment = renderComment(head, diff, breaches)
     if (options.comment) await writeFile(options.comment, comment + '\n', 'utf8')

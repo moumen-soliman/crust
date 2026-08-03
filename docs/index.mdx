@@ -13,7 +13,9 @@ PR should merge.**
 
 The experimental [`next experimental-analyze`](https://nextjs.org/docs/app/guides/package-bundling#nextjs-bundle-analyzer-experimental)
 is an interactive Turbopack module explorer. Use it to inspect the client and server module graph of
-one build, find large dependencies, and follow their import chains.
+one build, find large dependencies, and follow their import chains. Next.js also provides
+[`@next/bundle-analyzer`](https://nextjs.org/docs/app/guides/package-bundling#nextbundle-analyzer-for-webpack)
+for webpack bundle inspection.
 
 crust complements it by reading completed webpack or Turbopack builds, recording compatible
 snapshots, and comparing them automatically. It analyzes rendering modes, cache decisions,

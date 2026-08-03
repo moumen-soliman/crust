@@ -27,7 +27,7 @@
     "primary": {
       "type": "button",
       "label": "Get started",
-      "href": "https://docs.crust.moumen.dev/docs/quickstart"
+      "href": "/docs/quickstart"
     }
   },
   "navigation": {
@@ -36,17 +36,16 @@
         "group": "Getting started",
         "pages": [
           "docs/index",
-          "docs/quickstart",
-          "docs/support"
+          "docs/quickstart"
         ]
       },
       {
         "group": "Concepts",
         "pages": [
-          "docs/concepts/shell-engine",
           "docs/concepts/regressions",
-          "docs/concepts/attribution",
           "docs/concepts/build-identity",
+          "docs/concepts/shell-engine",
+          "docs/concepts/attribution",
           "docs/concepts/unknowns"
         ]
       },
@@ -54,10 +53,10 @@
         "group": "Guides",
         "pages": [
           "docs/guides/ci",
+          "docs/guides/monorepos",
           "docs/guides/widget",
           "docs/guides/runtime",
-          "docs/guides/staging",
-          "docs/guides/monorepos"
+          "docs/guides/staging"
         ]
       },
       {
@@ -66,6 +65,12 @@
           "docs/reference/cli",
           "docs/reference/budgets",
           "docs/reference/files"
+        ]
+      },
+      {
+        "group": "Support",
+        "pages": [
+          "docs/support"
         ]
       }
     ]

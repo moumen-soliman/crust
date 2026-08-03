@@ -15,7 +15,7 @@ at the detected workspace root.
 
 ## analyze
 
-Analyse a production build and record a snapshot.
+Analyze a production build and record a snapshot.
 
 ```bash
 npx @moumensoliman/crust analyze [--routes] [--verbose] [--report [file]] [--json [file]] [--no-save]
@@ -56,15 +56,16 @@ breach.**
 npx @moumensoliman/crust ci [ref] [--comment <file>]
 ```
 
-Defaults to comparing against `main`.
+Defaults to comparing against `main`. Branch refs resolve to their merge-base with `HEAD`, not the
+latest snapshot at the branch tip.
 
 Without `.perf/budgets.json`, rendering-mode drops, newly uncached reads, and shell disappearance
 still fail when the baseline is comparable. A budget file adds byte, growth, and shell-ratio
 ceilings. See [regressions](/docs/concepts/regressions) and
 [budgets](/docs/reference/budgets).
 
-If no baseline exists, crust analyzes and snapshots the current build but warns that regressions
-cannot be detected. Absolute ceilings still apply.
+Every `ci` run records the current build before exiting, including runs that find a breach. If no
+baseline exists, crust warns that regressions cannot be detected; absolute ceilings still apply.
 
 ## report
 
@@ -82,6 +83,10 @@ No external requests: styles, script and data are inlined. The report supports:
 - full cause and import chains with evidence labels
 - shared-cause blast radius that filters the affected routes
 - PR-ready shared-cause explanations
+
+`--out` is resolved from the shell's current directory, not from `--cwd`. In a monorepo, either run
+the command from the app directory or pass an explicit path such as
+`--out apps/web/crust-report.html`.
 
 ## manifest
 
@@ -138,10 +143,9 @@ npx @moumensoliman/crust list
 
 ## Exit codes
 
-| Code | Meaning |
-|---|---|
-| `0` | Success; no automatic regression or configured ceiling was breached |
-| `1` | Regression or budget breach, or `diff` found no baseline |
+`crust ci` exits with `1` when an automatic regression or configured ceiling is breached.
+`crust diff` exits with `1` only when it cannot find the requested baseline; a displayed regression
+does not make `diff` a CI gate. Other successful commands exit with `0`.
 
 Any unsupported project - Next outside 15–16, a dev-only build, a Pages Router app - throws with a
 message naming the reason rather than emitting numbers it cannot stand behind.

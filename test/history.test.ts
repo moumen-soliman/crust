@@ -88,6 +88,23 @@ describe('perf-history branch', () => {
   }, 20_000)
 })
 
+describe('GitHub Action verdict flow', () => {
+  it('publishes history and comments before enforcing a failed verdict', async () => {
+    const action = await readFile(new URL('../action/action.yml', import.meta.url), 'utf8')
+    const check = action.indexOf('- name: Run crust')
+    const publish = action.indexOf('- name: Publish snapshot history')
+    const comment = action.indexOf('- name: Comment on the pull request')
+    const enforce = action.indexOf('- name: Enforce crust verdict')
+
+    expect(action.slice(check, publish)).toContain('continue-on-error: true')
+    expect(check).toBeGreaterThanOrEqual(0)
+    expect(publish).toBeGreaterThan(check)
+    expect(comment).toBeGreaterThan(publish)
+    expect(enforce).toBeGreaterThan(comment)
+    expect(action.slice(enforce)).toContain("steps.check.outcome == 'failure'")
+  })
+})
+
 describe('live section', () => {
   const state: CollectorState = {
     vitals: { lcp: 4000, lcpElement: 'h1', cls: 0.02, inp: null, ttfb: 12, fcp: 900 },
