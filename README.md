@@ -65,6 +65,19 @@ client-JavaScript change can be traced back to the component, import, and call s
 The in-app panel, runtime collector, ingest endpoint, synthetic runner, and OpenTelemetry spans are
 deliberately secondary. The core workflow needs only source code and a production build.
 
+## How is this different from Next.js Bundle Analyzer?
+
+The experimental [`next experimental-analyze`](https://nextjs.org/docs/app/guides/package-bundling#nextjs-bundle-analyzer-experimental)
+is an interactive Turbopack module explorer. It is the better tool for inspecting the client and
+server module graph of one build, finding large dependencies, and following their import chains.
+
+crust is complementary: it reads completed webpack or Turbopack builds, records compatible
+snapshots, and compares them automatically. It covers more than bundle composition—rendering modes,
+cache decisions, static-shell changes, shared causes, and client-JavaScript growth—and turns those
+changes into CI findings and merge verdicts. The Next.js analyzer helps answer **"what is in this
+bundle?"**; crust focuses on **"what changed since the baseline, why did it change, and should this
+PR merge?"**
+
 ## Requirements
 
 - Next.js 15 or 16

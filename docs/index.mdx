@@ -9,6 +9,22 @@ story of every route, and stores a snapshot so the next build can be compared wi
 **Next DevTools explains the current page. crust explains what became worse, why, and whether the
 PR should merge.**
 
+## Compared with Next.js Bundle Analyzer
+
+The experimental [`next experimental-analyze`](https://nextjs.org/docs/app/guides/package-bundling#nextjs-bundle-analyzer-experimental)
+is an interactive Turbopack module explorer. Use it to inspect the client and server module graph of
+one build, find large dependencies, and follow their import chains.
+
+crust complements it by reading completed webpack or Turbopack builds, recording compatible
+snapshots, and comparing them automatically. It analyzes rendering modes, cache decisions,
+static-shell changes, shared causes, and client-JavaScript growth, then turns regressions into CI
+findings and merge verdicts.
+
+<Note>
+The Next.js analyzer answers “what is in this bundle?” crust focuses on “what changed since the
+baseline, why did it change, and should this PR merge?”
+</Note>
+
 ## What crust answers
 
 For a single build:
