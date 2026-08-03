@@ -3,7 +3,7 @@ import { diffSnapshots } from '../src/diff/diff.ts'
 import { checkBudgets } from '../src/ci/budgets.ts'
 import { renderComment } from '../src/ci/comment.ts'
 import { route, snapshot } from './factories.ts'
-import type { RouteSnapshot, Snapshot } from '../src/store/snapshot.ts'
+import type { CauseChain, RouteSnapshot, Snapshot } from '../src/store/snapshot.ts'
 
 
 
@@ -376,6 +376,82 @@ describe('renderComment', () => {
   })
 })
 
+describe('stored cause chains reach the verdict', () => {
+  const chain = (overrides: Partial<CauseChain> = {}): CauseChain => ({
+    route: '/products/[slug]',
+    entryFile: 'app/products/[slug]/page.tsx',
+    component: 'ProductGallery',
+    links: [
+      { file: 'app/products/[slug]/page.tsx', binding: 'ProductPage', via: 'entry', barrel: false, component: true },
+      { file: 'components/ProductGallery.tsx', binding: 'ProductGallery', via: 'import', barrel: false, component: true },
+      { file: 'lib/http.ts', binding: 'fetchJson', via: 'import', barrel: false, component: false },
+    ],
+    site: 'lib/http.ts:3',
+    detail: 'uncached fetch',
+    evidence: 'verified',
+    unresolved: null,
+    ...overrides,
+  })
+
+  const regressed = (causes: CauseChain[]): Snapshot =>
+    snapshot({
+      routes: [
+        route({
+          pattern: '/products/[slug]',
+          renderingMode: 'DYNAMIC',
+          renderingModeReason: 'uncached fetch at lib/http.ts:3',
+          dynamicReasons: ['uncached fetch at lib/http.ts:3'],
+          causes,
+        }),
+      ],
+    })
+
+  const before = snapshot({ routes: [route({ pattern: '/products/[slug]', renderingMode: 'STATIC' })] })
+
+  it('attaches the chain whose call site matches the cause', () => {
+    const diff = diffSnapshots(before, regressed([chain()]))
+    expect(diff.routes[0]?.causeChain?.site).toBe('lib/http.ts:3')
+    // The shell recorded no hole here, so the one-liner had no component of its
+    // own; the chain walked the graph and knows one.
+    expect(diff.routes[0]?.cause?.component).toBe('ProductGallery')
+  })
+
+  it('refuses to attach a chain for a different call site', () => {
+    const diff = diffSnapshots(before, regressed([chain({ site: 'lib/other.ts:99', detail: 'cookies()' })]))
+    expect(diff.routes[0]?.causeChain).toBeNull()
+    expect(diff.routes[0]?.cause?.what).toBe('uncached fetch at lib/http.ts:3')
+  })
+
+  it('ignores byte chains, which explain size rather than rendering', () => {
+    const bytes = chain({ site: null, detail: '84.1 kB of client JavaScript', component: 'Hero' })
+    expect(diffSnapshots(before, regressed([bytes])).routes[0]?.causeChain).toBeNull()
+  })
+
+  it('folds the chain into the comment behind a disclosure, after the summary', () => {
+    const comment = renderComment(regressed([chain()]), diffSnapshots(before, regressed([chain()])), [])
+
+    expect(comment).toContain('- Cause: `uncached fetch at lib/http.ts:3`')
+    expect(comment).toContain('- Introduced by: `<ProductGallery>`')
+    expect(comment).toContain('<details><summary>How it reaches this route</summary>')
+    expect(comment).toContain('→ <ProductGallery>')
+    expect(comment).toContain('→ uncached fetch at lib/http.ts:3')
+    // The verdict has to come first - the chain is the follow-up question.
+    expect(comment.indexOf('- Cause:')).toBeLessThan(comment.indexOf('<details><summary>How it reaches'))
+  })
+
+  it('names a weaker evidence level and the segment it could not follow', () => {
+    const partial = chain({ evidence: 'inferred', unresolved: 'require() of a computed path' })
+    const comment = renderComment(regressed([partial]), diffSnapshots(before, regressed([partial])), [])
+
+    expect(comment).toContain('Evidence: inferred - could not follow require() of a computed path.')
+  })
+
+  it('says nothing about evidence when the chain is verified', () => {
+    const comment = renderComment(regressed([chain()]), diffSnapshots(before, regressed([chain()])), [])
+    expect(comment).not.toContain('Evidence:')
+  })
+})
+
 describe('renderComment: configuration versus application code', () => {
   it('keeps a comparable configuration change as evidence, not as a regression', () => {
     // Maps off: every module list empties out without a line of code being
@@ -408,6 +484,38 @@ describe('renderComment: configuration versus application code', () => {
 
     expect(comment).toContain('> - snapshot schema changed: v1 -> v4')
     expect(comment).not.toContain('v4 - explains')
+  })
+
+  it('does not report a declaration twice in one comment', () => {
+    const before = snapshot({ routes: [route({ renderingMode: 'STATIC' })] })
+    const after = snapshot({
+      routes: [
+        route({
+          renderingMode: 'DYNAMIC',
+          renderingModeReason: 'route config: dynamic = "force-dynamic"',
+          config: { dynamic: 'force-dynamic' },
+        }),
+      ],
+    })
+    const comment = renderComment(after, diffSnapshots(before, after), [])
+
+    // The route block is where a segment declaration belongs - it sits beside the
+    // mode drop it caused. The note is for configuration that governs the build.
+    expect(comment).toContain('- Declared: `dynamic` **unset → force-dynamic**')
+    expect(comment).not.toContain('[!NOTE]')
+    expect(comment.match(/force-dynamic/g)).toHaveLength(1)
+  })
+
+  it('keeps a declaration in the note when its route gets no block', () => {
+    // Only `runtime` moved: nothing measurable changed, so the route stays behind
+    // the fold and the declaration has nowhere else to be reported.
+    const before = snapshot({ routes: [route({ config: { runtime: 'nodejs' } })] })
+    const after = snapshot({ routes: [route({ config: { runtime: 'edge' } })] })
+    const comment = renderComment(after, diffSnapshots(before, after), [])
+
+    expect(comment).toContain('[!NOTE]')
+    expect(comment).toContain('`/ · runtime`: nodejs → edge')
+    expect(comment).not.toContain('- Declared:')
   })
 
   it('names the declaration on a route that regressed because of one', () => {

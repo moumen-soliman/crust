@@ -213,6 +213,15 @@ function reconstruct(
  * takes the head and tail, the report takes all of it - but none of them get to
  * invent their own spelling of the same evidence.
  */
+/**
+ * A byte chain explains size, not rendering, and only means something with the
+ * sizes printed beside it. Every place that leads with "why did this route
+ * change behaviour" filters them out, so the rule lives here rather than being
+ * spelled out at each call site.
+ */
+export const isBytesChain = (chain: CauseChain): boolean =>
+  chain.detail === 'client JavaScript' || chain.detail.includes(' kB')
+
 export function causeChainLines(chain: CauseChain): string[] {
   const lines: string[] = [chain.route]
 

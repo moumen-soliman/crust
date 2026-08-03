@@ -120,6 +120,29 @@ instead of stacking a new comment on every push. Regressions receive prose and s
 improvements and neutral changes stay behind a disclosure. If the builds are incomparable, no
 route deltas are printed.
 
+### The import chain, one click away
+
+`Cause` and `Introduced by` answer *what broke and where*. The chain behind them answers *how it got
+into this route*, which is a different question, so it is folded rather than inlined - on a deep
+import path it would push the verdict off the screen:
+
+```text
+<details><summary>How it reaches this route</summary>
+
+/products/[slug]
+→ <ProductPage>
+→ <ProductGallery>
+→ getProduct · lib/product.ts
+→ fetchJson · lib/http.ts
+→ uncached fetch at lib/http.ts:3
+</details>
+```
+
+The chain is the one the analyzer stored, matched to the finding by call site. When no stored chain
+matches, none is shown - an import path under the wrong finding sends a reviewer somewhere real that
+is not where the problem is. A chain that is not `verified` states its evidence level and the segment
+crust could not follow.
+
 ### Configuration is reported apart from code
 
 Build configuration moves for reasons no pull request caused, so it is never mixed into the route

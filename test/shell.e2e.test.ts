@@ -2,8 +2,43 @@ import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { analyzeBuild } from '../src/analyze/analyze.ts'
+import { renderComment } from '../src/ci/comment.ts'
+import { diffSnapshots } from '../src/diff/diff.ts'
+import type { Snapshot } from '../src/store/snapshot.ts'
 
 const FIXTURE = join(import.meta.dirname, '..', 'fixtures', 'basic')
+
+/**
+ * The same build with one route rewritten as if it had been fully static, so a
+ * real head can be diffed against a plausible baseline. Derived from the real
+ * snapshot rather than hand-built: everything except the route under test - the
+ * bundler, the schema, the route identities - then matches by construction.
+ */
+function staticBaselineFor(head: Snapshot, pattern: string): Snapshot {
+  return {
+    ...head,
+    buildId: 'baseline00000000',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    routes: head.routes.map((route) =>
+      route.pattern !== pattern
+        ? route
+        : {
+            ...route,
+            renderingMode: 'STATIC' as const,
+            renderingModeReason: null,
+            dynamicReasons: [],
+            causes: [],
+            shell: {
+              predictedStatic: [],
+              predictedHoles: [],
+              actual: { htmlPath: 'server/app/index.html', bytes: 2048, holes: 0, boundaryIds: [], shellRatio: 1 },
+              agreement: 1,
+              unknown: [],
+            },
+          },
+    ),
+  }
+}
 
 /**
  * These run against real build output, so they are skipped unless the fixture has
@@ -58,6 +93,32 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
       'getProduct',
       'fetchJson',
     ])
+  })
+
+  it('carries that chain through the diff and into the PR comment', async () => {
+    // The whole feature rests on one unwritten agreement: the site string the
+    // analyzer stores on a chain and the one the diff parses out of a reason have
+    // to be identical. Both sides are hand-written in the unit tests, so only a
+    // real build can prove they agree - and if they ever stop agreeing, the chain
+    // silently stops appearing rather than failing anything.
+    const head = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-cc', toolVersion: 'test' })
+    const base = staticBaselineFor(head, '/products/[slug]')
+
+    const diff = diffSnapshots(base, head)
+    const delta = diff.routes.find((r) => r.pattern === '/products/[slug]')
+
+    expect(delta?.causeChain?.site).toBe('fixtures/basic/lib/http.ts:3')
+    expect(delta?.causeChain?.links.map((link) => link.binding)).toEqual([
+      'ProductPage',
+      'ProductGallery',
+      'getProduct',
+      'fetchJson',
+    ])
+
+    const comment = renderComment(head, diff, [])
+    expect(comment).toContain('<details><summary>How it reaches this route</summary>')
+    expect(comment).toContain('→ <ProductGallery>')
+    expect(comment).toContain('→ uncached fetch at fixtures/basic/lib/http.ts:3')
   })
 
   it('measures how much of the build it could account for', async () => {

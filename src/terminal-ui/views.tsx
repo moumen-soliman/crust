@@ -1,5 +1,5 @@
 import { Box, Text, renderToString } from 'ink'
-import { causeChainLines } from '../analyze/cause.ts'
+import { causeChainLines, isBytesChain } from '../analyze/cause.ts'
 import { coverageLines } from '../analyze/coverage.ts'
 import { kb, pct, signed } from '../ci/budgets.ts'
 import type { Breach } from '../ci/budgets.ts'
@@ -61,7 +61,7 @@ function SnapshotView({ snapshot, options, width }: { snapshot: Snapshot; option
   // sizes beside it to mean anything, and the terminal has no room for both.
   const chains = snapshot.routes
     .flatMap((route) => route.causes)
-    .filter((cause) => cause.detail !== 'client JavaScript' && !cause.detail.includes(' kB'))
+    .filter((cause) => !isBytesChain(cause))
     .slice(0, options.verbose ? 8 : 2)
   // One root cause beats the same finding repeated per route, so this sits
   // above the per-route chains rather than beside them.

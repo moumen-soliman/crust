@@ -1,11 +1,25 @@
+import { causeChainLines } from '../analyze/cause.ts'
 import type { ConfigChange } from '../analyze/config.ts'
 import { NOISE_FLOOR_BYTES, type Diff, type RouteDelta } from '../diff/diff.ts'
 import { modeLabel } from '../diff/mode.ts'
-import type { Snapshot } from '../store/snapshot.ts'
+import type { CauseChain, Snapshot } from '../store/snapshot.ts'
 import { kb, pct, signed, type Breach } from './budgets.ts'
 
 /** What this run could actually be measured against. */
 type Basis = 'comparable' | 'incomparable' | 'no-baseline'
+
+/** Regressed routes that get a full block; the rest are counted, not printed. */
+const ROUTE_BLOCK_LIMIT = 10
+
+/**
+ * The route a segment-config change belongs to, from keys shaped
+ * `/products/[slug] · revalidate`. Null for build-level configuration, which
+ * belongs to no route and is always reported in the note.
+ */
+function routeScopeOf(change: ConfigChange): string | null {
+  const separator = change.key.indexOf(' · ')
+  return separator > 0 ? change.key.slice(0, separator) : null
+}
 
 /**
  * The PR comment is the growth mechanism (plan §8). Every comment is read by every
@@ -40,7 +54,15 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
   // regression has to treat every number as suspect.
   const configChanges = diff?.configChanges ?? []
   const blockingConfig = configChanges.filter((change) => change.incomparable)
-  const configEvidence = configChanges.filter((change) => !change.incomparable)
+
+  // Segment config is reported beside the route it governs, as a `Declared:` line,
+  // so repeating it in the note says the same thing twice in one comment. Only for
+  // routes that actually get a block, though: a declaration on a route that stays
+  // behind the fold has nowhere else to appear, and dropping it would lose it.
+  const printedRoutes = new Set(regressions.slice(0, ROUTE_BLOCK_LIMIT).map((route) => route.pattern))
+  const configEvidence = configChanges.filter(
+    (change) => !change.incomparable && !printedRoutes.has(routeScopeOf(change) ?? ''),
+  )
 
   lines.push('<!-- crust-report -->')
   lines.push(`### ${verdict(breaches, regressions, others, basis, configEvidence)}`)
@@ -73,13 +95,13 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
     lines.push('')
   }
 
-  for (const route of regressions.slice(0, 10)) {
+  for (const route of regressions.slice(0, ROUTE_BLOCK_LIMIT)) {
     lines.push(...routeBlock(route, configChanges))
     lines.push('')
   }
 
-  if (regressions.length > 10) {
-    lines.push(`<sub>… and ${regressions.length - 10} more regressed routes.</sub>`)
+  if (regressions.length > ROUTE_BLOCK_LIMIT) {
+    lines.push(`<sub>… and ${regressions.length - ROUTE_BLOCK_LIMIT} more regressed routes.</sub>`)
     lines.push('')
   }
 
@@ -111,7 +133,7 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
   }
 
   lines.push(
-    `<sub>${snapshot.routes.length} routes · next ${snapshot.nextVersion} · ${snapshot.bundler} · build \`${snapshot.buildId}\`` +
+    `<sub>${snapshot.routes.length} route${snapshot.routes.length === 1 ? '' : 's'} · next ${snapshot.nextVersion} · ${snapshot.bundler} · build \`${snapshot.buildId}\`` +
       `${diff ? ` · vs \`${diff.base.buildId}\`` : ' · no baseline'}</sub>`,
   )
 
@@ -157,8 +179,16 @@ function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): stri
   }
 
   const cause = route.cause
+  // A cause that only restates a declaration is dropped: the `Declared:` line
+  // above is the same fact with the before and after values attached, and three
+  // lines saying "force-dynamic" teaches a reviewer to skim the block.
+  const causeRestatesDeclaration = declared.length > 0 && cause?.what.startsWith('route config:') === true
   if (cause) {
-    lines.push(cause.kind === 'unknown' ? `- Cause: unknown - ${cause.what}` : `- Cause: \`${cause.what}\``)
+    if (!causeRestatesDeclaration) {
+      lines.push(cause.kind === 'unknown' ? `- Cause: unknown - ${cause.what}` : `- Cause: \`${cause.what}\``)
+    }
+    // Kept either way: which component carries the change is evidence the
+    // declaration lines do not contain.
     if (cause.component) lines.push(`- Introduced by: \`<${cause.component}>\``)
   }
 
@@ -169,7 +199,40 @@ function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): stri
     lines.push(`- Also left the shell: ${extras.map((h) => `\`<${h.component}>\``).join(', ')}`)
   }
 
+  lines.push(...chainBlock(route.causeChain))
+
   return lines
+}
+
+/**
+ * The complete chain, folded away.
+ *
+ * The summary above answers "what broke and where"; this answers "how did it get
+ * into this route", which is a different question asked by a different reader at a
+ * different moment. Inline it would push the verdict off the screen on any route
+ * with a deep import path - so it stays one click away, which is the whole reason
+ * the analyzer stores the links instead of only the call site.
+ */
+function chainBlock(chain: CauseChain | null): string[] {
+  if (!chain || chain.links.length === 0) return []
+
+  const [route, ...rest] = causeChainLines(chain)
+  return [
+    '',
+    '<details><summary>How it reaches this route</summary>',
+    '',
+    '```text',
+    route ?? '',
+    ...rest.map((line) => `→ ${line}`),
+    '```',
+    '',
+    // Stated only when it is not the strongest kind. A label on every chain trains
+    // the reader to skip it, and then the one that matters is skipped too.
+    ...(chain.evidence === 'verified'
+      ? []
+      : [`<sub>Evidence: ${chain.evidence}${chain.unresolved ? ` - could not follow ${chain.unresolved}` : ''}.</sub>`, '']),
+    '</details>',
+  ]
 }
 
 function routeRow(route: RouteDelta): string {

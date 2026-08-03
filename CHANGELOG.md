@@ -12,6 +12,48 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-04
+
+### Added
+
+- Complete cause chains reach CI. The analyzer already walked the module graph and stored the route →
+  component → import → call-site chain for every finding; the diff threw it away and rebuilt a single
+  line from the delta. `RouteDelta` now carries the stored chain, matched to the finding by call site,
+  and the PR comment folds it behind a disclosure under the one-line summary - the verdict still
+  leads, the import path is one click away. A chain that cannot be matched is left off rather than
+  approximated, because a reviewer follows an import path, and one attached to the wrong finding sends
+  them somewhere real that is not where the problem is. Where the chain names the nearest rendered
+  component and the one-line heuristic could not, the chain fills it in; it never overwrites a
+  component the emitted shell verified.
+
+### Fixed
+
+- One finding is stated once. A route segment declaration was reported three times in the same
+  comment: in the configuration note, as a `Declared:` line on the route, and again as the `Cause:`.
+  The note now carries build-level configuration only - segment config already sits beside the route
+  it governs - and the `Cause:` line is dropped when it merely restates a declaration that shows the
+  before and after values. A declaration on a route that gets no block of its own is still reported in
+  the note, because there is nowhere else for it to appear. Found by reading a real pull-request
+  comment rather than the tests.
+- The comment footer says "1 route" rather than "1 routes".
+
+## [0.1.5] - 2026-08-03
+
+### Fixed
+
+- A route declaring `dynamic = 'force-dynamic'` is classified as dynamic instead of `unknown`.
+  Next lists such a route in neither `prerender-manifest.routes` nor `dynamicRoutes` - being opted
+  out of prerendering is *why* it is absent - so the classifier had no artifact and refused to guess.
+  An `unknown` transition is reported but never failed, which meant the most explicit way there is to
+  make a route dynamic was the one case `crust ci` stayed silent about: the recipe in crust's own
+  documentation and in `crust init`'s closing step ("add `export const dynamic = 'force-dynamic'` to a
+  static page ... it exits 1") did not exit 1. A declaration in the source is stronger evidence than
+  the absence of a manifest entry, and a declaration on a layout is honoured for the routes beneath
+  it, naming the layout as the cause. Found by running the documented recipe against a real
+  application instead of trusting it.
+
+## [0.1.4] - 2026-08-03
+
 ### Added
 
 - `crust init`: guided setup from an installed package to an enforcing check. It picks the Next.js
@@ -39,16 +81,6 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ### Fixed
 
-- A route declaring `dynamic = 'force-dynamic'` is classified as dynamic instead of `unknown`.
-  Next lists such a route in neither `prerender-manifest.routes` nor `dynamicRoutes` - being opted
-  out of prerendering is *why* it is absent - so the classifier had no artifact and refused to guess.
-  An `unknown` transition is reported but never failed, which meant the most explicit way there is to
-  make a route dynamic was the one case `crust ci` stayed silent about: the recipe in crust's own
-  documentation and in `crust init`'s closing step ("add `export const dynamic = 'force-dynamic'` to a
-  static page ... it exits 1") did not exit 1. A declaration in the source is stronger evidence than
-  the absence of a manifest entry, and a declaration on a layout is honoured for the routes beneath
-  it, naming the layout as the cause. Found by running the documented recipe against a real
-  application instead of trusting it.
 - The documented and generated workflows referenced `moumen-soliman/crust/action@main`, and this
   repository has no `main` branch. Every copy of that YAML failed on "unable to resolve action"
   before running a step, so the documented CI setup had never worked. Now `@master`, asserted in the
@@ -98,7 +130,7 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## Earlier releases
 
-0.1.5 and before predate this changelog. Their contents are recoverable from
+0.1.3 and before predate this changelog. Their contents are recoverable from
 [the commit history](https://github.com/moumen-soliman/crust/commits/master) and the published
 [npm versions](https://www.npmjs.com/package/@moumensoliman/crust?activeTab=versions).
 
