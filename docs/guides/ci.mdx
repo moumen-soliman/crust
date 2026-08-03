@@ -35,12 +35,17 @@ jobs:
         with: { node-version: 22 }
       - run: npm ci
       - run: npx next build
-      - uses: moumen-soliman/crust/action@main
+      - uses: moumen-soliman/crust/action@master
         with:
           working-directory: .
           baseline: main
-          crust-version: 0.1.3   # pin the verdict; omit to track latest
+          crust-version: 0.1.4   # pin the verdict; omit to track latest
 ```
+
+<Note>
+The action lives on `master`. `baseline` is a branch in *your* repository and is unrelated to it -
+set it to whatever your pull requests target.
+</Note>
 
 It fetches snapshot history, runs the check, records and publishes the new snapshot, and posts or
 updates one comment on pull requests. Run the workflow on the base branch as well as pull requests
@@ -114,6 +119,30 @@ The comment carries a hidden `<!-- crust-report -->` marker so the action update
 instead of stacking a new comment on every push. Regressions receive prose and source blame;
 improvements and neutral changes stay behind a disclosure. If the builds are incomparable, no
 route deltas are printed.
+
+### Configuration is reported apart from code
+
+Build configuration moves for reasons no pull request caused, so it is never mixed into the route
+deltas:
+
+```text
+> [!NOTE]
+> Build configuration changed. Kept as evidence rather than reported as a
+> regression - what it explains below was not caused by application code:
+> - `productionBrowserSourceMaps`: true → false - explains per-file attribution is gone; module lists will empty out without any code being deleted
+```
+
+A change that stops the comparison entirely gets the warning block instead, and each reason says what
+it explains - so "no deltas were reported" never reads as "nothing happened". A route that regressed
+because it *declared* `dynamic`, `revalidate`, `runtime`, or `fetchCache` still fails, with the
+declaration named beside the mode drop:
+
+```text
+**`/products/[slug]`**
+
+- rendering: **static → dynamic**
+- Declared: `dynamic` **unset → force-dynamic**
+```
 
 `crust ci` exits non-zero on a breach.
 

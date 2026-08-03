@@ -375,3 +375,57 @@ describe('renderComment', () => {
     expect(comment).not.toContain('- Cause:')
   })
 })
+
+describe('renderComment: configuration versus application code', () => {
+  it('keeps a comparable configuration change as evidence, not as a regression', () => {
+    // Maps off: every module list empties out without a line of code being
+    // deleted. Without this the reviewer sees attribution vanish on their PR.
+    const before = snapshot({ config: { cacheComponents: false, experimental: {}, sourceMaps: true } })
+    const after = snapshot({ config: { cacheComponents: false, experimental: {}, sourceMaps: false } })
+    const comment = renderComment(after, diffSnapshots(before, after), [])
+
+    expect(comment).toContain('> [!NOTE]')
+    expect(comment).toContain('Kept as evidence rather than reported as a')
+    expect(comment).toContain('`productionBrowserSourceMaps`: true → false')
+    expect(comment).toContain('explains per-file attribution is gone')
+    // "No change" would be false, and the heading is the line most likely to be read.
+    expect(comment).toContain('### crust: 1 configuration change, no route regressed')
+  })
+
+  it('says what an incomparable change explains, not just that it happened', () => {
+    const before = snapshot({ config: { cacheComponents: true, experimental: {}, sourceMaps: true } })
+    const after = snapshot({ config: { cacheComponents: false, experimental: {}, sourceMaps: true } })
+    const comment = renderComment(after, diffSnapshots(before, after), [])
+
+    expect(comment).toContain('> [!WARNING]')
+    expect(comment).toContain('Cache Components turned off - explains rendering is static by default again')
+  })
+
+  it('leaves a reason with no configuration change behind it as a bare reason', () => {
+    const before = snapshot({ schemaVersion: 1 })
+    const after = snapshot({ schemaVersion: 4 })
+    const comment = renderComment(after, diffSnapshots(before, after), [])
+
+    expect(comment).toContain('> - snapshot schema changed: v1 -> v4')
+    expect(comment).not.toContain('v4 - explains')
+  })
+
+  it('names the declaration on a route that regressed because of one', () => {
+    const before = snapshot({ routes: [route({ renderingMode: 'STATIC' })] })
+    const after = snapshot({
+      routes: [
+        route({
+          renderingMode: 'DYNAMIC',
+          renderingModeReason: 'route config: dynamic = force-dynamic',
+          config: { dynamic: 'force-dynamic' },
+        }),
+      ],
+    })
+    const comment = renderComment(after, diffSnapshots(before, after), [])
+
+    // Still a regression - it is just not a mystery, so the reviewer is not sent
+    // hunting for an uncached fetch that does not exist.
+    expect(comment).toContain('- rendering: **static → dynamic**')
+    expect(comment).toContain('- Declared: `dynamic` **unset → force-dynamic**')
+  })
+})

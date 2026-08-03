@@ -2,6 +2,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { analyzeBuild } from '../analyze/analyze.ts'
 import { pct } from '../ci/budgets.ts'
+import { latestCompatibleBaseline } from '../diff/compatible.ts'
 import { findWorkspaceRoot, toPosix } from '../core/workspace.ts'
 import { SnapshotStore } from '../store/store.ts'
 import type { Snapshot } from '../store/snapshot.ts'
@@ -92,6 +93,18 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   })
 
   // 1. The app
+  if (!(await exists(cwd))) {
+    // Without this, a typo in --cwd falls through to the workspace scan and the
+    // report names some other app entirely - answering a question nobody asked.
+    steps.push({
+      title: 'Next.js app',
+      status: 'fail',
+      detail: `${options.cwd} does not exist`,
+      lines: ['Point --cwd at the directory holding the Next.js app.'],
+    })
+    return stop()
+  }
+
   const choice = await chooseNextApp(root, cwd)
   if (!choice.app) {
     steps.push({
@@ -177,14 +190,25 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   if (snapshotPath) {
     files.push({ path: workspacePath(root, snapshotPath), status: 'written', detail: 'snapshot' })
   }
+  // Stored snapshots are not the same thing as a usable baseline. Ones written by
+  // an older schema, another bundler or a different Next major are refused by the
+  // comparison on purpose, and a setup that counted them would report a project as
+  // ready while its first CI run says "nothing to compare".
+  const baselineSnapshot = latestCompatibleBaseline(snapshot, existing)
+  const stale = existing.length > 0 && !baselineSnapshot
   steps.push({
     title: 'First snapshot',
-    status: 'ok',
+    status: stale ? 'warn' : 'ok',
     detail: `${snapshot.buildId}  ${snapshot.routes.length} routes · confidence ${pct(snapshot.coverage.confidence)}`,
     lines: [
-      existing.length === 0
-        ? 'This build is the baseline. Regression checks compare against it from the next build onwards.'
-        : `${existing.length} snapshot${existing.length === 1 ? '' : 's'} already stored in .perf/ - this one joins them.`,
+      ...(baselineSnapshot
+        ? [`Comparable baseline found (${baselineSnapshot.buildId}), so regression rules are live from this build on.`]
+        : existing.length === 0
+          ? ['This build is the baseline. Regression checks compare against it from the next build onwards.']
+          : [
+              `${existing.length} snapshot${existing.length === 1 ? '' : 's'} in .perf/, and none is comparable to this build - ${incomparableReason(snapshot, existing)}.`,
+              'No regression check can run against them. This build becomes the baseline instead, so the rules go live one build later.',
+            ]),
       `${snapshot.coverage.routesClassified}/${snapshot.coverage.routesTotal} routes classified · ${snapshot.coverage.shellsMeasured}/${snapshot.coverage.shellsEmitted} emitted shells measured`,
     ],
   })
@@ -282,9 +306,10 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
       steps.push({
         title: 'CI configuration',
         status: written.status === 'kept' ? 'skip' : 'ok',
-        detail: `${config.path}${written.status === 'kept' ? ' kept as it is' : ''}  (${detection.provider}: ${detection.how})`,
-        lines:
-          written.status === 'kept'
+        detail: `${config.path}${written.status === 'kept' ? '  kept as it is' : ''}`,
+        lines: [
+          `${detection.provider} detected: ${detection.how}.`,
+          ...(written.status === 'kept'
             ? ['That file already exists, so nothing was changed. Rerun with --force to replace it.']
             : [
                 `Pinned to @moumensoliman/crust@${options.toolVersion}, so a crust release cannot change the verdict without a commit.`,
@@ -292,7 +317,8 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
                 ...(config.kind === 'snippet'
                   ? [`${detection.provider} keeps its whole pipeline in one file, so this is a job to paste in rather than a file that runs.`]
                   : []),
-              ],
+              ]),
+        ],
       })
     }
   }
@@ -373,6 +399,26 @@ async function writeIfAbsent(
   await mkdir(dirname(target), { recursive: true })
   await writeFile(target, contents, 'utf8')
   return { path: relativePath, status: 'written', detail: present ? 'replaced' : null }
+}
+
+/**
+ * Why the stored snapshots cannot serve as a baseline, in the terms the diff uses
+ * to refuse them. Named rather than summarised as "incompatible": the schema case
+ * is fixed by re-analysing, and the bundler and framework cases are not fixed at
+ * all - they are waited out.
+ */
+export function incomparableReason(snapshot: Snapshot, existing: Snapshot[]): string {
+  const newest = existing[0]
+  if (!newest) return 'no comparable build'
+  if (newest.schemaVersion !== snapshot.schemaVersion) {
+    return `they were written under snapshot schema v${newest.schemaVersion}, this one is v${snapshot.schemaVersion}`
+  }
+  if (newest.bundler !== snapshot.bundler) return `they were built with ${newest.bundler}, this one with ${snapshot.bundler}`
+  const major = (version: string): string => version.split('.')[0] ?? version
+  if (major(newest.nextVersion) !== major(snapshot.nextVersion)) {
+    return `they were built on Next ${major(newest.nextVersion)}, this one on Next ${major(snapshot.nextVersion)}`
+  }
+  return 'they share no route with this build'
 }
 
 const buildCommandFor = (packageManager: string, app: NextApp): string =>

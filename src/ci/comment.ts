@@ -1,3 +1,4 @@
+import type { ConfigChange } from '../analyze/config.ts'
 import { NOISE_FLOOR_BYTES, type Diff, type RouteDelta } from '../diff/diff.ts'
 import { modeLabel } from '../diff/mode.ts'
 import type { Snapshot } from '../store/snapshot.ts'
@@ -32,20 +33,48 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
     ? diff.routes.filter((r) => r.status !== 'unchanged' && r.severity !== 'regression')
     : []
 
+  // Configuration moves for reasons application code did not, so it is reported
+  // apart from the route deltas rather than mixed into them: the blocking ones
+  // explain why there are no deltas at all, and the rest explain movement the
+  // pull request did not cause. A reviewer who cannot tell those apart from a
+  // regression has to treat every number as suspect.
+  const configChanges = diff?.configChanges ?? []
+  const blockingConfig = configChanges.filter((change) => change.incomparable)
+  const configEvidence = configChanges.filter((change) => !change.incomparable)
+
   lines.push('<!-- crust-report -->')
-  lines.push(`### ${verdict(breaches, regressions, others, basis)}`)
+  lines.push(`### ${verdict(breaches, regressions, others, basis, configEvidence)}`)
   lines.push('')
 
   if (diff?.incomparable.length) {
+    // Every entry says what it explains where crust knows. A schema mismatch has
+    // no config change behind it, so it stays a bare reason.
+    const explanations = new Map(blockingConfig.map((change) => [change.summary, change.explains]))
     lines.push('> [!WARNING]')
     lines.push('> Not comparable to the baseline, so no deltas are reported and no regression')
     lines.push('> check ran:')
-    for (const reason of diff.incomparable) lines.push(`> - ${reason}`)
+    for (const reason of diff.incomparable) {
+      const explains = explanations.get(reason)
+      lines.push(explains ? `> - ${reason} - explains ${explains}` : `> - ${reason}`)
+    }
+    lines.push('')
+  }
+
+  if (configEvidence.length > 0) {
+    lines.push('> [!NOTE]')
+    lines.push('> Build configuration changed. Kept as evidence rather than reported as a')
+    lines.push('> regression - what it explains below was not caused by application code:')
+    for (const change of configEvidence.slice(0, 8)) {
+      lines.push(`> - \`${change.key}\`: ${change.before} → ${change.after} - explains ${change.explains}`)
+    }
+    if (configEvidence.length > 8) {
+      lines.push(`> - … and ${configEvidence.length - 8} more configuration change${configEvidence.length - 8 === 1 ? '' : 's'}`)
+    }
     lines.push('')
   }
 
   for (const route of regressions.slice(0, 10)) {
-    lines.push(...routeBlock(route))
+    lines.push(...routeBlock(route, configChanges))
     lines.push('')
   }
 
@@ -96,8 +125,13 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
  * an unchanged shell percentage, because a number that never moves is a number
  * people stop reading.
  */
-function routeBlock(route: RouteDelta): string[] {
+function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): string[] {
   const lines = [`**\`${route.pattern}\`**${route.status === 'added' ? ' 🆕' : ''}`]
+  // Segment config this route declares, keyed `/pattern · revalidate`. A route
+  // that dropped to dynamic because someone wrote `export const dynamic` is still
+  // a regression - it is just not a mystery, and naming the declaration is the
+  // difference between a reviewer fixing it and a reviewer hunting for a fetch.
+  const declared = configChanges.filter((change) => change.key.startsWith(`${route.pattern} · `))
 
   if (route.modeChange) {
     lines.push(`- rendering: **${modeLabel(route.modeChange.before)} → ${modeLabel(route.modeChange.after)}**`)
@@ -116,6 +150,10 @@ function routeBlock(route: RouteDelta): string[] {
 
   if (Math.abs(route.firstLoadDelta) > NOISE_FLOOR_BYTES) {
     lines.push(`- first load: **${kb(route.firstLoadAfter)}** (${signed(route.firstLoadDelta)})`)
+  }
+
+  for (const change of declared) {
+    lines.push(`- Declared: \`${change.key.split(' · ')[1]}\` **${change.before} → ${change.after}**`)
   }
 
   const cause = route.cause
@@ -151,7 +189,13 @@ function routeRow(route: RouteDelta): string {
  * notification email and the PR timeline. So it names the single worst thing,
  * with the route, rather than a count of everything that moved.
  */
-function verdict(breaches: Breach[], regressions: RouteDelta[], others: RouteDelta[], basis: Basis): string {
+function verdict(
+  breaches: Breach[],
+  regressions: RouteDelta[],
+  others: RouteDelta[],
+  basis: Basis,
+  configEvidence: ConfigChange[],
+): string {
   if (basis !== 'comparable') {
     const why = basis === 'no-baseline' ? 'no baseline yet' : 'baseline not comparable'
     return breaches.length > 0
@@ -175,6 +219,11 @@ function verdict(breaches: Breach[], regressions: RouteDelta[], others: RouteDel
   if (breaches.length > 0) return `crust: ${breaches.length} budget breach${breaches.length === 1 ? '' : 'es'}`
   if (regressions.length > 0) return `crust: ${regressions.length} route${regressions.length === 1 ? '' : 's'} grew`
   if (others.length > 0) return `crust: ${others.length} route${others.length === 1 ? '' : 's'} changed, nothing regressed`
+  // "No change" would be false on a build whose configuration moved, and it is the
+  // heading most likely to be the only line anyone reads.
+  if (configEvidence.length > 0) {
+    return `crust: ${configEvidence.length} configuration change${configEvidence.length === 1 ? '' : 's'}, no route regressed`
+  }
   return 'crust: no change'
 }
 

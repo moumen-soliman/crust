@@ -314,7 +314,9 @@ async function loadPair(ref: string, options: CommonOptions): Promise<{ head: Sn
   })
   const root = await findWorkspaceRoot(resolve(options.cwd))
   const store = new SnapshotStore(root)
-  let base = await store.resolve(ref, options.cwd)
+  // `head` is passed so that a commit holding several snapshots yields one this
+  // build can be compared against, rather than whichever was written first.
+  let base = await store.resolve(ref, options.cwd, head)
 
   // Squash merges orphan snapshots - the pre-squash SHAs stop existing, so
   // ancestry lookup finds nothing. Fall back to matching by analysed content (R13).

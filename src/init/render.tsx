@@ -58,23 +58,32 @@ function InitView({ result, width }: { result: InitResult; width: number }) {
       </Box>
 
       <Box marginTop={1} flexDirection="column">
-        {result.steps.map((step, index) => (
-          <Box key={step.title} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
-            <Box>
-              <Text color={STATUS_COLOR[step.status]}>{GLYPH[step.status]} </Text>
-              <Text bold>{step.title.padEnd(titleWidth)}</Text>
-              <Text color={step.status === 'fail' ? colors.danger : colors.muted}>  {step.detail}</Text>
+        {result.steps.map((step, index) => {
+          // The header row is wrapped here rather than by Ink. A row of Texts
+          // that overflows gets re-laid out, and the separating spaces - glyph to
+          // title, title to detail - are the first thing that goes, so an
+          // overflowing step loses the space after its own status glyph.
+          const [detail, ...overflow] = wrapText(step.detail, Math.max(16, width - titleWidth - 4))
+          const lines = [...overflow, ...step.lines.flatMap((line) => wrapText(line, width - 4))]
+
+          return (
+            <Box key={step.title} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
+              <Box>
+                <Text color={STATUS_COLOR[step.status]}>{GLYPH[step.status]} </Text>
+                <Text bold>{step.title.padEnd(titleWidth)}</Text>
+                <Text color={step.status === 'fail' ? colors.danger : colors.muted}>  {detail ?? ''}</Text>
+              </Box>
+              {/* Padding rather than a literal indent: a line long enough to wrap
+                  keeps its offset on the continuation, instead of restarting at
+                  column zero and reading as a new bullet. */}
+              <Box flexDirection="column" paddingLeft={4}>
+                {lines.map((line, lineIndex) => (
+                  <Text key={lineIndex} color={colors.muted}>{line}</Text>
+                ))}
+              </Box>
             </Box>
-            {/* Padding rather than a literal indent: a line long enough to wrap
-                keeps its offset on the continuation, instead of restarting at
-                column zero and reading as a new bullet. */}
-            <Box flexDirection="column" paddingLeft={4}>
-              {step.lines.flatMap((line) => wrapText(line, width - 4)).map((line, lineIndex) => (
-                <Text key={lineIndex} color={colors.muted}>{line}</Text>
-              ))}
-            </Box>
-          </Box>
-        ))}
+          )
+        })}
       </Box>
 
       {wrote.length > 0 ? (

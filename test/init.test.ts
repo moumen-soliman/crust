@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { deriveStarterBudgets } from '../src/init/budgets.ts'
 import { ciConfigFor } from '../src/init/ci.ts'
 import { chooseNextApp, detectCiProvider, detectNodeMajor, detectPackageManager } from '../src/init/detect.ts'
-import { runInit } from '../src/init/init.ts'
+import { incomparableReason, runInit } from '../src/init/init.ts'
 import { renderInitTerminal } from '../src/init/render.tsx'
 import { route, snapshot as makeSnapshot } from './factories.ts'
 import type { NextApp } from '../src/init/detect.ts'
@@ -162,6 +162,10 @@ describe('init: CI configuration', () => {
     expect(config.path).toBe('.github/workflows/crust.yml')
     expect(config.kind).toBe('workflow')
     expect(config.contents).toContain('crust-version: 9.9.9')
+    // The action lives on master; `@main` resolves to nothing and fails the run
+    // before any step executes.
+    expect(config.contents).toContain('moumen-soliman/crust/action@master')
+    expect(config.contents).not.toContain('action@main')
     expect(config.contents).toContain('pnpm/action-setup@v4')
     expect(config.contents).toContain('version: 10')
     expect(config.contents).toContain('cache: pnpm')
@@ -249,6 +253,35 @@ describe('init: the command', () => {
     const result = await runInit({ cwd: root, toolVersion: 'test' })
     expect(result.ok).toBe(false)
     expect(renderInitTerminal(result, 100)).toContain('crust init --cwd apps/web')
+  })
+})
+
+describe('init: stored snapshots that cannot serve as a baseline', () => {
+  // A count of stored snapshots is not a baseline. Reporting one as the other is
+  // how a project is told it is set up and then gets "nothing to compare" in CI.
+  const head = makeSnapshot({ schemaVersion: 4, bundler: 'turbopack', nextVersion: '16.2.6' })
+
+  it('names the schema gap, which re-analysing the baseline fixes', () => {
+    const old = makeSnapshot({ schemaVersion: 1, bundler: 'turbopack', nextVersion: '16.2.6' })
+    expect(incomparableReason(head, [old])).toBe('they were written under snapshot schema v1, this one is v4')
+  })
+
+  it('names a bundler or framework gap, which re-analysing does not fix', () => {
+    const webpack = makeSnapshot({ schemaVersion: 4, bundler: 'webpack', nextVersion: '16.2.6' })
+    expect(incomparableReason(head, [webpack])).toContain('built with webpack')
+
+    const next15 = makeSnapshot({ schemaVersion: 4, bundler: 'turbopack', nextVersion: '15.4.1' })
+    expect(incomparableReason(head, [next15])).toBe('they were built on Next 15, this one on Next 16')
+  })
+
+  it('falls back to the route-identity case when everything else matches', () => {
+    const renamed = makeSnapshot({
+      schemaVersion: 4,
+      bundler: 'turbopack',
+      nextVersion: '16.2.6',
+      routes: [route({ id: 'app/old/page.tsx' })],
+    })
+    expect(incomparableReason(head, [renamed])).toBe('they share no route with this build')
   })
 })
 
