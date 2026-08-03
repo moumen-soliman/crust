@@ -20,7 +20,9 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 - The fixture job now analyses its builds through that installed executable as well.
 - Release workflow (`.github/workflows/release.yml`): tag-triggered publish with
   [npm provenance](https://docs.npmjs.com/generating-provenance-statements), plus an automatic
-  GitHub release whose notes are this file's section for that version.
+  GitHub release whose notes are this file's section for that version. The published version is
+  taken from the tag and written into `package.json` before the build, so the tag and the package
+  cannot disagree and there is no manual bump step that can be skipped.
 - `CHANGELOG.md` and `COMPATIBILITY.md`.
 
 ### Changed

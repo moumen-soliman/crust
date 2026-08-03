@@ -208,8 +208,14 @@ to the CLI, the exports or the snapshot schema go in the minor position.
    build time.
 3. **Push.** `git push --follow-tags`.
 
-The tag must match `package.json`; the workflow stops if it doesn't, because npm does not allow a
-version to be republished and a mismatched tag cannot be corrected after the fact.
+**The tag decides the published version.** The workflow writes it into `package.json` before it
+builds anything, so a hand-cut tag on a commit whose manifest was never bumped still publishes the
+version the tag names. Step 2 is the convenient path, not a requirement, and there is no
+version-mismatch failure to run into. The bump is not committed back to `master`: the tag is the
+record, and a release job that pushes to a protected branch is a release job that fails.
+
+What the tag cannot fix is a wrong tag. npm does not allow a version to be republished, so a typo
+means burning that version number and cutting the next one.
 
 Requires an `NPM_TOKEN` repository secret with publish rights. Provenance additionally needs the repo
 and package to be public - that is what makes the published tarball traceable to the commit and the

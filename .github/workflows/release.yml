@@ -4,9 +4,11 @@ name: Release
 #
 #   pnpm version minor && git push --follow-tags
 #
-# The tag is the trigger and the only input. Everything else - the published
-# version, the release notes - is derived from files already in the commit the
-# tag points at, so a release cannot describe something other than what shipped.
+# The tag is the trigger and the only input. The published version is taken from
+# the tag and written into package.json here, so the two cannot disagree - there
+# is no manual bump to forget, and no mismatch to fail on. The release notes come
+# from the CHANGELOG in the commit the tag points at, so a release cannot
+# describe something other than what shipped.
 on:
   push:
     tags: ['v*.*.*']
@@ -39,10 +41,10 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      # The tag names the release; package.json names what gets published. If
-      # they disagree, stop here - past this point the wrong version is on npm
-      # under a tag that claims otherwise, and npm does not allow a re-publish.
-      - name: Resolve and verify the version
+      # The tag is the single source of the released version. Validated here so a
+      # malformed tag fails in seconds, and applied to package.json further down
+      # - after install, before anything is built from it.
+      - name: Resolve the version from the tag
         id: version
         run: |
           tag="${GITHUB_REF_NAME}"
@@ -51,15 +53,8 @@ jobs:
             *) echo "::error::'$tag' is not a vX.Y.Z tag. Dispatch this workflow against a tag."; exit 1 ;;
           esac
 
-          version="${tag#v}"
-          manifest=$(node -p "require('./package.json').version")
-          if [ "$version" != "$manifest" ]; then
-            echo "::error::tag $tag does not match package.json version $manifest"
-            exit 1
-          fi
-
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
       # Extracted before anything is built, so a missing entry fails in seconds
       # rather than after the test suite. An unwritten changelog is a release
@@ -81,6 +76,20 @@ jobs:
           cat "$RUNNER_TEMP/notes.md"
 
       - run: pnpm install --frozen-lockfile
+
+      # After install so the lockfile check sees the committed manifest, and
+      # before any build so the version tsup inlines into src/version.ts is the
+      # one being published. `--allow-same-version` keeps this a no-op in the
+      # normal case, where `pnpm version` already wrote it locally; it only does
+      # real work when a tag was cut by hand. Not committed back - the tag is the
+      # record, and a release job that pushes to master is a release job that
+      # fails on a protected branch.
+      - name: Set the package version from the tag
+        run: |
+          npm version "${{ steps.version.outputs.version }}" \
+            --no-git-tag-version --allow-same-version
+          node -p "'publishing ' + require('./package.json').name + '@' + require('./package.json').version"
+
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm typecheck
       - run: pnpm test
