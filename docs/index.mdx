@@ -9,6 +9,52 @@ story of every route, and stores a snapshot so the next build can be compared wi
 **Next DevTools explains the current page. crust explains what became worse, why, and whether the
 PR should merge.**
 
+## How crust calculates the report
+
+`crust report` does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins
+the completed production build in `.next` with the application's source graph, stores the result as
+a snapshot, optionally adds local history from `.perf/`, and renders a self-contained HTML file.
+
+It reads:
+
+- route, prerender, client-reference, build, and resolved-config manifests
+- emitted HTML from `server/app/**/*.html`
+- production JavaScript from `static/**/*.js` and its source maps
+- pages, layouts, components, and first-party imports under `app/` or `src/app/`
+
+Source supplies the **why**; emitted build artifacts supply the **what**.
+
+| Report value | Calculation |
+|---|---|
+| **Rendering mode** | Partial routes have pending boundaries in emitted HTML. ISR and static routes come from the prerender manifest. A non-prerendered route is dynamic only when source analysis finds a supported reason; otherwise it remains `unknown`. |
+| **First-load JavaScript** | Route chunks + shared route chunks + root runtime and polyfill chunks, using uncompressed on-disk bytes. This is not gzip size or a browser network measurement. |
+| **Static shell** | `(all visible text - text inside pending boundaries) / all visible text` after removing `<head>` and scripts from emitted HTML. A 100% shell does not mean every component or byte is static. |
+| **File and package bytes** | Source-map generated ranges assigned to workspace files or `node_modules` packages. Missing or ambiguous mappings remain unattributed. |
+| **Client-boundary cost** | Attributed bytes in the complete import subtree rooted at each first `'use client'` boundary. |
+| **Barrel cost** | Attributed modules reachable through a barrel minus those still reachable without that barrel. |
+| **Shared cause** | The same layout, boundary, barrel, package, chunk, or call site grouped across all affected routes. |
+| **Confidence** | The mean of classified-route, measured-shell, and attributed-byte coverage. Unresolved relationships are reported separately. |
+
+### Function-level analysis
+
+crust parses source without executing it. It looks for:
+
+- `cookies`, `headers`, `draftMode`, `connection`, and page `searchParams`
+- `fetch()` caching, `no-store`, default uncached reads under Cache Components, and `'use cache'`
+- route exports such as `dynamic`, `revalidate`, `runtime`, and `fetchCache`
+- Suspense and client boundaries, rendered components, imports, exports, aliases, and barrel
+  re-exports
+
+It follows reachable exported functions and imported bindings from each page and layout to the
+dynamic read or attributed module. Direct imports can be narrowed per function. Namespace imports,
+computed calls, `export *`, unresolved aliases, and components passed through props fall back to
+conservative module-level evidence or remain `unknown`.
+
+<Note>
+Every cause is labeled **verified**, **inferred**, or **unknown**. File-level byte attribution needs
+`productionBrowserSourceMaps: true`; route totals and shell analysis do not.
+</Note>
+
 ## Compared with Next.js Bundle Analyzer
 
 The experimental [`next experimental-analyze`](https://nextjs.org/docs/app/guides/package-bundling#nextjs-bundle-analyzer-experimental)

@@ -33,3 +33,6 @@ spike/out/
 site/.next/
 site/node_modules/
 my-video
+CLAUDE.md
+docs/next-vision.md
+.rtk

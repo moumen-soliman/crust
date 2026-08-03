@@ -10,7 +10,9 @@ inputs:
     description: Build output directory.
     default: '.next'
   baseline:
-    description: Git ref to compare against.
+    description: >-
+      Git ref in your repository to compare against. Defaults to the ecosystem
+      default branch name; set it to master (or any ref) if yours differs.
     default: 'main'
   comment:
     description: Post the report as a PR comment.

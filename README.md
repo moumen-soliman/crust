@@ -31,6 +31,63 @@
 
 **Status: pre-alpha.** The snapshot format, CLI output, and package API can still change.
 
+## How crust calculates the report
+
+`crust report` does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins
+the completed production build in `.next` with the application's source graph, stores the result as
+a snapshot, optionally adds local history from `.perf/`, and renders that snapshot as a
+self-contained HTML file.
+
+It reads these production artifacts:
+
+- `app-path-routes-manifest.json` for App Router route patterns
+- `prerender-manifest.json` for prerendering and ISR
+- per-route client-reference manifests plus `build-manifest.json` for client chunks
+- `required-server-files.json` for resolved Next.js configuration such as Cache Components
+- `server/app/**/*.html` for the shell Next.js actually emitted
+- `static/**/*.js` and their source maps for byte attribution
+
+It also parses `app/` or `src/app/`, layouts, and first-party imports. Source supplies the **why**;
+emitted build artifacts supply the **what**.
+
+| Report value | How it is calculated |
+|---|---|
+| **Rendering mode** | Route handlers come from route entries. Partial routes have pending boundaries in emitted HTML. ISR and static routes come from the prerender manifest. A non-prerendered route is dynamic only when source analysis finds a supported dynamic reason; otherwise it remains `unknown`. |
+| **First-load JavaScript** | `route chunks + shared route chunks + root runtime/polyfill chunks`, using uncompressed on-disk JavaScript bytes. It is not gzip size or a browser network measurement. Route handlers report zero client bytes. |
+| **Static shell** | crust removes `<head>` and scripts from emitted HTML, counts visible-text characters, and calculates `(all visible text - text inside pending boundaries) / all visible text`. A 100% shell means all measured visible text is outside pending boundaries—not that every component or byte is static. |
+| **File and package bytes** | Source-map generated ranges are assigned to workspace files or `node_modules` packages. Missing or ambiguous mappings stay unattributed. Per-file attribution requires `productionBrowserSourceMaps: true`; route totals do not. |
+| **Client-boundary cost** | Attributed bytes for the complete import subtree rooted at each first `'use client'` boundary. |
+| **Barrel cost** | Attributed modules reachable through a barrel minus those still reachable without that barrel—the measured drag introduced by the barrel path. |
+| **Shared cause** | The same layout, client boundary, barrel, package, chunk, or call site grouped across every affected route instead of repeated once per route. |
+| **Confidence** | The mean of measurable coverage ratios: classified routes, emitted shells that could be checked, and attributed client bytes. Unresolved and conservative relationships are reported separately. |
+
+### What function-level analysis looks for
+
+crust parses source without executing the application. It records:
+
+- calls to `cookies`, `headers`, `draftMode`, and `connection`
+- page `searchParams` usage
+- `fetch()` cache behavior, including `no-store`, default uncached reads under Cache Components,
+  and `'use cache'`
+- route exports such as `dynamic`, `revalidate`, `runtime`, and `fetchCache`
+- Suspense boundaries, rendered components, client boundaries, imports, exports, aliases, default
+  exports, and barrel re-exports
+
+It then walks from the page and layouts through reachable exported functions and imported bindings
+to the dynamic read or expensive module. Direct imports can be narrowed per function. Namespace
+imports, computed calls, `export *`, unresolved aliases, and components passed through props fall
+back to conservative module-level evidence or remain `unknown`; crust does not turn an incomplete
+chain into confident blame.
+
+Every cause is labeled:
+
+- **Verified** - production artifacts confirm the result and the source chain is complete.
+- **Inferred** - source relationships support the conclusion, but no emitted artifact confirms it.
+- **Unknown** - the relationship is incomplete or ambiguous.
+
+The report is therefore an explanation of one production build. Regression views compare two
+snapshots only when their schema, bundler, Next.js major, and route identities are compatible.
+
 ## Features
 
 - **Production-build analysis** - reads `.next` output instead of measuring unminified, HMR-heavy
@@ -158,6 +215,10 @@ Then, after a change:
 next build
 npx @moumensoliman/crust diff main
 ```
+
+The ref is your repository's default branch - substitute `master` or whatever yours is called. Where
+crust takes a baseline ref it defaults to `main`, and resolves both `main` and `master` through
+`git merge-base`.
 
 ```
 crust diff  cfdcf50068722687 -> 4a80239769ea8b93

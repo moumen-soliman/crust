@@ -1,0 +1,123 @@
+name: Release
+
+# Cut a release by pushing a tag; see CONTRIBUTING.md#releasing.
+#
+#   pnpm version minor && git push --follow-tags
+#
+# The tag is the trigger and the only input. Everything else - the published
+# version, the release notes - is derived from files already in the commit the
+# tag points at, so a release cannot describe something other than what shipped.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+# Publishing is not undoable. One release at a time, and never cancel one
+# half-way: an interrupted job can leave npm published and the GitHub release
+# missing, which is the awkward half to repair by hand.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # OIDC, for npm provenance
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # release notes and provenance want real history
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # The tag names the release; package.json names what gets published. If
+      # they disagree, stop here - past this point the wrong version is on npm
+      # under a tag that claims otherwise, and npm does not allow a re-publish.
+      - name: Resolve and verify the version
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::'$tag' is not a vX.Y.Z tag. Dispatch this workflow against a tag."; exit 1 ;;
+          esac
+
+          version="${tag#v}"
+          manifest=$(node -p "require('./package.json').version")
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::tag $tag does not match package.json version $manifest"
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Extracted before anything is built, so a missing entry fails in seconds
+      # rather than after the test suite. An unwritten changelog is a release
+      # nobody can read: for a tool whose whole value is comparison over time,
+      # "what changed" is the product, not paperwork.
+      - name: Extract the release notes
+        run: |
+          awk -v v="${{ steps.version.outputs.version }}" '
+            $0 ~ "^## \\[" v "\\]" { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "::error::CHANGELOG.md has no '## [${{ steps.version.outputs.version }}]' section."
+            echo "::error::Rename the Unreleased heading to that version before tagging."
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/notes.md"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      # Same check the `package` CI job runs. Repeated here because this is the
+      # last moment a broken manifest is still fixable.
+      - name: Smoke-test the tarball as a consumer
+        run: |
+          pnpm pack --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/consumer"
+          npm init -y --prefix "$RUNNER_TEMP/consumer" >/dev/null
+          npm install --no-audit --no-fund \
+            --prefix "$RUNNER_TEMP/consumer" \
+            "$RUNNER_TEMP"/moumensoliman-crust-*.tgz
+
+          CRUST="$RUNNER_TEMP/consumer/node_modules/.bin/crust"
+          actual=$("$CRUST" --version)
+          echo "$actual"
+          case "$actual" in
+            "crust/${{ steps.version.outputs.version }} "*) ;;
+            *) echo "::error::installed executable reports: $actual"; exit 1 ;;
+          esac
+
+      # Provenance links this tarball to this workflow run and this commit, so
+      # anyone can verify what source produced the package they installed.
+      # Requires the id-token permission above and a public repository.
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag

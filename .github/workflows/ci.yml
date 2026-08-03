@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -53,6 +53,83 @@ jobs:
       - run: CRUST_FIXTURE_MODE=cc pnpm --filter @fixture/web exec next build --webpack
 
       - run: pnpm test
-      # The terminal renderer is TSX; exercise the packaged CLI exactly as users do.
-      - run: node dist/cli.js analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
-      - run: node dist/cli.js analyze --cwd fixtures/legacy --no-save
+
+      # Drive the fixtures through the *installed* executable rather than
+      # `node dist/cli.js`. The terminal renderer is TSX, so this is where a
+      # broken bundle surfaces - and running it from a consumer install means a
+      # broken `bin`, `files` or `exports` field fails here too, instead of on a
+      # user's machine after publish.
+      - run: pnpm pack --pack-destination "$RUNNER_TEMP"
+      - name: Install the tarball into a throwaway project
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          npm init -y --prefix "$RUNNER_TEMP/consumer" >/dev/null
+          npm install --no-audit --no-fund \
+            --prefix "$RUNNER_TEMP/consumer" \
+            "$RUNNER_TEMP"/moumensoliman-crust-*.tgz
+      - name: Analyse the fixtures with the installed executable
+        run: |
+          CRUST="$RUNNER_TEMP/consumer/node_modules/.bin/crust"
+          "$CRUST" analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
+          "$CRUST" analyze --cwd fixtures/legacy --no-save
+
+  # Publishing is the one step with no undo, so the manifest is checked against a
+  # real install rather than by reading package.json. npm repairs some of these
+  # on the way out (a `./`-prefixed bin, for one); the tarball should be correct
+  # before that happens, because the repair is not guaranteed to stay.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm pack --pack-destination "$RUNNER_TEMP"
+
+      - name: Check the manifest inside the tarball
+        run: |
+          tar -xzOf "$RUNNER_TEMP"/moumensoliman-crust-*.tgz package/package.json > "$RUNNER_TEMP/packed.json"
+          node -e '
+            const pkg = require(process.env.RUNNER_TEMP + "/packed.json")
+            const bin = pkg.bin.crust
+            if (bin !== "dist/cli.js") {
+              console.error(`bin.crust is ${JSON.stringify(bin)}; expected "dist/cli.js"`)
+              process.exit(1)
+            }
+          '
+
+      - name: Install it into a throwaway project
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          npm init -y --prefix "$RUNNER_TEMP/consumer" >/dev/null
+          npm install --no-audit --no-fund \
+            --prefix "$RUNNER_TEMP/consumer" \
+            "$RUNNER_TEMP"/moumensoliman-crust-*.tgz
+
+      - name: Run the generated executable
+        run: |
+          CRUST="$RUNNER_TEMP/consumer/node_modules/.bin/crust"
+          test -x "$CRUST" || { echo "no executable at $CRUST"; exit 1; }
+
+          # The version is inlined at build time; if the define ever stops
+          # firing, every snapshot this release writes is mislabelled.
+          expected=$(node -p "require('./package.json').version")
+          actual=$("$CRUST" --version)
+          echo "$actual"
+          case "$actual" in
+            "crust/$expected "*) ;;
+            *) echo "expected version $expected, got: $actual"; exit 1 ;;
+          esac
+
+          "$CRUST" --help > /dev/null
+
+      - name: Check the package entry points resolve
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          for entry in "" /widget /collector /ingest /otel; do
+            node -e "import('@moumensoliman/crust$entry').then(() => console.log('ok: @moumensoliman/crust$entry'))"
+            node -e "require.resolve('@moumensoliman/crust$entry'); console.log('ok (cjs): @moumensoliman/crust$entry')"
+          done

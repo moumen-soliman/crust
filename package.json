@@ -31,7 +31,7 @@
     "node": ">=20"
   },
   "bin": {
-    "crust": "./dist/cli.js"
+    "crust": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -63,6 +63,8 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
+    "COMPATIBILITY.md",
     "LICENSE"
   ],
   "scripts": {
