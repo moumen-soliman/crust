@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { analyzeBuild } from '../src/analyze/analyze.ts'
+import { analyzeBuild, renderingModeFor } from '../src/analyze/analyze.ts'
 import { readSourceFacts } from '../src/analyze/source-file.ts'
 import { packageNameOf } from '../src/analyze/attribution.ts'
 import { createIndex, findWorkspaceRoot } from '../src/core/workspace.ts'
@@ -17,6 +17,31 @@ describe('build discovery', () => {
     await expect(analyzeBuild({ cwd, toolVersion: 'test' })).rejects.toThrow(
       /Run `next build` in the app directory[\s\S]*--cwd apps\/web[\s\S]*--dist-dir <directory>/,
     )
+  })
+})
+
+describe('rendering mode from a declaration', () => {
+  // Next lists a force-dynamic route in neither `prerender-manifest.routes` nor
+  // `dynamicRoutes`, so the artifacts say nothing at all. Before this, the most
+  // explicit way to make a route dynamic classified as `unknown` - and an unknown
+  // transition is never failed, so `crust ci` stayed silent on it.
+  const ctx = { pattern: '/[locale]/about', prerender: { routes: {}, dynamicRoutes: {} } } as never
+
+  it('trusts dynamic = force-dynamic declared on the page', () => {
+    expect(renderingModeFor(ctx, [], null, { dynamic: 'force-dynamic' })).toEqual({
+      mode: 'DYNAMIC',
+      reason: 'route config: dynamic = "force-dynamic"',
+    })
+  })
+
+  it('names the layout when the declaration is above the page', () => {
+    const result = renderingModeFor(ctx, [], null, { 'app/[locale]/layout.tsx:dynamic': 'force-dynamic' })
+    expect(result.mode).toBe('DYNAMIC')
+    expect(result.reason).toBe('route config: dynamic = "force-dynamic" in app/[locale]/layout.tsx')
+  })
+
+  it('still refuses to guess when nothing declares or explains it', () => {
+    expect(renderingModeFor(ctx, [], null, { revalidate: 0, runtime: 'edge' }).mode).toBe('unknown')
   })
 })
 

@@ -340,7 +340,7 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
 
   const { mode, reason } = isRouteHandler
     ? { mode: 'ROUTE_HANDLER' as const, reason: null }
-    : renderingModeFor(ctx, dynamicReasons, shell?.actual ?? null)
+    : renderingModeFor(ctx, dynamicReasons, shell?.actual ?? null, routeConfig)
 
   // A fully dynamic route has no shell artifact to name the missing component.
   // The build proves the route opted out, the taint graph names the call site,
@@ -434,10 +434,11 @@ function agreementBetween(predictedStatic: string[], predictedHoles: number, act
   return Math.max(0, 1 - Math.abs(predictedHoles - actualHoles) / worst)
 }
 
-function renderingModeFor(
+export function renderingModeFor(
   ctx: RouteContext,
   dynamicReasons: string[],
   actual: { holes: number } | null,
+  routeConfig: Record<string, string | number | boolean> = {},
 ): { mode: RenderingMode | 'unknown'; reason: string | null } {
   const prerendered = ctx.prerender?.routes[ctx.pattern]
 
@@ -465,9 +466,40 @@ function renderingModeFor(
   }
   if (dynamicReasons.length > 0) return { mode: 'DYNAMIC', reason: dynamicReasons[0]! }
 
+  // The source can also *declare* the answer outright. `dynamic = 'force-dynamic'`
+  // opts the route out of prerendering, which is exactly why it appears in neither
+  // the prerendered routes nor `dynamicRoutes` - so without reading the declaration,
+  // the most explicit way there is to make a route dynamic was the one case crust
+  // called `unknown`. And an `unknown` transition is reported but never failed, so
+  // the check stayed silent on a deliberate, one-line staticness regression.
+  //
+  // This is not inference: a declaration in the source is stronger evidence than
+  // the absence of a manifest entry, which is all the fallback below ever had.
+  const declared = forceDynamicDeclaration(routeConfig)
+  if (declared) return { mode: 'DYNAMIC', reason: declared }
+
   // Something made this route dynamic that we could not see in source. Saying
   // DYNAMIC would be a guess dressed as a fact.
   return { mode: 'unknown', reason: 'not prerendered, and no dynamic API found in source' }
+}
+
+/**
+ * `dynamic = 'force-dynamic'` on the page or on any layout above it.
+ *
+ * Layout entries are recorded as `<layout file>:<key>`, and a layout's declaration
+ * governs every route beneath it, so the file is named in the reason - otherwise a
+ * page with nothing in it reports a cause its own source does not contain.
+ */
+function forceDynamicDeclaration(config: Record<string, string | number | boolean>): string | null {
+  for (const [key, value] of Object.entries(config)) {
+    if (value !== 'force-dynamic') continue
+    if (key === 'dynamic') return 'route config: dynamic = "force-dynamic"'
+    const separator = key.lastIndexOf(':')
+    if (separator > 0 && key.slice(separator + 1) === 'dynamic') {
+      return `route config: dynamic = "force-dynamic" in ${key.slice(0, separator)}`
+    }
+  }
+  return null
 }
 
 /* ── discovery helpers ─────────────────────────────────────────────────── */
