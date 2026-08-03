@@ -1,8 +1,5 @@
+import { DOCS, GITHUB, SiteFooter, SiteNav } from './chrome'
 import { CodePanel, type CodeTab } from './code-panel'
-import { Mark } from './mark'
-
-const DOCS = 'https://docs.crust.moumen.dev'
-const GITHUB = 'https://github.com/moumen-soliman/crust'
 
 const TABS: CodeTab[] = [
   {
@@ -205,38 +202,7 @@ const nogoRow =
 export default function Home() {
   return (
     <div className="mx-auto min-h-screen max-w-shell border-x border-border">
-      <nav className="sticky top-0 z-20 flex h-[54px] items-center gap-5 border-b border-border bg-bg/84 px-pad backdrop-blur-[12px] backdrop-saturate-[180%]">
-        <a className="inline-flex items-center gap-2 text-body font-[550] tracking-[-0.01em] no-underline" href="/">
-          <Mark size={17} />
-          crust
-        </a>
-        <div className="mx-auto flex gap-[26px] max-[720px]:hidden">
-          <a
-            className="text-micro uppercase tracking-[0.09em] text-muted no-underline transition-colors duration-[120ms] hover:text-fg"
-            href={`${DOCS}/docs/quickstart`}
-          >
-            Quickstart
-          </a>
-          <a
-            className="text-micro uppercase tracking-[0.09em] text-muted no-underline transition-colors duration-[120ms] hover:text-fg"
-            href={`${DOCS}/docs/concepts/regressions`}
-          >
-            How it thinks
-          </a>
-          <a
-            className="text-micro uppercase tracking-[0.09em] text-muted no-underline transition-colors duration-[120ms] hover:text-fg"
-            href={`${DOCS}/docs/reference/cli`}
-          >
-            CLI
-          </a>
-        </div>
-        <a
-          className="inline-flex items-center gap-[7px] text-meta text-muted no-underline hover:text-fg"
-          href={GITHUB}
-        >
-          GitHub
-        </a>
-      </nav>
+      <SiteNav />
 
       <header className="grid items-center gap-[clamp(28px,5vw,56px)] px-pad py-[clamp(44px,7vw,88px)] max-[900px]:grid-cols-1 min-[901px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <div>
@@ -489,25 +455,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-border py-[22px]">
-        <div className="flex flex-wrap items-center gap-4 px-pad text-meta text-muted">
-          <Mark size={14} />
-          <a className="no-underline hover:text-fg" href={DOCS}>
-            Docs
-          </a>
-          <span className="text-border">/</span>
-          <a className="no-underline hover:text-fg" href={GITHUB}>
-            GitHub
-          </a>
-          <span className="text-border">/</span>
-          <a className="no-underline hover:text-fg" href={`${GITHUB}/blob/main/LICENSE`}>
-            MIT
-          </a>
-          <span className="ms-auto max-[520px]:ms-0 max-[520px]:w-full">
-            Next.js 15 &amp; 16 · webpack + Turbopack · Node 20+
-          </span>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }
