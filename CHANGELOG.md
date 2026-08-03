@@ -39,6 +39,16 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ### Fixed
 
+- A route declaring `dynamic = 'force-dynamic'` is classified as dynamic instead of `unknown`.
+  Next lists such a route in neither `prerender-manifest.routes` nor `dynamicRoutes` - being opted
+  out of prerendering is *why* it is absent - so the classifier had no artifact and refused to guess.
+  An `unknown` transition is reported but never failed, which meant the most explicit way there is to
+  make a route dynamic was the one case `crust ci` stayed silent about: the recipe in crust's own
+  documentation and in `crust init`'s closing step ("add `export const dynamic = 'force-dynamic'` to a
+  static page ... it exits 1") did not exit 1. A declaration in the source is stronger evidence than
+  the absence of a manifest entry, and a declaration on a layout is honoured for the routes beneath
+  it, naming the layout as the cause. Found by running the documented recipe against a real
+  application instead of trusting it.
 - The documented and generated workflows referenced `moumen-soliman/crust/action@main`, and this
   repository has no `main` branch. Every copy of that YAML failed on "unable to resolve action"
   before running a step, so the documented CI setup had never worked. Now `@master`, asserted in the
@@ -88,7 +98,7 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## Earlier releases
 
-0.1.4 and before predate this changelog. Their contents are recoverable from
+0.1.5 and before predate this changelog. Their contents are recoverable from
 [the commit history](https://github.com/moumen-soliman/crust/commits/master) and the published
 [npm versions](https://www.npmjs.com/package/@moumensoliman/crust?activeTab=versions).
 
