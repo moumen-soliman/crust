@@ -19,7 +19,7 @@ inputs:
     default: 'true'
   crust-version:
     description: >-
-      Version of @moumensoliman/crust to run, e.g. 0.1.3. Pin it so a new release
+      Version of @moumensoliman/crust to run, e.g. 0.1.4. Pin it so a new release
       cannot change your verdict without a commit; leave empty to track latest.
       `crust init` writes the version that generated the workflow.
     default: ''

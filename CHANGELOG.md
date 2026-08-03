@@ -88,7 +88,7 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## Earlier releases
 
-0.1.3 and before predate this changelog. Their contents are recoverable from
+0.1.4 and before predate this changelog. Their contents are recoverable from
 [the commit history](https://github.com/moumen-soliman/crust/commits/master) and the published
 [npm versions](https://www.npmjs.com/package/@moumensoliman/crust?activeTab=versions).
 
