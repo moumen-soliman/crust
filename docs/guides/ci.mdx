@@ -6,6 +6,12 @@ description: "Automatic regression checks, optional ceilings, an updating PR com
 The PR comment is the point. Every comment is read by every reviewer, in context, at the moment it
 matters.
 
+<Tip>
+`npx @moumensoliman/crust init` generates the configuration below for the detected provider, filled in
+with your package manager, app directory, and default branch - and pinned to the crust version that
+wrote it. The rest of this page is what it writes, and why.
+</Tip>
+
 ## The action
 
 ```yaml .github/workflows/crust.yml
@@ -33,6 +39,7 @@ jobs:
         with:
           working-directory: .
           baseline: main
+          crust-version: 0.1.3   # pin the verdict; omit to track latest
 ```
 
 It fetches snapshot history, runs the check, records and publishes the new snapshot, and posts or

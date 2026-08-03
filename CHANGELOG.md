@@ -14,6 +14,20 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ### Added
 
+- `crust init`: guided setup from an installed package to an enforcing check. It picks the Next.js
+  app (and refuses to guess between several in a monorepo), verifies a production build exists,
+  records the first snapshot, reports whether source-map attribution is available, writes starter
+  budgets, and generates CI configuration for the detected provider. Nothing existing is replaced
+  without `--force`, and `--dry-run` prints the same report while writing nothing.
+  - Generated budgets carry a `"//"` array explaining how every number was derived, and which of
+    them crust *chose* rather than measured. A generated threshold nobody can explain in review is
+    one that hardens into a standard by default, which is the opposite of the intent.
+  - Generated CI pins `@moumensoliman/crust` to the version that wrote the file, so a crust release
+    cannot change a project's verdict without a commit. It builds with the detected package manager,
+    defers to the `packageManager` field where one exists, and runs on the base branch as well as
+    pull requests - without that, a pull request has no merge-base snapshot to compare against.
+- `crust-version` input on the bundled GitHub Action, which is what makes that pin possible. Empty
+  (the default) tracks latest, as before.
 - `package` CI job: the release tarball is packed, installed into a throwaway project, and driven
   through the generated `crust` executable. `node dist/cli.js` cannot catch a broken `bin`, `files`
   or `exports` field, because it never resolves the package the way a consumer does.

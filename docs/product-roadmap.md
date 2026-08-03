@@ -10,7 +10,8 @@ Crust is build-causality and merge-intelligence tooling for Next.js. It explains
 
 Milestone 1 is implemented. Milestone 2's shared causes, client cost, configuration detection, and
 single-build report controls are implemented; explicit config explanations in every `diff`/CI view
-remain follow-up work. Milestones 3 and 4 remain planned.
+remain follow-up work. Milestone 3 has started: `crust init` is implemented. Milestone 4 remains
+planned.
 
 ## Product principles
 
@@ -113,24 +114,22 @@ If a route calls only `cachedProduct`, it should not inherit taint from `livePro
 - Fall back to conservative module-level taint when calls are computed or otherwise opaque.
 - Surface the fallback as inferred evidence.
 
-## Priority 5: `crust init`
+## Priority 5: `crust init` — implemented
 
-Add a guided setup command:
+A guided setup command:
 
 ```bash
-crust init
+crust init [--cwd <dir>] [--ci github|gitlab|circleci|none] [--force] [--dry-run]
 ```
 
-It should:
+- [x] Analyze the current production build.
+- [x] Create the first compatible snapshot.
+- [x] Generate `.perf/budgets.json` with explained starter values.
+- [x] Check source-map and Next.js configuration.
+- [x] Offer CI configuration for the detected provider.
+- [x] Explain which regression rules require no thresholds.
 
-- Analyze the current production build.
-- Create the first compatible snapshot.
-- Generate `.perf/budgets.json` with explained starter values.
-- Check source-map and Next.js configuration.
-- Offer CI configuration for the detected provider.
-- Explain which regression rules require no thresholds.
-
-Generated budgets must be reviewable. Crust should never silently convert the current build into an unquestionable standard.
+Generated budgets must be reviewable. Crust should never silently convert the current build into an unquestionable standard. In practice that meant three rules: every number states its derivation in the file itself, a number crust *chose* rather than measured says so, and a threshold with nothing to derive it from is left out with the reason rather than filled in with a default.
 
 ## Priority 6: Exceptional CI output
 
@@ -232,9 +231,9 @@ Each supported combination should pin route classification, shell discovery, sou
 - [x] Configuration-change detection (analyze; explicit diff/CI presentation remains)
 - [x] Exploratory report filters
 
-### Milestone 3: Adoption
+### Milestone 3: Adoption — started
 
-- `crust init`  
+- [x] `crust init`
 - Source-line CI annotations
 - SARIF and CODEOWNERS support
 - Acknowledged regressions with expiry
