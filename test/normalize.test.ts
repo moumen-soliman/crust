@@ -19,7 +19,9 @@ import { snapshot } from './factories.ts'
  */
 const V3_ON_DISK = {
   schemaVersion: 3,
-  toolVersion: '0.1.3',
+  // Frozen on purpose: this is what an older crust actually wrote, so it must
+  // not track the current version the way the factory does.
+  toolVersion: '0.1.1',
   buildId: 'aaaaaaaaaaaaaaaa',
   createdAt: '2026-01-01T00:00:00.000Z',
   gitSha: null,

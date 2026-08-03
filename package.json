@@ -108,5 +108,9 @@
     "playwright": {
       "optional": true
     }
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "test"
   }
 }

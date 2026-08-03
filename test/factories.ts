@@ -1,4 +1,5 @@
 import { computeCoverage } from '../src/analyze/coverage.ts'
+import { VERSION } from '../src/version.ts'
 import type { RouteSnapshot, Snapshot } from '../src/store/snapshot.ts'
 
 /**
@@ -39,7 +40,7 @@ export function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   const routes = overrides.routes ?? [route()]
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.3',
+    toolVersion: VERSION,
     buildId: 'aaaaaaaaaaaaaaaa',
     createdAt: '2026-01-01T00:00:00.000Z',
     gitSha: null,

@@ -16,9 +16,9 @@ import { SnapshotStore } from './store/store.ts'
 import { fetchHistory, pushHistory } from './store/history-branch.ts'
 import { runSynthetic } from './synthetic/run.ts'
 import { renderDiffTerminal, renderSnapshotTerminal } from './terminal-ui/views.tsx'
+import { VERSION } from './version.ts'
 import type { Snapshot } from './store/snapshot.ts'
 
-const VERSION = '0.1.3'
 const cli = cac('crust')
 
 interface CommonOptions {
@@ -110,6 +110,10 @@ cli
   .option('--dist-dir <dir>', 'Build output directory', { default: '.next' })
   .option('--comment <file>', 'Write the PR comment markdown to a file')
   .action(async (ref: string | undefined, options: CommonOptions & { comment?: string }) => {
+    // `main` names the branch of the project being analysed, not crust's own
+    // (crust develops on master). It is the ecosystem default for new repos, and
+    // SnapshotStore.resolve merge-bases `main` and `master` alike, so a `master`
+    // project only has to pass the ref explicitly to get the same behaviour.
     const { head, base, aliases } = await loadPair(ref ?? 'main', options)
     const diff = base ? diffSnapshots(base, head, aliases) : null
 
