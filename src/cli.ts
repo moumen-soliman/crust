@@ -12,6 +12,8 @@ import { renderReportHtml } from './report/render.ts'
 import { diffSnapshots, type RouteAliases } from './diff/diff.ts'
 import { latestCompatibleBaseline } from './diff/compatible.ts'
 import { findWorkspaceRoot } from './core/workspace.ts'
+import { runInit, type CiChoice } from './init/init.ts'
+import { renderInitTerminal } from './init/render.tsx'
 import { SnapshotStore } from './store/store.ts'
 import { fetchHistory, pushHistory } from './store/history-branch.ts'
 import { runSynthetic } from './synthetic/run.ts'
@@ -27,6 +29,35 @@ interface CommonOptions {
 }
 
 const ms = (value: number): string => `${Math.round(value)} ms`
+
+const CI_CHOICES: CiChoice[] = ['auto', 'none', 'github', 'gitlab', 'circleci']
+
+cli
+  .command('init', 'Set up crust here: first snapshot, starter budgets, CI configuration')
+  .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
+  .option('--dist-dir <dir>', 'Build output directory', { default: '.next' })
+  .option('--ci <provider>', `CI configuration to generate (${CI_CHOICES.join(' | ')})`, { default: 'auto' })
+  .option('--force', 'Replace files init would otherwise keep')
+  .option('--dry-run', 'Print the plan without writing anything')
+  .action(async (options: CommonOptions & { ci: string; force?: boolean; dryRun?: boolean }) => {
+    if (!CI_CHOICES.includes(options.ci as CiChoice)) {
+      console.error(pc.red(`Unknown --ci value "${options.ci}". Expected one of: ${CI_CHOICES.join(', ')}.`))
+      process.exitCode = 1
+      return
+    }
+
+    const result = await runInit({
+      cwd: options.cwd,
+      ...(options.distDir ? { distDir: options.distDir } : {}),
+      toolVersion: VERSION,
+      ci: options.ci as CiChoice,
+      force: options.force ?? false,
+      dryRun: options.dryRun ?? false,
+    })
+
+    console.log(renderInitTerminal(result))
+    if (!result.ok) process.exitCode = 1
+  })
 
 cli
   .command('analyze', 'Analyse a production build and record a snapshot')

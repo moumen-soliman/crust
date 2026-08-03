@@ -13,6 +13,63 @@ Commands that analyze a build accept:
 This keeps monorepo usage explicit: point `--cwd` at the app, while snapshots and budgets are stored
 at the detected workspace root.
 
+## init
+
+Set up crust in a project: first snapshot, starter budgets, CI configuration.
+
+```bash
+npx @moumensoliman/crust init [--ci <provider>] [--force] [--dry-run]
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--ci <provider>` | `auto` | `auto`, `none`, `github`, `gitlab`, or `circleci`. |
+| `--force` | off | Replace files init would otherwise keep. |
+| `--dry-run` | off | Print the plan and write nothing. |
+
+Seven steps, each reporting what it found and what it decided:
+
+1. **Detects the Next.js app.** The directory `--cwd` points at wins. In a monorepo with several
+   apps and no pointer, init lists them and stops rather than analyzing the wrong product.
+2. **Checks for a production build**, naming the build command for the detected package manager if
+   there isn't one.
+3. **Analyzes it and records the first snapshot**, with route count and analysis confidence.
+4. **Reports whether source-map attribution is available**, and what is still measured without it.
+5. **Writes `.perf/budgets.json`** — see [starter budgets](#starter-budgets) below.
+6. **Generates CI configuration** for the detected provider, pinned to the crust version that wrote
+   it.
+7. **States the three rules that need no budgets at all.**
+
+Exits non-zero when a step fails. Existing files are never replaced without `--force`; init reports
+them as kept.
+
+### Starter budgets
+
+Generated budgets are derived from one build, so the file carries a `"//"` array explaining every
+number and separating what was *measured* from what crust *chose*:
+
+```json .perf/budgets.json
+{
+  "//": [
+    "defaultFirstLoadBytes 620000 (605.5 kB) - derived: the heaviest route (/) is 542.1 kB, plus 10% headroom, rounded up to the next 10 kB. Nothing in this build breaches it.",
+    "maxGrowth 5% - chosen, not measured: crust has one build and cannot know how fast this app grows on purpose."
+  ],
+  "defaultFirstLoadBytes": 620000,
+  "maxGrowth": 0.05,
+  "defaultMinShellRatio": 0.9
+}
+```
+
+`readBudgets` ignores the key. A shell floor appears only when a route in this build emitted a shell
+crust could measure; no per-route ceilings are generated, because crust cannot know which routes
+deserve a tighter number than the rest.
+
+<Note>
+`.perf/` holds two unlike things: generated snapshots, which travel on the `perf-history` branch, and
+the budget file, which is a decision worth reviewing. init suggests the ignore rule that separates
+them - `.perf/*` with `!.perf/budgets.json`.
+</Note>
+
 ## analyze
 
 Analyze a production build and record a snapshot.

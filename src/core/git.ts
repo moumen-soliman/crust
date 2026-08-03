@@ -60,6 +60,27 @@ export async function mergeBase(cwd: string, ref: string): Promise<string | null
   return git(['merge-base', 'HEAD', ref], cwd)
 }
 
+/**
+ * The branch pull requests target. `origin/HEAD` is the remote's own answer, so
+ * it beats guessing between `main` and `master`; a local-only repository falls
+ * back to whichever of the two exists. Null when neither does - the caller has
+ * to name a ref, and inventing one silently is how a CI baseline points at
+ * nothing.
+ */
+export async function defaultBranch(cwd: string): Promise<string | null> {
+  const symbolic = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], cwd)
+  if (symbolic) return symbolic.replace(/^origin\//, '')
+  for (const candidate of ['main', 'master']) {
+    if (await git(['rev-parse', '--verify', `refs/heads/${candidate}`], cwd)) return candidate
+  }
+  return null
+}
+
+/** A remote's URL - tells GitHub from GitLab in a repository with no CI directory yet. */
+export async function remoteUrl(cwd: string, remote = 'origin'): Promise<string | null> {
+  return git(['remote', 'get-url', remote], cwd)
+}
+
 /** Commits from HEAD backwards, newest first. Trend ordering is topological, not clock. */
 export async function revList(cwd: string, limit: number): Promise<string[]> {
   const out = await git(['rev-list', `--max-count=${limit}`, 'HEAD'], cwd)

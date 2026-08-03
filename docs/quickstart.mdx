@@ -18,7 +18,24 @@ Do not install the unscoped `crust` package—it is unrelated. The package is
 `@moumensoliman/crust`; the installed executable is `crust`.
 </Warning>
 
-## 1. Build, then analyze
+## 1. Set it up in one command
+
+```bash
+next build
+npx @moumensoliman/crust init
+```
+
+`init` finds the app, records the first snapshot, writes starter budgets you can argue with, and
+generates a CI workflow pinned to this crust version. It reports what it decided at every step, and
+replaces nothing without `--force` - `--dry-run` shows the plan first. See the
+[CLI reference](/docs/reference/cli#init) for the seven steps and the generated files.
+
+In a monorepo, point it at the app: `npx @moumensoliman/crust init --cwd apps/web`. With several apps
+and no pointer, it lists them and stops instead of measuring the wrong one.
+
+The rest of this page is what `init` does one command at a time, and what the output means.
+
+## 2. Build, then analyze
 
 <CodeGroup>
 ```bash npm
@@ -69,7 +86,7 @@ what remains generated.
 - Indented `↳` lines name the reason for a mode or hole.
 - `✂` names a component that was postponed out of the shell.
 
-## 2. See it visually
+## 3. See it visually
 
 ```bash
 npx @moumensoliman/crust report --open
@@ -78,7 +95,7 @@ npx @moumensoliman/crust report --open
 A single self-contained HTML file with no server or external requests. It adds route, component,
 and source search; filters and grouping; complete cause chains; and shared-cause blast radius.
 
-## 3. Compare against a baseline
+## 4. Compare against a baseline
 
 First record the base branch, then rebuild and diff after your change:
 

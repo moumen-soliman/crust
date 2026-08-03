@@ -17,6 +17,12 @@ inputs:
   comment:
     description: Post the report as a PR comment.
     default: 'true'
+  crust-version:
+    description: >-
+      Version of @moumensoliman/crust to run, e.g. 0.1.3. Pin it so a new release
+      cannot change your verdict without a commit; leave empty to track latest.
+      `crust init` writes the version that generated the workflow.
+    default: ''
 
 runs:
   using: composite
@@ -25,15 +31,19 @@ runs:
     - name: Fetch snapshot history
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: npx --yes @moumensoliman/crust history fetch || true
+      env:
+        CRUST_PKG: ${{ inputs.crust-version && format('@moumensoliman/crust@{0}', inputs.crust-version) || '@moumensoliman/crust' }}
+      run: npx --yes "$CRUST_PKG" history fetch || true
 
     - name: Run crust
       id: check
       continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        CRUST_PKG: ${{ inputs.crust-version && format('@moumensoliman/crust@{0}', inputs.crust-version) || '@moumensoliman/crust' }}
       run: |
-        npx --yes @moumensoliman/crust ci "${{ inputs.baseline }}" \
+        npx --yes "$CRUST_PKG" ci "${{ inputs.baseline }}" \
           --dist-dir "${{ inputs.dist-dir }}" \
           --comment "$RUNNER_TEMP/crust-comment.md"
 
@@ -43,7 +53,9 @@ runs:
       if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: npx --yes @moumensoliman/crust history push || true
+      env:
+        CRUST_PKG: ${{ inputs.crust-version && format('@moumensoliman/crust@{0}', inputs.crust-version) || '@moumensoliman/crust' }}
+      run: npx --yes "$CRUST_PKG" history push || true
 
     - name: Comment on the pull request
       if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}

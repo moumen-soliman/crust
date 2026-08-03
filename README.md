@@ -175,6 +175,17 @@ crust reads the output of a **production build**. Run one first - it refuses to 
 
 ```bash
 next build
+npx @moumensoliman/crust init
+```
+
+`init` is the guided path: it finds the app (and refuses to guess between several in a monorepo),
+records the first snapshot, writes starter budgets with the derivation of every number beside it, and
+generates CI configuration pinned to the crust version that wrote it. It replaces nothing without
+`--force`, and `--dry-run` prints the plan first.
+
+Or go one command at a time:
+
+```bash
 npx @moumensoliman/crust analyze
 ```
 
@@ -334,6 +345,7 @@ totals and shell ratios are kept forever.
 
 | Command | Purpose |
 |---|---|
+| `crust init` | Guided setup: first snapshot, starter budgets, CI configuration for the detected provider |
 | `crust analyze` | Explain build health and changes, then save a snapshot; add `--routes` or `--report` for detail |
 | `crust diff [ref]` | Compare the current build with a build id, Git ref, branch, or ancestor |
 | `crust ci [ref]` | Enforce regressions and budgets; optionally write a PR comment |

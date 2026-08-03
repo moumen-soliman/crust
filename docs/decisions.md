@@ -91,6 +91,37 @@ and 45% without it. Before this the predictor said 45% both times - layer 1 disa
 in the cached build (`agreement: 0`), and the regression was only catchable from the emitted HTML.
 Both builds now agree.
 
+## `crust init` asks nothing and overwrites nothing
+
+A "guided" setup command suggests prompts. It has none. Two reasons: the same command has to work
+non-interactively (a piped shell, a container, someone else's CI), and every question a prompt would
+ask is one crust can answer from the repository and then *report* - the package manager from the
+lockfile, the app from the workspace, the baseline from `origin/HEAD`. A printed decision is
+reviewable after the fact; an answered prompt is not.
+
+What replaces the safety a prompt would provide: nothing existing is replaced without `--force`,
+`--dry-run` prints the identical report while writing nothing, and the one question crust genuinely
+cannot answer - which of several Next.js apps in a monorepo - stops the command and lists the
+candidates instead of picking one.
+
+Non-GitHub providers get a pasteable job under `.perf/ci/` rather than a written pipeline file.
+GitLab and CircleCI keep the whole pipeline in one file, and appending to a file the project
+maintains is how a setup command breaks a working build.
+
+## Generated budgets explain themselves; the pin is the crust version
+
+`.perf/budgets.json` carries a `"//"` array naming the derivation of every number, and marking which
+ones crust *chose* rather than measured (`maxGrowth` is chosen; the first-load ceiling is derived from
+the heaviest route). `readBudgets` ignores the key. Without it the file reads as authority: a
+threshold nobody in review can explain is one nobody edits, and a generated number that hardens into
+a standard is the exact failure the roadmap named. A threshold with nothing to derive it from - a
+shell floor in a build that emitted no measurable shell - is left out with the reason, not defaulted.
+
+Generated CI pins `@moumensoliman/crust` to the version that wrote the file, so a crust release cannot
+change a project's verdict without a commit. The action ref stays `@main`: there is no release tag to
+point at yet, and generating a reference to a tag that does not exist produces a workflow that fails
+on its first run. The generated file says which half is pinned rather than implying both are.
+
 ## SQLite index - `node:sqlite`, not better-sqlite3
 
 The plan named `better-sqlite3`; it is a native module and a version-conflict magnet. Node's
