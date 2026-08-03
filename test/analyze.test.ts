@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { analyzeBuild } from '../src/analyze/analyze.ts'
 import { readSourceFacts } from '../src/analyze/source-file.ts'
 import { packageNameOf } from '../src/analyze/attribution.ts'
 import { createIndex, findWorkspaceRoot } from '../src/core/workspace.ts'
 import { layoutChainFor } from '../src/analyze/module-graph.ts'
 
 const FIXTURE = join(import.meta.dirname, '..', 'fixtures', 'basic')
+
+describe('build discovery', () => {
+  it('explains how to build an app or target one in a monorepo', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'crust-no-build-'))
+
+    await expect(analyzeBuild({ cwd, toolVersion: 'test' })).rejects.toThrow(
+      /Run `next build` in the app directory[\s\S]*--cwd apps\/web[\s\S]*--dist-dir <directory>/,
+    )
+  })
+})
 
 describe('source facts', () => {
   it('finds a dynamic API and the component it sits in', async () => {

@@ -55,7 +55,7 @@ export async function analyzeBuild(options: AnalyzeOptions): Promise<Snapshot> {
   const distDir = resolve(projectDir, options.distDir ?? '.next')
   const warnings: string[] = []
 
-  await assertBuildExists(distDir)
+  await assertBuildExists(projectDir, distDir)
 
   const nextVersion = (await readNextVersion(projectDir)) ?? 'unknown'
   const major = Number(nextVersion.split('.')[0])
@@ -472,12 +472,18 @@ function renderingModeFor(
 
 /* ── discovery helpers ─────────────────────────────────────────────────── */
 
-async function assertBuildExists(distDir: string): Promise<void> {
+async function assertBuildExists(projectDir: string, distDir: string): Promise<void> {
   try {
     await stat(join(distDir, 'app-path-routes-manifest.json'))
   } catch {
     throw new Error(
-      `No production build found at ${distDir}. crust measures production builds only - dev numbers are unminified, unbundled fiction.`,
+      [
+        `No Next.js production build found at ${distDir}.`,
+        `Run \`next build\` in the app directory (${projectDir}), then rerun crust.`,
+        'In a monorepo, run crust from the app folder (for example, `apps/web`) or pass `--cwd apps/web`.',
+        'If Next.js writes somewhere other than `.next`, pass `--dist-dir <directory>`.',
+        'crust measures production builds only; development output is not valid performance evidence.',
+      ].join('\n'),
     )
   }
 }
