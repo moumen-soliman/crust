@@ -28,6 +28,34 @@ this project cannot afford: a diff against a baseline that quietly stopped being
     pull requests - without that, a pull request has no merge-base snapshot to compare against.
 - `crust-version` input on the bundled GitHub Action, which is what makes that pin possible. Empty
   (the default) tracks latest, as before.
+- The PR comment explains build configuration instead of only reacting to it. Comparable changes get
+  their own note, labelled as evidence and explicitly not attributed to application code; incomparable
+  ones keep the warning block but now say what each *explains*, so "no deltas were reported" cannot
+  read as "nothing happened". A route that regressed because it declared `dynamic`, `revalidate`,
+  `runtime` or `fetchCache` still fails, with the declaration named beside the mode drop - the
+  reviewer is no longer sent looking for an uncached fetch that does not exist. The heading counts
+  configuration changes too, because `crust: no change` was false on a build whose configuration
+  moved. This completes Milestone 2.
+
+### Fixed
+
+- The documented and generated workflows referenced `moumen-soliman/crust/action@main`, and this
+  repository has no `main` branch. Every copy of that YAML failed on "unable to resolve action"
+  before running a step, so the documented CI setup had never worked. Now `@master`, asserted in the
+  generator's tests.
+- Baseline resolution prefers a snapshot the comparison can actually use. One commit can carry
+  several - every `analyze` and `ci` run on it writes one, and a crust from before a schema bump left
+  records the current comparison refuses - and `resolve` returned whichever came first. A project
+  whose history contained an older-schema snapshot for its base commit got "baseline not comparable,
+  so nothing to compare" on every pull request, with a usable snapshot for the same commit sitting in
+  the store. Found by running the check on a real repository rather than a fixture.
+- `crust init` reports whether a *comparable* baseline exists rather than counting stored snapshots.
+  Counting them told a project it was set up while its first CI run had nothing to compare against,
+  and named the reason - schema, bundler, or Next major - only in the CI output, one step too late.
+- `crust init --cwd` on a path that does not exist says so, instead of falling through to the
+  workspace scan and reporting a different app entirely.
+- Long step details in the `init` report no longer lose their status glyph. Ink re-lays out a row of
+  text that overflows, and the separating spaces are the first thing it drops.
 - `package` CI job: the release tarball is packed, installed into a throwaway project, and driven
   through the generated `crust` executable. `node dist/cli.js` cannot catch a broken `bin`, `files`
   or `exports` field, because it never resolves the package the way a consumer does.

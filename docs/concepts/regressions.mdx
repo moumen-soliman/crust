@@ -66,8 +66,9 @@ boundaries would attribute framework or measurement changes to the application P
 
 ### Build configuration changed
 
-crust records configuration that materially changes emitted output. `crust analyze` reports these
-changes separately when it finds a compatible local baseline:
+crust records configuration that materially changes emitted output. `crust analyze`, `crust diff`, and
+the PR comment all report these changes separately from route deltas, whenever a compatible local
+baseline exists:
 
 - Cache Components
 - bundler, Next.js version, and Node major
@@ -76,9 +77,14 @@ changes separately when it finds a compatible local baseline:
 - per-route `dynamic`, `revalidate`, `runtime`, and `fetchCache`
 
 A bundler, Next major, snapshot schema, or Cache Components change makes route deltas unsafe and
-stops regression enforcement. Other changes remain comparable and are retained as configuration
-evidence; explicit presentation of every non-blocking change in `diff` and CI is still being
-completed.
+stops regression enforcement. The comment names each one with what it explains, so "no deltas" never
+reads as "nothing happened".
+
+Other changes remain comparable and are retained as configuration evidence: the comment lists them
+in a note, states what each accounts for, and says outright that they were not caused by application
+code. A route that regressed because it declared `dynamic`, `revalidate`, `runtime`, or `fetchCache`
+still fails - it is a real staticness downgrade - but the comment names the declaration instead of
+sending the reviewer to look for a cause that is not in the code.
 
 ### Byte noise
 

@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { shardPath, shortHash } from '../core/hash.ts'
 import { mergeBase, revList } from '../core/git.ts'
+import { comparableBuilds } from '../diff/compatible.ts'
 import { normalizeSnapshot } from './normalize.ts'
 import { SCHEMA_VERSION, type Snapshot } from './snapshot.ts'
 
@@ -211,27 +212,47 @@ export class SnapshotStore {
    * this branch's history, and a snapshot recorded later on another branch must
    * not be mistaken for an ancestor just because its timestamp is larger.
    */
-  async resolve(ref: string, cwd: string): Promise<Snapshot | null> {
+  async resolve(ref: string, cwd: string, head?: Snapshot): Promise<Snapshot | null> {
     const all = await this.list()
     if (all.length === 0) return null
 
-    const direct = all.find((s) => s.buildId === ref || s.gitSha === ref)
+    /**
+     * One commit can carry several snapshots: every `analyze` and `ci` run on it
+     * writes one, and a crust from before a schema bump left records the current
+     * comparison refuses. Given `head`, prefer a record that can actually be
+     * compared - returning an incomparable one when a usable sibling exists for
+     * the same commit runs no regression check at all, and reports that as "not
+     * comparable to the baseline" rather than as a store wanting a prune.
+     */
+    const pick = (candidates: Snapshot[]): Snapshot | null => {
+      if (candidates.length === 0) return null
+      if (!head) return candidates[0]!
+      return candidates.find((candidate) => comparableBuilds(candidate, head)) ?? candidates[0]!
+    }
+
+    const direct = pick(all.filter((s) => s.buildId === ref || s.gitSha === ref))
     if (direct) return direct
 
     const base = ref.includes('..') || ref === 'main' || ref === 'master' ? await mergeBase(cwd, ref) : null
     if (base) {
-      const match = all.find((s) => s.gitSha === base)
+      const match = pick(all.filter((s) => s.gitSha === base))
       if (match) return match
     }
 
     // Walk this branch's ancestry and take the newest commit we have a snapshot for.
     const ancestry = await revList(cwd, 200)
-    const bySha = new Map(all.filter((s) => s.gitSha).map((s) => [s.gitSha!, s]))
+    const bySha = new Map<string, Snapshot[]>()
+    for (const snapshot of all) {
+      if (!snapshot.gitSha) continue
+      const list = bySha.get(snapshot.gitSha)
+      if (list) list.push(snapshot)
+      else bySha.set(snapshot.gitSha, [snapshot])
+    }
     const offset = /^HEAD~(\d+)$/.exec(ref)
     const startIndex = offset ? Number(offset[1]) : 0
 
     for (let i = startIndex; i < ancestry.length; i++) {
-      const snapshot = bySha.get(ancestry[i]!)
+      const snapshot = pick(bySha.get(ancestry[i]!) ?? [])
       if (snapshot) return snapshot
     }
 

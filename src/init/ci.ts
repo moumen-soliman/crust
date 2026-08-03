@@ -51,7 +51,7 @@ function githubWorkflow(input: CiConfigInput): string {
     `# The verdict comes from ${pkg}, pinned so a crust release cannot`,
     '# change your check without a commit here. The action is the plumbing around it:',
     '# fetch history, run the check, publish the snapshot, post one comment. Point it at',
-    '# a release tag instead of @main when you want that frozen too.',
+    '# a release tag instead of @master when you want that frozen too.',
     'name: crust',
     '',
     'on:',
@@ -94,7 +94,10 @@ function githubWorkflow(input: CiConfigInput): string {
   if (inApp) lines.push(`        working-directory: ${input.app.relativeDir}`)
 
   lines.push(
-    '      - uses: moumen-soliman/crust/action@main',
+    // `master` is the branch this action actually lives on. `@main` resolved to
+    // nothing, so every generated workflow failed on "unable to resolve action"
+    // before it ran a single step.
+    '      - uses: moumen-soliman/crust/action@master',
     '        with:',
     `          crust-version: ${input.toolVersion}`,
     `          baseline: ${input.baseline}`,

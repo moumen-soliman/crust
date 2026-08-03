@@ -8,10 +8,10 @@ Crust is build-causality and merge-intelligence tooling for Next.js. It explains
 
 ## Implementation status
 
-Milestone 1 is implemented. Milestone 2's shared causes, client cost, configuration detection, and
-single-build report controls are implemented; explicit config explanations in every `diff`/CI view
-remain follow-up work. Milestone 3 has started: `crust init` is implemented. Milestone 4 remains
-planned.
+Milestone 1 is implemented. Milestone 2 is implemented: shared causes, client cost, configuration
+detection *and* its explanation in every `diff`/CI view, and single-build report controls; only the
+two-build report remains, deliberately sequenced after adoption. Milestone 3 has started: `crust init`
+is implemented. Milestone 4 remains planned.
 
 ## Product principles
 
@@ -224,11 +224,11 @@ Each supported combination should pin route classification, shell discovery, sou
 - [x] Function-level taint foundations
 - [x] Compatibility fixtures for supported Next.js and bundler combinations
 
-### Milestone 2: Leverage — mostly implemented
+### Milestone 2: Leverage — implemented
 
 - [x] Shared-cause blast radius
 - [x] Barrel and client-boundary cost attribution
-- [x] Configuration-change detection (analyze; explicit diff/CI presentation remains)
+- [x] Configuration-change detection, explained in `analyze`, `diff`, and the PR comment
 - [x] Exploratory report filters
 
 ### Milestone 3: Adoption — started
