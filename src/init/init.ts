@@ -1,9 +1,10 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { analyzeBuild } from '../analyze/analyze.ts'
 import { pct } from '../ci/budgets.ts'
 import { latestCompatibleBaseline } from '../diff/compatible.ts'
-import { findWorkspaceRoot, toPosix } from '../core/workspace.ts'
+import { exists, readText } from '../core/fs.ts'
+import { findWorkspaceRoot, relativePosix } from '../core/workspace.ts'
 import { SnapshotStore } from '../store/store.ts'
 import type { Snapshot } from '../store/snapshot.ts'
 import { ZERO_CONFIG_RULES, deriveStarterBudgets } from './budgets.ts'
@@ -188,58 +189,12 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
 
   const snapshotPath = dryRun ? null : await store.write(snapshot)
   if (snapshotPath) {
-    files.push({ path: workspacePath(root, snapshotPath), status: 'written', detail: 'snapshot' })
+    files.push({ path: relativePosix(root, snapshotPath), status: 'written', detail: 'snapshot' })
   }
-  // Stored snapshots are not the same thing as a usable baseline. Ones written by
-  // an older schema, another bundler or a different Next major are refused by the
-  // comparison on purpose, and a setup that counted them would report a project as
-  // ready while its first CI run says "nothing to compare".
-  const baselineSnapshot = latestCompatibleBaseline(snapshot, existing)
-  const stale = existing.length > 0 && !baselineSnapshot
-  steps.push({
-    title: 'First snapshot',
-    status: stale ? 'warn' : 'ok',
-    detail: `${snapshot.buildId}  ${snapshot.routes.length} routes · confidence ${pct(snapshot.coverage.confidence)}`,
-    lines: [
-      ...(baselineSnapshot
-        ? [`Comparable baseline found (${baselineSnapshot.buildId}), so regression rules are live from this build on.`]
-        : existing.length === 0
-          ? ['This build is the baseline. Regression checks compare against it from the next build onwards.']
-          : [
-              `${existing.length} snapshot${existing.length === 1 ? '' : 's'} in .perf/, and none is comparable to this build - ${incomparableReason(snapshot, existing)}.`,
-              'No regression check can run against them. This build becomes the baseline instead, so the rules go live one build later.',
-            ]),
-      `${snapshot.coverage.routesClassified}/${snapshot.coverage.routesTotal} routes classified · ${snapshot.coverage.shellsMeasured}/${snapshot.coverage.shellsEmitted} emitted shells measured`,
-    ],
-  })
+  steps.push(snapshotStep(snapshot, existing))
 
   // 4. Source-map attribution
-  const attributed =
-    snapshot.coverage.clientBytesTotal > 0
-      ? snapshot.coverage.clientBytesAttributed / snapshot.coverage.clientBytesTotal
-      : 0
-  steps.push(
-    snapshot.config?.sourceMaps
-      ? {
-          title: 'Source attribution',
-          status: 'ok',
-          detail: `on - ${pct(attributed)} of client bytes traced to a file`,
-          lines: ['Cause chains can name the source line responsible, not just the route.'],
-        }
-      : {
-          title: 'Source attribution',
-          status: 'warn',
-          detail: 'off - per-file blame unavailable',
-          lines: [
-            'Route totals, rendering modes, dynamic-route causes and shell composition are all',
-            'measured without maps; only "which file are these bytes" is missing, and crust says',
-            'so rather than guessing. Turn it on with:',
-            '  // next.config.ts',
-            '  export default { productionBrowserSourceMaps: true }',
-            'Enable it in a dedicated analyze build if you would rather not ship maps.',
-          ],
-        },
-  )
+  steps.push(attributionStep(snapshot))
 
   // 5. Starter budgets
   const starter = deriveStarterBudgets(snapshot)
@@ -368,7 +323,7 @@ function nextStepsFor(input: { app: NextApp; baseline: string; files: InitFile[]
  * commits every build or hides the thresholds.
  */
 async function gitignoreAdvice(root: string): Promise<string[]> {
-  const contents = (await read(join(root, '.gitignore'))) ?? ''
+  const contents = (await readText(join(root, '.gitignore'))) ?? ''
   const lines = contents.split('\n').map((line) => line.trim())
   if (lines.some((line) => line === '!.perf/budgets.json')) return []
 
@@ -402,10 +357,67 @@ async function writeIfAbsent(
 }
 
 /**
+ * Stored snapshots are not the same thing as a usable baseline: ones from an older
+ * schema, another bundler or a different Next major are refused by the comparison.
+ * Counting them would report a project as ready while its first CI run says
+ * "nothing to compare".
+ */
+function snapshotStep(snapshot: Snapshot, existing: Snapshot[]): InitStep {
+  const baseline = latestCompatibleBaseline(snapshot, existing)
+  const { coverage } = snapshot
+
+  const state = baseline
+    ? [`Comparable baseline found (${baseline.buildId}), so regression rules are live from this build on.`]
+    : existing.length === 0
+      ? ['This build is the baseline. Regression checks compare against it from the next build onwards.']
+      : [
+          `${existing.length} snapshot${existing.length === 1 ? '' : 's'} in .perf/, and none is comparable to this build - ${incomparableReason(snapshot, existing)}.`,
+          'No regression check can run against them. This build becomes the baseline instead, so the rules go live one build later.',
+        ]
+
+  return {
+    title: 'First snapshot',
+    status: existing.length > 0 && !baseline ? 'warn' : 'ok',
+    detail: `${snapshot.buildId}  ${snapshot.routes.length} routes · confidence ${pct(coverage.confidence)}`,
+    lines: [
+      ...state,
+      `${coverage.routesClassified}/${coverage.routesTotal} routes classified · ${coverage.shellsMeasured}/${coverage.shellsEmitted} emitted shells measured`,
+    ],
+  }
+}
+
+function attributionStep(snapshot: Snapshot): InitStep {
+  const { clientBytesAttributed, clientBytesTotal } = snapshot.coverage
+
+  if (!snapshot.config?.sourceMaps) {
+    return {
+      title: 'Source attribution',
+      status: 'warn',
+      detail: 'off - per-file blame unavailable',
+      lines: [
+        'Route totals, rendering modes, dynamic-route causes and shell composition are all',
+        'measured without maps; only "which file are these bytes" is missing, and crust says',
+        'so rather than guessing. Turn it on with:',
+        '  // next.config.ts',
+        '  export default { productionBrowserSourceMaps: true }',
+        'Enable it in a dedicated analyze build if you would rather not ship maps.',
+      ],
+    }
+  }
+
+  const share = clientBytesTotal > 0 ? clientBytesAttributed / clientBytesTotal : 0
+  return {
+    title: 'Source attribution',
+    status: 'ok',
+    detail: `on - ${pct(share)} of client bytes traced to a file`,
+    lines: ['Cause chains can name the source line responsible, not just the route.'],
+  }
+}
+
+/**
  * Why the stored snapshots cannot serve as a baseline, in the terms the diff uses
  * to refuse them. Named rather than summarised as "incompatible": the schema case
- * is fixed by re-analysing, and the bundler and framework cases are not fixed at
- * all - they are waited out.
+ * is fixed by re-analysing, the bundler and framework cases are waited out.
  */
 export function incomparableReason(snapshot: Snapshot, existing: Snapshot[]): string {
   const newest = existing[0]
@@ -429,26 +441,6 @@ const chosenBecause = (how: 'cwd' | 'only-app' | 'ambiguous' | 'none', count: nu
   return count === 1 ? 'The only Next.js app in this workspace.' : `Chosen from ${count} candidates.`
 }
 
-const describe = (root: string, cwd: string): string => {
-  const rel = toPosix(relative(root, cwd))
-  return rel === '' ? root : rel
-}
+const describe = (root: string, cwd: string): string => relativePosix(root, cwd) || root
 
-const workspacePath = (root: string, absolute: string): string => toPosix(relative(root, absolute))
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function read(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, 'utf8')
-  } catch {
-    return null
-  }
-}

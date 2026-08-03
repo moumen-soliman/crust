@@ -13,21 +13,18 @@ function resolveHref(href: string): string {
 }
 
 /**
- * The four inline forms the changelog actually uses: `code`, **bold**, *italic*,
- * and [links](url).
- *
- * Nodes are built rather than HTML injected. A changelog is not user input, so
- * this is not a sanitisation story - it is that `dangerouslySetInnerHTML` would
- * make every future entry a potential layout break, and the styling here has to
- * match tokens the rest of the site uses anyway.
+ * The four inline forms the changelog uses: `code`, **bold**, *italic*, links.
+ * Nodes rather than injected HTML, so entries style themselves with the site's
+ * own tokens instead of needing a stylesheet for raw markup.
  */
 const PATTERN = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g
+const LINK = /^\[([^\]]+)\]\(([^)]+)\)$/
 
+// Split keeps the delimiters, so a token either matched PATTERN or is plain text;
+// the openers below are enough to tell which, and each is guaranteed non-empty.
 export function Inline({ text }: { text: string }): ReactNode {
-  return text.split(PATTERN).map((token, index) => {
-    const key = `${index}-${token.slice(0, 12)}`
-
-    if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
+  return text.split(PATTERN).map((token, key) => {
+    if (token.startsWith('`')) {
       return (
         <code key={key} className="rounded-[4px] bg-raised px-[4px] py-[1px] text-[0.92em] text-fg">
           {token.slice(1, -1)}
@@ -35,7 +32,7 @@ export function Inline({ text }: { text: string }): ReactNode {
       )
     }
 
-    if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
+    if (token.startsWith('**')) {
       return (
         <strong key={key} className="font-[550] text-fg">
           {token.slice(2, -2)}
@@ -43,7 +40,7 @@ export function Inline({ text }: { text: string }): ReactNode {
       )
     }
 
-    if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
+    if (token.startsWith('*')) {
       return (
         <em key={key} className="italic">
           {token.slice(1, -1)}
@@ -51,7 +48,7 @@ export function Inline({ text }: { text: string }): ReactNode {
       )
     }
 
-    const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token)
+    const link = LINK.exec(token)
     if (link) {
       return (
         <a

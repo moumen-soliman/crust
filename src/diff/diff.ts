@@ -40,15 +40,12 @@ export interface RouteDelta {
    */
   cause: Cause | null
   /**
-   * The stored chain behind `cause` - route, the component that renders it, the
-   * imports that carry it, and the call site - when the head snapshot holds one
-   * for the same site. `cause` stays the line CI leads with; this is what a
-   * reviewer expands, and it is the difference between "this route became
-   * dynamic" and "this import is why".
+   * The stored chain behind `cause` - route, component, imports, call site - when
+   * the head snapshot holds one for the same site. `cause` is the line CI leads
+   * with; this is what a reviewer expands.
    *
-   * Null when no stored chain can be matched to the cause. Attaching the nearest
-   * one instead would put a confident-looking import path under a finding it does
-   * not explain, and a reviewer would act on it.
+   * Null when nothing matches. Attaching the nearest chain instead would put a
+   * confident-looking import path under a finding it does not explain.
    */
   causeChain: CauseChain | null
 }
@@ -206,11 +203,9 @@ function compareRoute(before: RouteSnapshot | undefined, after: RouteSnapshot | 
   delta.cause = causeOf(delta, after)
   delta.causeChain = chainFor(delta.cause, after)
 
-  // The analyzer walks the module graph to name the nearest rendered component;
-  // the one-line heuristic can only find one when the shell predictor happened to
-  // record a hole for the same site. Where the chain knows and the line does not,
-  // the chain wins - that is what "prefer the stored evidence" means here. It does
-  // not overwrite a component the shell verified, which is stronger still.
+  // The chain walked the module graph; the one-liner only finds a component when
+  // the shell predictor recorded a hole at the same site. Fill in, never overwrite:
+  // a component the shell verified is stronger evidence.
   if (delta.cause && !delta.cause.component && delta.causeChain?.component) {
     delta.cause = { ...delta.cause, component: delta.causeChain.component }
   }
@@ -317,13 +312,10 @@ function causeOf(d: RouteDelta, after: RouteSnapshot | undefined): Cause | null 
 }
 
 /**
- * The stored chain that corresponds to the one-line cause.
- *
- * Matched on the call site, which is the only key both sides carry verbatim, with
- * the reason text as a fallback for causes that have no position. Anything that
- * does not match is left off: the point of the chain is that a reviewer can follow
- * it, and an import path under the wrong finding sends them somewhere real that is
- * not where the problem is.
+ * Matched on the call site - the only key both sides carry verbatim - with the
+ * reason text as a fallback for causes that have no position. Anything that does
+ * not match is left off; a reviewer follows an import path, so the wrong one sends
+ * them somewhere real that is not the problem.
  */
 function chainFor(cause: Cause | null, after: RouteSnapshot | undefined): CauseChain | null {
   if (!cause || !after) return null

@@ -12,13 +12,9 @@ const START_MAX_GROWTH = 0.05
 
 export interface AnnotatedBudgets extends Budgets {
   /**
-   * How every number below was arrived at.
-   *
-   * JSON has no comments and `readBudgets` ignores unknown keys, so this is the
-   * one place the derivation can live next to the numbers. It is not decoration:
-   * a threshold nobody in review can explain is a threshold nobody will ever
-   * change, and it hardens into a standard by default - which is exactly what
-   * generated budgets must not do.
+   * How every number below was arrived at. JSON has no comments and `readBudgets`
+   * ignores unknown keys, so this is the only place the derivation can sit next to
+   * the numbers - and a threshold nobody can explain in review is one nobody edits.
    */
   '//': string[]
 }
@@ -30,15 +26,13 @@ export interface StarterBudgets {
 }
 
 /**
- * Starter ceilings from one build.
+ * Starter ceilings from one build. The notes keep two kinds of number apart:
+ * *derived* ones restate what this build measures, *chosen* ones are crust's
+ * opinion, and presenting the second as evidence is how a generated file becomes
+ * an unquestionable standard.
  *
- * Two kinds of number end up in the file and the notes keep them apart:
- * *derived* ones restate what this build already measures, and *chosen* ones are
- * crust's opinion. Presenting the second kind as evidence is how a generated
- * file turns today's build into an unquestionable standard.
- *
- * Returns null when the build has no sized routes - there is nothing to derive
- * from, and an empty budget file only pretends the project has ceilings.
+ * Null when no route has a size - an empty budget file only pretends to have
+ * ceilings.
  */
 export function deriveStarterBudgets(snapshot: Snapshot): StarterBudgets | null {
   const sized = snapshot.routes.filter((route) => route.firstLoadBytes > 0)

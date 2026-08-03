@@ -1,9 +1,6 @@
 /**
- * CHANGELOG.md is the source. This page renders it.
- *
- * The alternative - a hand-written timeline - is a second copy of the release
- * history that drifts from the first, and for a tool whose whole subject is
- * "what changed since the last build" that would be an unusually bad look.
+ * CHANGELOG.md is the source; the page renders it. A hand-written timeline would
+ * be a second copy of the release history, free to drift from the first.
  */
 
 export interface ChangelogEntry {
@@ -155,13 +152,9 @@ export function parseChangelog(markdown: string): Changelog {
 }
 
 /**
- * Split the claim from the reasoning, so a reader can scan the claims and stop at
- * the one they care about.
- *
- * Bounded on both sides: a fragment too short to be a claim, or a first sentence
- * long enough to be the whole entry, is left unsplit rather than cut at a
- * misdetected boundary. `0.1.4.` and `e.g.` are exactly the sentence ends that are
- * not sentence ends, hence the requirement for a following capital.
+ * Split the claim from the reasoning so the claims can be scanned. Bounded on both
+ * sides, and requiring a following capital: `0.1.4.` and `e.g.` are the sentence
+ * ends that are not sentence ends, and a bad split reads worse than none.
  */
 function splitLead(entry: ChangelogEntry): ChangelogEntry {
   const match = /^(.{40,220}?[.:])\s+(?=[A-Z`])/.exec(entry.lead)

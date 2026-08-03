@@ -1,5 +1,6 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readdir } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
+import { exists, readJson } from './fs.ts'
 
 const WORKSPACE_MARKERS = ['pnpm-workspace.yaml', 'pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'bun.lock']
 
@@ -84,26 +85,17 @@ export async function indexWorkspace(root: string): Promise<ProjectFileIndex> {
 
 export const toPosix = (p: string): string => p.split('\\').join('/')
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
-  }
-}
+/** How a path is written everywhere crust reports one: workspace-relative, POSIX. */
+export const relativePosix = (root: string, path: string): string => toPosix(relative(root, path))
 
 /** Version of the `next` package resolved from the project, or null if absent. */
 export async function readNextVersion(projectDir: string): Promise<string | null> {
   let dir = resolve(projectDir)
   for (;;) {
-    try {
-      const raw = await readFile(join(dir, 'node_modules', 'next', 'package.json'), 'utf8')
-      return (JSON.parse(raw) as { version?: string }).version ?? null
-    } catch {
-      const parent = dirname(dir)
-      if (parent === dir) return null
-      dir = parent
-    }
+    const pkg = await readJson<{ version?: string }>(join(dir, 'node_modules', 'next', 'package.json'))
+    if (pkg) return pkg.version ?? null
+    const parent = dirname(dir)
+    if (parent === dir) return null
+    dir = parent
   }
 }

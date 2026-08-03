@@ -65,7 +65,7 @@ export default function Changelog() {
         <h1 className="mb-3.5 text-h1 font-medium tracking-[-0.03em] text-balance">Changelog</h1>
         <div className="max-w-[68ch] space-y-2.5">
           {intro.map((paragraph) => (
-            <p key={paragraph.slice(0, 40)} className="text-small text-muted text-pretty">
+            <p key={paragraph} className="text-small text-muted text-pretty">
               <Inline text={paragraph} />
             </p>
           ))}
@@ -73,7 +73,7 @@ export default function Changelog() {
       </header>
 
       <main className="px-pad py-[clamp(30px,4vw,52px)]">
-        <ol className="space-y-0">
+        <ol>
           {releases.map((release, index) => (
             <Release
               key={release.version}
@@ -91,13 +91,13 @@ export default function Changelog() {
               {earlier.blocks.map((block, index) =>
                 block.kind === 'heading' ? (
                   <h3
-                    key={`${index}-${block.text.slice(0, 24)}`}
+                    key={index}
                     className="pt-2 text-body font-[550] tracking-[-0.01em] text-fg"
                   >
                     <Inline text={block.text} />
                   </h3>
                 ) : (
-                  <p key={`${index}-${block.text.slice(0, 24)}`} className="text-small text-muted text-pretty">
+                  <p key={index} className="text-small text-muted text-pretty">
                     <Inline text={block.text} />
                   </p>
                 ),
@@ -126,13 +126,8 @@ function Release({
 }) {
   return (
     <li className="relative ps-[clamp(22px,3vw,34px)] pb-[clamp(30px,4.5vw,52px)] last:pb-0">
-      {/* Rail and dot are drawn per item, so nothing depends on the list's padding
-          resolving to the same clamp value the offsets were written against. The
-          rail is omitted on the final release rather than hidden by a `last:`
-          variant - the rail is the item's first child, so `last:` would never have
-          matched it, and the line would run past the oldest entry into nothing.
-          `faint/30` rather than `border`: a full-width section rule reads at that
-          contrast, a 1px vertical hairline does not. */}
+      {/* Drawn per item, and skipped on the oldest release so the line does not run
+          past it. `faint/30` because `border` is invisible as a 1px hairline. */}
       {last ? null : <span className="absolute start-[3px] top-[19px] bottom-0 w-px bg-faint/30" aria-hidden />}
       <span
         className={`absolute start-0 top-[7px] size-[9px] rounded-full border ${
@@ -166,8 +161,8 @@ function Release({
                 {group.name}
               </h3>
               <ul className="space-y-3.5">
-                {group.entries.map((entry) => (
-                  <Entry key={entry.lead.slice(0, 60)} entry={entry} />
+                {group.entries.map((entry, index) => (
+                  <Entry key={index} entry={entry} />
                 ))}
               </ul>
             </section>
@@ -196,8 +191,8 @@ function Entry({ entry }: { entry: ChangelogEntry }) {
       ) : null}
       {entry.children.length > 0 ? (
         <ul className="mt-2 space-y-2 border-s border-border ps-3.5">
-          {entry.children.map((child) => (
-            <li key={child.slice(0, 40)} className="text-muted">
+          {entry.children.map((child, index) => (
+            <li key={index} className="text-muted">
               <Inline text={child} />
             </li>
           ))}

@@ -10,16 +10,8 @@ type Basis = 'comparable' | 'incomparable' | 'no-baseline'
 
 /** Regressed routes that get a full block; the rest are counted, not printed. */
 const ROUTE_BLOCK_LIMIT = 10
-
-/**
- * The route a segment-config change belongs to, from keys shaped
- * `/products/[slug] · revalidate`. Null for build-level configuration, which
- * belongs to no route and is always reported in the note.
- */
-function routeScopeOf(change: ConfigChange): string | null {
-  const separator = change.key.indexOf(' · ')
-  return separator > 0 ? change.key.slice(0, separator) : null
-}
+/** Configuration changes listed in the note before it collapses to a count. */
+const CONFIG_NOTE_LIMIT = 8
 
 /**
  * The PR comment is the growth mechanism (plan §8). Every comment is read by every
@@ -55,13 +47,12 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
   const configChanges = diff?.configChanges ?? []
   const blockingConfig = configChanges.filter((change) => change.incomparable)
 
-  // Segment config is reported beside the route it governs, as a `Declared:` line,
-  // so repeating it in the note says the same thing twice in one comment. Only for
-  // routes that actually get a block, though: a declaration on a route that stays
-  // behind the fold has nowhere else to appear, and dropping it would lose it.
+  // Segment config appears beside the route it governs, so repeating it here would
+  // say the same thing twice. Only for routes that get a block: a declaration on a
+  // route behind the fold has nowhere else to appear.
   const printedRoutes = new Set(regressions.slice(0, ROUTE_BLOCK_LIMIT).map((route) => route.pattern))
   const configEvidence = configChanges.filter(
-    (change) => !change.incomparable && !printedRoutes.has(routeScopeOf(change) ?? ''),
+    (change) => !change.incomparable && !(change.route !== undefined && printedRoutes.has(change.route)),
   )
 
   lines.push('<!-- crust-report -->')
@@ -83,14 +74,15 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
   }
 
   if (configEvidence.length > 0) {
+    const hidden = configEvidence.length - CONFIG_NOTE_LIMIT
     lines.push('> [!NOTE]')
     lines.push('> Build configuration changed. Kept as evidence rather than reported as a')
     lines.push('> regression - what it explains below was not caused by application code:')
-    for (const change of configEvidence.slice(0, 8)) {
+    for (const change of configEvidence.slice(0, CONFIG_NOTE_LIMIT)) {
       lines.push(`> - \`${change.key}\`: ${change.before} → ${change.after} - explains ${change.explains}`)
     }
-    if (configEvidence.length > 8) {
-      lines.push(`> - … and ${configEvidence.length - 8} more configuration change${configEvidence.length - 8 === 1 ? '' : 's'}`)
+    if (hidden > 0) {
+      lines.push(`> - … and ${hidden} more configuration change${hidden === 1 ? '' : 's'}`)
     }
     lines.push('')
   }
@@ -149,11 +141,10 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
  */
 function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): string[] {
   const lines = [`**\`${route.pattern}\`**${route.status === 'added' ? ' 🆕' : ''}`]
-  // Segment config this route declares, keyed `/pattern · revalidate`. A route
-  // that dropped to dynamic because someone wrote `export const dynamic` is still
-  // a regression - it is just not a mystery, and naming the declaration is the
-  // difference between a reviewer fixing it and a reviewer hunting for a fetch.
-  const declared = configChanges.filter((change) => change.key.startsWith(`${route.pattern} · `))
+  // A route that dropped to dynamic because someone wrote `export const dynamic` is
+  // still a regression, it is just not a mystery. Naming the declaration is the
+  // difference between fixing it and hunting for a fetch that does not exist.
+  const declared = configChanges.filter((change) => change.route === route.pattern)
 
   if (route.modeChange) {
     lines.push(`- rendering: **${modeLabel(route.modeChange.before)} → ${modeLabel(route.modeChange.after)}**`)
@@ -175,20 +166,17 @@ function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): stri
   }
 
   for (const change of declared) {
-    lines.push(`- Declared: \`${change.key.split(' · ')[1]}\` **${change.before} → ${change.after}**`)
+    lines.push(`- Declared: \`${change.setting}\` **${change.before} → ${change.after}**`)
   }
 
   const cause = route.cause
-  // A cause that only restates a declaration is dropped: the `Declared:` line
-  // above is the same fact with the before and after values attached, and three
-  // lines saying "force-dynamic" teaches a reviewer to skim the block.
-  const causeRestatesDeclaration = declared.length > 0 && cause?.what.startsWith('route config:') === true
+  // A `Declared:` line above already carries this fact, with before and after.
+  const restatesDeclaration = declared.length > 0 && cause?.what.startsWith('route config:') === true
   if (cause) {
-    if (!causeRestatesDeclaration) {
+    if (!restatesDeclaration) {
       lines.push(cause.kind === 'unknown' ? `- Cause: unknown - ${cause.what}` : `- Cause: \`${cause.what}\``)
     }
-    // Kept either way: which component carries the change is evidence the
-    // declaration lines do not contain.
+    // Which component carries it is evidence the declaration lines do not have.
     if (cause.component) lines.push(`- Introduced by: \`<${cause.component}>\``)
   }
 
@@ -205,13 +193,8 @@ function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): stri
 }
 
 /**
- * The complete chain, folded away.
- *
- * The summary above answers "what broke and where"; this answers "how did it get
- * into this route", which is a different question asked by a different reader at a
- * different moment. Inline it would push the verdict off the screen on any route
- * with a deep import path - so it stays one click away, which is the whole reason
- * the analyzer stores the links instead of only the call site.
+ * The complete chain, folded away. Inline, a deep import path would push the
+ * verdict off the screen; the summary above is what most readers need.
  */
 function chainBlock(chain: CauseChain | null): string[] {
   if (!chain || chain.links.length === 0) return []

@@ -1,7 +1,8 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
-import { join, relative, resolve } from 'node:path'
+import { readdir } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { exists, readJson, readText } from '../core/fs.ts'
 import { defaultBranch, remoteUrl } from '../core/git.ts'
-import { toPosix } from '../core/workspace.ts'
+import { relativePosix } from '../core/workspace.ts'
 
 const NEXT_CONFIG_NAMES = [
   'next.config.js',
@@ -37,14 +38,10 @@ export interface NextApp {
 }
 
 /**
- * Every Next.js app in the workspace, shallowest first.
- *
- * Two independent signals, because either can be missing: a dependency on `next`
- * without a config file is the default shape of a new app, and a `next.config.*`
- * without a resolvable dependency is what a fresh clone looks like before
- * install. Depth is bounded because the answer is always within a couple of
- * levels (`apps/web`, `packages/site`) and walking a whole monorepo to find it
- * costs more than the command is worth.
+ * Every Next.js app in the workspace, shallowest first. Two signals because either
+ * can be missing: a `next` dependency with no config is a new app, a config with no
+ * resolvable dependency is a fresh clone. Depth is bounded - the answer is always
+ * a couple of levels down, and walking a whole monorepo costs more than that.
  */
 export async function findNextApps(root: string, maxDepth = 3): Promise<NextApp[]> {
   const apps: NextApp[] = []
@@ -87,10 +84,9 @@ export interface AppChoice {
 export async function chooseNextApp(root: string, cwd: string): Promise<AppChoice> {
   const here = resolve(cwd)
 
-  // The directory crust was pointed at, checked before the scan and independently
-  // of it. The scan is bounded by depth and skips build output, so an app that
-  // sits outside those bounds would otherwise lose to some unrelated app
-  // elsewhere in the workspace - which is the one outcome worth failing over.
+  // Checked before the scan and independently of it: the scan is bounded by depth
+  // and skips build output, so an app outside those bounds would otherwise lose to
+  // an unrelated one elsewhere in the workspace.
   const pointedAt = await readApp(root, here)
 
   const candidates = await findNextApps(root)
@@ -127,10 +123,9 @@ const LOCKFILES: [string, PackageManager][] = [
 export interface PackageManagerChoice {
   name: PackageManager
   /**
-   * The version from the root `packageManager` field, when it names this same
-   * manager. Its presence means CI should defer to it rather than pin a version
-   * of its own: a workflow that installs pnpm 10 against a lockfile written by
-   * pnpm 9 fails on `--frozen-lockfile`, and it fails on the wrong line.
+   * From the root `packageManager` field, when it names this same manager. CI defers
+   * to it rather than pinning its own: pnpm 10 against a pnpm 9 lockfile fails on
+   * `--frozen-lockfile`, and it fails on the wrong line.
    */
   declaredVersion: string | null
 }
@@ -162,11 +157,8 @@ export interface CiDetection {
 }
 
 /**
- * Prefer the CI directory that already exists; fall back to the remote host.
- *
- * The fallback matters more than it looks: a repository with no `.github/` yet
- * is exactly the repository that has never had a check, which is the one this
- * command exists for.
+ * Prefer the CI directory that exists; fall back to the remote host. A repository
+ * with no `.github/` is exactly the one that has never had a check.
  */
 export async function detectCiProvider(root: string): Promise<CiDetection> {
   if (await exists(join(root, '.github', 'workflows'))) return { provider: 'github', how: '.github/workflows exists' }
@@ -191,16 +183,17 @@ export interface NodeChoice {
  * be running under.
  */
 export async function detectNodeMajor(root: string, appDir: string): Promise<NodeChoice> {
-  for (const dir of dedupe([appDir, root])) {
-    const nvmrc = await read(join(dir, '.nvmrc'))
-    const fromNvmrc = nvmrc?.match(/(\d+)/)?.[1]
-    if (fromNvmrc) return { major: clampNode(Number(fromNvmrc)), how: `${label(root, dir)}.nvmrc` }
+  const dirs = [...new Set([appDir, root])]
+
+  for (const dir of dirs) {
+    const major = (await readText(join(dir, '.nvmrc')))?.match(/(\d+)/)?.[1]
+    if (major) return { major: clampNode(Number(major)), how: `${label(root, dir)}.nvmrc` }
   }
 
-  for (const dir of dedupe([appDir, root])) {
+  for (const dir of dirs) {
     const pkg = await readJson<{ engines?: { node?: string } }>(join(dir, 'package.json'))
-    const fromEngines = pkg?.engines?.node?.match(/(\d+)/)?.[1]
-    if (fromEngines) return { major: clampNode(Number(fromEngines)), how: `${label(root, dir)}package.json engines.node` }
+    const major = pkg?.engines?.node?.match(/(\d+)/)?.[1]
+    if (major) return { major: clampNode(Number(major)), how: `${label(root, dir)}package.json engines.node` }
   }
 
   // A stated version is honoured as stated, odd majors included. This one is not
@@ -238,7 +231,7 @@ async function readApp(root: string, dir: string): Promise<NextApp | null> {
   }
   if (!dependsOnNext && !hasConfig) return null
 
-  const rel = toPosix(relative(root, dir))
+  const rel = relativePosix(root, dir)
   return {
     dir,
     relativeDir: rel === '' ? '.' : rel,
@@ -251,35 +244,7 @@ async function readApp(root: string, dir: string): Promise<NextApp | null> {
 const clampNode = (major: number): number => (Number.isFinite(major) && major >= 20 ? major : 20)
 
 const label = (root: string, dir: string): string => {
-  const rel = toPosix(relative(root, dir))
+  const rel = relativePosix(root, dir)
   return rel === '' ? '' : `${rel}/`
 }
 
-const dedupe = (dirs: string[]): string[] => [...new Set(dirs)]
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function read(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, 'utf8')
-  } catch {
-    return null
-  }
-}
-
-async function readJson<T>(path: string): Promise<T | null> {
-  const raw = await read(path)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return null
-  }
-}

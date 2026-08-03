@@ -53,6 +53,14 @@ export function readBuildConfig(input: {
 export interface ConfigChange {
   /** `cacheComponents`, `bundler`, `/products/[slug] · revalidate`. */
   key: string
+  /**
+   * The route this governs, for segment config; absent for build-level settings.
+   * Carried rather than encoded in `key`, so readers do not have to agree on how
+   * to split the string back apart.
+   */
+  route?: string
+  /** The segment key alone - `revalidate`, `dynamic` - when `route` is set. */
+  setting?: string
   before: string
   after: string
   /** One line, ready to print. The diff surfaces these verbatim. */
@@ -190,6 +198,8 @@ function compareRouteConfig(base: RouteSnapshot[], head: RouteSnapshot[]): Confi
       if (a === b) continue
       changes.push({
         key: `${route.pattern} · ${key}`,
+        route: route.pattern,
+        setting: key,
         before: a === undefined ? 'unset' : String(a),
         after: b === undefined ? 'unset' : String(b),
         summary: `${route.pattern}: ${key} changed: ${a === undefined ? 'unset' : String(a)} -> ${b === undefined ? 'unset' : String(b)}`,
