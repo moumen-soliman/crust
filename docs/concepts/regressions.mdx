@@ -89,8 +89,9 @@ baseline exists:
 - Cache Components
 - bundler, Next.js version, and Node major
 - browser source-map emission
+- `partialPrefetching` and the `instantInsights` validation level, on Next 16.3
 - relevant experimental flags
-- per-route `dynamic`, `revalidate`, `runtime`, and `fetchCache`
+- per-route `dynamic`, `revalidate`, `runtime`, `fetchCache`, `instant`, and `prefetch`
 
 A bundler, Next major, snapshot schema, or Cache Components change makes route deltas unsafe and
 stops regression enforcement. The comment names each one with what it explains, so "no deltas" never
@@ -101,6 +102,28 @@ in a note, states what each accounts for, and says outright that they were not c
 code. A route that regressed because it declared `dynamic`, `revalidate`, `runtime`, or `fetchCache`
 still fails - it is a real staticness downgrade - but the comment names the declaration instead of
 sending the reviewer to look for a cause that is not in the code.
+
+#### Instant Navigations
+
+Next 16.3 adds the `partialPrefetching` config flag, an `instantInsights` validation level, and the
+`instant` and `prefetch` route segment exports. crust records all four and reports them here, as
+**declared intent**. `partialPrefetching` is kept raw, so `'unstable_eager'` stays distinct from
+`true`. The segment exports are inherited from layouts like every other segment key.
+
+They report as configuration rather than as per-route regressions because a flag flip is one
+decision, not one defect per route.
+
+crust does not claim to have measured instant navigation, and cannot. Two `next@16.3.0` builds of
+one app differing only in `partialPrefetching` emit an identical artifact tree, a byte-identical
+`server/prefetch-hints.json`, and per-segment payloads within a few bytes of each other; `instant`
+appears in no build manifest. Next enforces the contract by **failing the build**, so a route that
+stopped being instant does not produce a comparable snapshot to regress against - it produces a red
+build.
+
+One transition is named **weakened**: dropping from an `experimental-error` validation level to a
+warning level. At an error level, a route that breaks its `instant` contract fails the build. Below
+it, the same route ships. That change is silent in the build output and survives a green CI run,
+which is the reason this axis is worth reporting at all.
 
 ### Byte noise
 
