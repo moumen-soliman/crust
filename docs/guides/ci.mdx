@@ -1,6 +1,6 @@
 ---
 title: "CI and pull requests"
-description: "Automatic regression checks, optional ceilings, an updating PR comment, and durable history."
+description: "Decision-first regression checks, measured finding trust, and durable build history."
 ---
 
 The PR comment is the point. Every comment is read by every reviewer, in context, at the moment it
@@ -39,7 +39,7 @@ jobs:
         with:
           working-directory: .
           baseline: main
-          crust-version: 0.1.7   # pin the verdict; omit to track latest
+          crust-version: 0.2.0   # pin the verdict; omit to track latest
 ```
 
 <Note>
@@ -103,12 +103,19 @@ See the [regression model](/docs/concepts/regressions) for the certainty rules a
 ```text
 ### crust: `/products/[slug]` is no longer static
 
+<sub>attribution 94%</sub>
+
+**Cause**
+
+- `date-fns` added · +48.2 kB on `/checkout`, +8 more
+
 **`/products/[slug]`**
 
 - rendering: **static → partial**
 - static shell: **100% → 45%**
 - Cause: `uncached fetch at lib/http.ts:3`
 - Introduced by: `<ProductGallery>`
+- **Do this:** Cache that read and the route can prerender again.
 
 **Failing check**
 
@@ -116,9 +123,28 @@ See the [regression model](/docs/concepts/regressions) for the certainty rules a
 ```
 
 The comment carries a hidden `<!-- crust-report -->` marker so the action updates the existing one
-instead of stacking a new comment on every push. Regressions receive prose and source blame;
-improvements and neutral changes stay behind a disclosure. If the builds are incomparable, no
-route deltas are printed.
+instead of stacking a new comment on every push. It leads with the decision and attribution
+coverage. Improvements get their own visible section, and packages, client boundaries, barrels, and
+shared call sites are grouped once with their route blast radius. Additional neutral route movement
+stays behind a disclosure. If the builds are incomparable, no route deltas are printed.
+
+### Measure whether authors agree
+
+Every blocking breach is appended to `.perf/findings.jsonl` before the action publishes history.
+Reviewers can mark the occurrence locally after fetching history:
+
+```bash
+crust history fetch
+crust findings list --open
+crust findings agree <id>
+crust findings dispute <id> --note "intentional request-time personalization"
+crust findings rate
+crust history push
+```
+
+`rate` reports `disputed / (agreed + disputed)`. Open findings are unfinished measurement and do not
+enter the denominator; with no reviewed findings the rate remains unmeasured rather than appearing
+as 0%. The pre-ownership-routing target is fewer than 1 in 10 reviewed findings disputed.
 
 ### The import chain, one click away
 

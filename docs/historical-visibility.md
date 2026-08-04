@@ -25,7 +25,7 @@ Worth being exact, because four of the five items are closer than they look.
 
 | Capability | Status |
 | --- | --- |
-| One snapshot per build, content-addressed | `.perf/builds/<shard>/<buildId>.json`, `SCHEMA_VERSION = 1` |
+| One snapshot per build, content-addressed | `.perf/builds/<shard>/<buildId>.json`, `SCHEMA_VERSION = 4` |
 | Stable build identity | `buildId = shortHash(gitSha : dirtyHash : lockfileHash : nextVersion : nodeMajor : bundler : configHash)` |
 | Queryable index | `.perf/index.db` (`node:sqlite`), tables `snapshots` + `route_totals`, index `route_totals_by_route` |
 | N-build series per route | `SnapshotStore.routeHistory(limit = 30)` → `Map<routeId, {buildId, bytes, shellRatio}[]>`, oldest-first |
@@ -77,47 +77,38 @@ labels the dates rather than silently switching to a time axis.
 
 ## 2. Compare arbitrary branches or commits
 
-**Detects.** Every regression kind `diffSnapshots` already finds - the novelty is the *pair*, not
-the analysis. Today `diff [ref]` compares the **current build** against a stored ref, so answering
-"what did 2.3 → 2.4 do?" requires checking out and rebuilding 2.4.
+**Status: implemented.** `crust diff [base] [head]` resolves each side independently from stored
+snapshots, so answering "what did 2.3 → 2.4 do?" requires neither checkout nor rebuild. One argument
+still compares the current `.next` build with a stored baseline.
 
-**Emits** - `crust compare --base release/2.3 --head release/2.4`:
+**Emits** - `crust diff release/2.3 release/2.4`:
 
 ```text
-### crust: 2 routes regressed, 1 improved
+CRUST / DIFF  4b1d0e7a120c1348 (release/2.3@4b1d0e7a) → 9f2c1ab4c380721e (release/2.4@9f2c1ab4)
+3 changed · 2 regressions · 1 improvement · attribution 91%
 
-base  4b1d0e7  release/2.3  2026-07-24
-head  9f2c1ab  release/2.4  2026-08-01
+DECISION  BLOCK
+2 routes regressed
 
-**`/products/[slug]`**
+CHANGES
+✗ /products/[slug]  no longer static  ·  static shell 100% → 45%  ·  +59 kB
+    lib/http.ts:3 in <ProductGallery>
+✓ /account  -28 kB
 
-- rendering: **static → partial**
-- static shell: **100% → 45%**
-- first load: **241 kB** (+59 kB)
-- Cause: `uncached fetch at lib/http.ts:3`
-- Introduced by: `<ProductGallery>`
-
-**`/dashboard`**
-
-- first load: **198 kB** (+21 kB)
-- Cause: `date-fns via components/Chart.tsx:12`
-
-<sub>24 routes · next 16.2.1 · turbopack · 4b1d0e7 → 9f2c1ab</sub>
+CAUSES
++21 kB  date-fns · package
+          /dashboard
 ```
 
-**Rules.** Output is the existing comment renderer with a two-line pair header substituted for the
-`vs \`baseId\`` footer fragment - same route blocks, same verdict priority, so `crust compare`
-piped into a PR reads identically to `crust ci`. Both refs go through `resolve()`, so
-`--base v2.3.0 --head HEAD~5` works without special-casing tags.
+**Rules.** Both refs go through `resolve()`, so `crust diff v2.3.0 HEAD~5` works without
+special-casing tags. Terminal and PR surfaces share the same lead: decision, regressions and
+improvements, grouped causes, attribution coverage, and action.
 
 **The honest caveat.** Cross-release pairs trip `Diff.incomparable[]` far more often than
 adjacent-commit pairs do - a Next major, a bundler switch, or a `SCHEMA_VERSION` bump between two
-tags makes the byte deltas meaningless. `compare` must lead with the `> [!WARNING]` block and print
-**no** route deltas in that case, exactly as `ci` does. A release comparison that silently comments
+tags makes the byte deltas meaningless. `diff` leads with `CANNOT DECIDE` and prints **no**
+enforceable route deltas in that case, exactly as `ci` does. A release comparison that silently comments
 across a webpack → Turbopack migration is worse than no feature.
-
-**New work.** A `compare` command taking two refs; teaching the comment renderer a pair header.
-Everything under it already exists.
 
 ## 3. Identify frequently regressing routes
 
@@ -211,7 +202,7 @@ readable, and today crust is only the first one.
   b6f2201  2026-07-27  23 routes  1.7 MB     +8 kB
 
   crust timeline <route>   per-route detail
-  crust compare --base <ref> --head <ref>
+  crust diff <base> <head>
 ```
 
 and a generated `.perf/HISTORY.md`, refreshed by `crust history push`, so the orphan branch is
@@ -238,7 +229,6 @@ snapshots - `log` is `list` with deltas and a verdict per row.
 `SnapshotStore.range(fromRef, toRef)` first - items 1, 3, and 4 are all renderers over it, and
 building it once avoids three subtly different window definitions.
 
-Then `compare` (item 2), which needs no new store work and is the cheapest thing to ship: it is
-`diffSnapshots` plus a header. `log` and `HISTORY.md` (item 5) next, because they make the other
-surfaces discoverable. `hotspots` and `summary` (items 3 and 4) last - they are the most valuable
-to a reader and the most dependent on a correct window definition.
+Item 2 has shipped as `crust diff [base] [head]`. Build `log` and `HISTORY.md` (item 5) next because
+they make the other historical surfaces discoverable. `hotspots` and `summary` (items 3 and 4) come
+last: they are the most valuable to a reader and the most dependent on a correct window definition.

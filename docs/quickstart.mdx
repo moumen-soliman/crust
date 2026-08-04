@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "From a production build to prioritized findings, a snapshot, and a baseline."
+description: "From two production builds to a decision, grouped causes, and CI."
 ---
 
 ## Requirements
@@ -95,7 +95,7 @@ npx @moumensoliman/crust report --open
 A single self-contained HTML file with no server or external requests. It adds route, component,
 and source search; filters and grouping; complete cause chains; and shared-cause blast radius.
 
-## 4. Compare against a baseline
+## 4. Compare production builds
 
 First record the base branch, then rebuild and diff after your change:
 
@@ -110,13 +110,20 @@ npx @moumensoliman/crust diff main
 ```
 
 ```text
-crust diff  cfdcf50068722687 -> 4a80239769ea8b93
+CRUST / DIFF  cfdcf50068722687 (main@cfdcf500) → 4a80239769ea8b93 (feature@4a802397)
+1 changed · 1 regression · attribution 94%
 
-/products/[slug] ▼  543.2 kB  -
-    static -> partial
-    shell 100% -> 45%
-    cause: uncached fetch at lib/http.ts:3
-    introduced by <ProductGallery>
+DECISION  BLOCK
+`/products/[slug]` is no longer static
+
+CHANGES
+✗ /products/[slug]  no longer static  ·  static shell 100% → 45%
+    lib/http.ts:3 in <ProductGallery>
+    → Cache that read (`use cache`, or `fetch(…, { next: { revalidate } })`) and the route can prerender again.
+
+CAUSES
++48.2 kB  date-fns added · package
+            /checkout, +8 more
 ```
 
 <Tip>
@@ -132,6 +139,10 @@ shared baselines from `perf-history`.
 
 The two builds must use the same bundler, Next.js major, and snapshot schema. If they do not, crust
 names the incompatibility and refuses to assign a cause.
+
+The decision is shared with `crust ci`: `BLOCK`, `REVIEW`, `CLEAR`, or `CANNOT DECIDE`. Improvements
+appear alongside regressions, and attribution beside the verdict tells you how much of the cause
+explanation the build supports.
 
 ## Unlock per-file attribution
 

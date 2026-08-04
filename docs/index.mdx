@@ -1,19 +1,20 @@
 ---
 title: "Introduction"
-description: "Production-build explanations and regression blame for Next.js App Router."
+description: "The production-build diff for Next.js App Router."
 ---
 
-crust analyzes a production build of a Next.js App Router project, explains the rendering and cache
-story of every route, and stores a snapshot so the next build can be compared with evidence.
+crust compares two Next.js App Router production builds and leads with the decision: what changed,
+why it changed, everything affected, and whether the evidence supports merging or shipping it.
 
-**Next DevTools explains the current page. crust explains what became worse, why, and whether the
-PR should merge.**
+**A one-build analyzer answers “what is in this bundle?” crust answers “what changed between builds,
+why, and can it ship?”**
 
-## How crust calculates the report
+## How crust builds the comparison
 
-`crust report` does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins
-the completed production build in `.next` with the application's source graph, stores the result as
-a snapshot, optionally adds local history from `.perf/`, and renders a self-contained HTML file.
+crust does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins each
+completed `.next` build with the application's source graph and stores a compatible snapshot.
+`crust diff [base] [head]` then derives one decision from rendering, caching, shell, and client-cost
+movement.
 
 It reads:
 
@@ -75,7 +76,17 @@ baseline, why did it change, and should this PR merge?”
 
 ## What crust answers
 
-For a single build:
+Across two builds:
+
+- Should this change be blocked, reviewed, cleared, or left undecidable?
+- Did a route become less static, lose caching, or shrink its shell?
+- Did first-load JavaScript grow, and was it a package, client boundary, barrel, or file?
+- Which routes share the same cause and source location?
+- What improved?
+- How much of the explanation is backed by attributed evidence?
+- What is the likely next action?
+
+For one build, the stored evidence also answers:
 
 - Is this route static, partially static, ISR, dynamic, or a route handler?
 - Which dynamic API, uncached read, or route configuration produced that mode?
@@ -86,29 +97,22 @@ For a single build:
 - How much of the build did crust classify, measure, and attribute?
 - Which three findings are most worth investigating first?
 
-Across builds:
-
-- Did a route become less static?
-- Did a cached read become uncached?
-- Did a component leave the static shell?
-- Did first-load JavaScript grow, and which module caused it?
-- Was the movement caused by application source or build configuration?
-- Which other routes share the same root cause?
-- Is the regression certain enough to fail CI?
-
 ## The failure it exists to catch
 
 Under Cache Components, removing a cache directive deep in a utility silently shrinks the static
 shell. No build error and no bundle growth:
 
 ```text
-crust diff  cfdcf500 → 4a802397
+CRUST / DIFF  cfdcf50068722687 (main@cfdcf500) → 4a80239769ea8b93 (feature@4a802397)
+1 changed · 1 regression · attribution 94%
 
-/products/[slug] ▼  543.2 kB  -
-    static → partial
-    shell 100% → 45%
-    cause: uncached fetch at lib/http.ts:3
-    introduced by <ProductGallery>
+DECISION  BLOCK
+`/products/[slug]` is no longer static
+
+CHANGES
+✗ /products/[slug]  no longer static  ·  static shell 100% → 45%
+    lib/http.ts:3 in <ProductGallery>
+    → Cache that read (`use cache`, or `fetch(…, { next: { revalidate } })`) and the route can prerender again.
 ```
 
 The call site named there is three frames below the page, in a file the route never mentions.
@@ -122,10 +126,13 @@ what postpones, and it fails quietly.
 ## What it does
 
 <CardGroup cols={2}>
+  <Card title="Compare two builds" icon="code-compare" href="/docs/reference/cli#diff">
+    Branches, tags, commits, and build ids with one decision, grouped causes, and improvements.
+  </Card>
   <Card title="Analyze a build" icon="chart-simple" href="/docs/quickstart">
     Prioritized findings, route modes, first-load JS, shell composition, and source-level reasons.
   </Card>
-  <Card title="Understand regressions" icon="code-compare" href="/docs/concepts/regressions">
+  <Card title="Understand regressions" icon="triangle-exclamation" href="/docs/concepts/regressions">
     What fails automatically, what needs a budget, and when crust refuses to compare.
   </Card>
   <Card title="Shell engine" icon="layer-group" href="/docs/concepts/shell-engine">
@@ -135,7 +142,7 @@ what postpones, and it fails quietly.
     Source-map attribution, client-boundary cost, barrel drag, and import chains.
   </Card>
   <Card title="Add CI" icon="circle-check" href="/docs/guides/ci">
-    Zero-config regression checks, optional ceilings, and a PR comment that updates in place.
+    Zero-config regressions, optional ceilings, measured finding trust, and an updating PR comment.
   </Card>
 </CardGroup>
 

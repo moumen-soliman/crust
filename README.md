@@ -7,9 +7,9 @@
 <h1 align="center">crust</h1>
 
 <p align="center">
-  <strong>Know what became slower before it merges.</strong> crust analyzes production builds of
-  Next.js App Router projects, explains why each route is static, partial, ISR, or dynamic, and
-  compares snapshots to identify the component, import, and source line behind a regression.
+  <strong>The production-build diff for Next.js.</strong> Compare two App Router builds, decide
+  what can ship, and trace rendering, caching, shell, and client-cost regressions to the component,
+  import, package, and source line that introduced them.
 </p>
 
 <p align="center">
@@ -27,16 +27,17 @@
   <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha" />
 </p>
 
-> The crust is what ships instantly. `crust` tells you what is in it, what fell out, why, and when.
+> Bundle explorers show what one build contains. `crust` tells you what changed between builds,
+> why it changed, everything affected, and whether it should ship.
 
 **Status: pre-alpha.** The snapshot format, CLI output, and package API can still change.
 
-## How crust calculates the report
+## How crust builds a trustworthy comparison
 
-`crust report` does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins
-the completed production build in `.next` with the application's source graph, stores the result as
-a snapshot, optionally adds local history from `.perf/`, and renders that snapshot as a
-self-contained HTML file.
+crust does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins each
+completed production build in `.next` with the application's source graph and stores the result as
+a comparable snapshot. `crust diff [base] [head]` then leads with `BLOCK`, `REVIEW`, `CLEAR`, or
+`CANNOT DECIDE`, followed by the changes, grouped causes, evidence coverage, and likely next action.
 
 It reads these production artifacts:
 
@@ -85,11 +86,15 @@ Every cause is labeled:
 - **Inferred** - source relationships support the conclusion, but no emitted artifact confirms it.
 - **Unknown** - the relationship is incomplete or ambiguous.
 
-The report is therefore an explanation of one production build. Regression views compare two
-snapshots only when their schema, bundler, Next.js major, and route identities are compatible.
+One snapshot explains one production build. The product decision comes from comparing two snapshots,
+and only when their schema, bundler, Next.js major, and route identities are compatible.
 
 ## Features
 
+- **Two-build comparison** - compares branches, tags, commits, or build ids without checking either
+  ref out or rebuilding it.
+- **Decision before inventory** - leads with the verdict, worst changes, attribution coverage, and
+  likely next action before route tables and raw totals.
 - **Production-build analysis** - reads `.next` output instead of measuring unminified, HMR-heavy
   development builds.
 - **Route explanations** - reports static, partial, ISR, dynamic, and route-handler modes with the
@@ -98,23 +103,25 @@ snapshots only when their schema, bundler, Next.js major, and route identities a
   and names the component and call site behind each hole.
 - **Bundle attribution** - maps route bytes to first-party modules and dependencies through source
   maps, with separate webpack and Turbopack adapters.
-- **Regression blame** - compares builds and identifies rendering-mode drops, cache regressions,
-  shell shrinkage, and first-load growth.
+- **Regression blame** - identifies rendering-mode drops, cache regressions, shell shrinkage, and
+  first-load growth while treating improvements as first-class evidence.
 - **Cause chains and confidence** - follows routes through components and imports to call sites,
   labels the evidence, and reports measurable analysis coverage.
-- **Shared causes and client cost** - groups one root cause across affected routes and measures
-  client-boundary subtrees and barrel-import drag.
+- **Grouped causes and client cost** - groups package, client-boundary, barrel, and call-site movement
+  once with its route blast radius.
 - **Configuration-aware comparison** - separates framework and route configuration changes from
   application regressions.
 - **CI enforcement** - fails strict regressions without configuration and supports explicit size,
   growth, and shell-ratio budgets.
 - **Durable history** - stores one snapshot per build and can synchronize baselines through an
   orphan `perf-history` branch.
+- **Measured trust** - records blocking findings and reports author agreement or disagreement over
+  reviewed occurrences instead of asserting a false-positive rate.
 - **Reports without a service** - produces a searchable, filterable self-contained HTML report and
   an optional in-app panel. No account or hosted dashboard is required.
 
-**Next DevTools explains the current page. crust explains what became worse, why, and whether the
-PR should merge.**
+**A one-build analyzer answers “what is in this bundle?” crust answers “what changed, why, and can
+this merge or ship?”**
 
 crust connects build artifacts, source relationships, and compatible snapshots so a rendering or
 client-JavaScript change can be traced back to the component, import, and call site responsible.
@@ -227,21 +234,27 @@ next build
 npx @moumensoliman/crust diff main
 ```
 
-The ref is your repository's default branch - substitute `master` or whatever yours is called. Where
-crust takes a baseline ref it defaults to `main`, and resolves both `main` and `master` through
-`git merge-base`.
+The one-argument form compares the current `.next` build against the named baseline at its merge
+base with `HEAD`. With no argument, `diff` defaults the base to `HEAD~1`. `crust ci` separately
+defaults its baseline to `main`.
 
+```text
+CRUST / DIFF  cfdcf50068722687 (main@cfdcf500) → 4a80239769ea8b93 (feature@4a802397)
+1 changed · 1 regression · attribution 94%
+
+DECISION  BLOCK
+`/products/[slug]` is no longer static
+
+CHANGES
+✗ /products/[slug]  no longer static  ·  static shell 100% → 45%
+    lib/http.ts:3 in <ProductGallery>
+    → Cache that read (`use cache`, or `fetch(…, { next: { revalidate } })`) and the route can prerender again.
 ```
-crust diff  cfdcf50068722687 -> 4a80239769ea8b93
 
-/products/[slug] ▼  543.2 kB  -
-    static -> partial
-    shell 100% -> 45%
-    cause: uncached fetch at lib/http.ts:3
-    introduced by <ProductGallery>
-```
+Name two refs—`crust diff v1.2.0 release/next`—and both sides are read from stored snapshots. Neither
+ref needs to be checked out or rebuilt.
 
-That is the point. No build error was produced and not one byte moved - a `use cache` directive was
+That is the point. No build error was produced and not one byte moved—a `use cache` directive was
 removed three call frames below the page, and 55% of the route stopped being static.
 
 ### Module attribution needs source maps
@@ -294,17 +307,37 @@ switched off, so no delta-based regression is enforced when the comparison itsel
 
 Ceilings still apply in all three cases, because they describe a single build rather than a change.
 
-The comment leads with the one route that got worst, and stays quiet about everything else:
+The comment leads with the decision and evidence coverage. Improvements and grouped causes appear
+before route detail, and one cause replaces the repeated route blocks it fully explains:
 
 ```markdown
 ### crust: `/products/[slug]` is no longer static
+
+<sub>attribution 94%</sub>
+
+**Cause**
+- `date-fns` added · +48.2 kB on `/checkout`, +8 more
 
 **`/products/[slug]`**
 - rendering: **static → partial**
 - static shell: **100% → 45%**
 - Cause: `uncached fetch at lib/http.ts:3`
 - Introduced by: `<ProductGallery>`
+- **Do this:** Cache that read and the route can prerender again.
 ```
+
+Every blocking `ci` breach is also appended to `.perf/findings.jsonl`. Mark what authors actually
+agreed with, then report the measured disagreement rate:
+
+```bash
+crust findings list --open
+crust findings agree <id>
+crust findings dispute <id> --note "why"
+crust findings rate
+```
+
+The rate is `disputed / (agreed + disputed)`. With nothing reviewed it remains unmeasured—it is
+never presented as 0%.
 
 *Ceilings*, unlike regressions, cannot be guessed for someone else's app, so they do nothing until
 `.perf/budgets.json` names a number:
@@ -349,7 +382,7 @@ totals and shell ratios are kept forever.
 | `crust analyze` | Explain build health and changes, then save a snapshot; add `--routes` or `--report` for detail |
 | `crust diff [base] [head]` | Compare two builds by build id, Git ref, tag, branch, or ancestor. One argument compares the current build against a base; two compare stored snapshots without checking either ref out |
 | `crust ci [ref]` | Enforce regressions and budgets; optionally write a PR comment |
-| `crust findings` | List, agree/dispute, and score blocking findings from `ci` |
+| `crust findings list\|agree\|dispute\|rate` | Review and score blocking findings from `ci` |
 | `crust report` | Generate a self-contained HTML report |
 | `crust manifest` | Generate the data consumed by the optional in-app panel |
 | `crust history fetch` | Restore snapshots from the `perf-history` branch |

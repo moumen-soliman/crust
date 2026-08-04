@@ -118,7 +118,7 @@ a standard is the exact failure the roadmap named. A threshold with nothing to d
 shell floor in a build that emitted no measurable shell - is left out with the reason, not defaulted.
 
 Generated CI pins `@moumensoliman/crust` to the version that wrote the file, so a crust release cannot
-change a project's verdict without a commit. The action ref stays `@main`: there is no release tag to
+change a project's verdict without a commit. The action ref stays `@master`: there is no release tag to
 point at yet, and generating a reference to a tag that does not exist produces a workflow that fails
 on its first run. The generated file says which half is pinned rather than implying both are.
 

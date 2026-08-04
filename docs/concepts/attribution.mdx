@@ -95,3 +95,14 @@ Client boundaries are charged for their reachable subtree. Barrel cost includes 
 become unreachable when that barrel is removed. Shared layouts, boundaries, packages, barrels,
 chunks, and call sites are grouped once with every affected route, so one root cause does not become
 twenty repeated findings.
+
+Across builds, `crust diff` compares three byte-attribution axes directly:
+
+- **packages** - dependency movement grouped over every affected route
+- **client boundaries** - movement in the attributed subtree crossing into the client
+- **barrels** - movement in modules that reach a route only through the barrel import
+
+These axes can overlap: a client boundary may contain a package reached through a barrel. crust does
+not add all three together and pretend the same bytes were explained multiple times. It keeps the
+largest overlapping explanation, reports attribution coverage beside the verdict, and preserves
+route detail when the evidence does not fully explain the movement.

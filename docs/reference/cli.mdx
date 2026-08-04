@@ -65,9 +65,10 @@ crust could measure; no per-route ceilings are generated, because crust cannot k
 deserve a tighter number than the rest.
 
 <Note>
-`.perf/` holds two unlike things: generated snapshots, which travel on the `perf-history` branch, and
-the budget file, which is a decision worth reviewing. init suggests the ignore rule that separates
-them - `.perf/*` with `!.perf/budgets.json`.
+`.perf/` holds generated snapshots, the mutable `findings.jsonl` trust log, and reviewed project
+configuration such as budgets. Snapshots and findings travel on the `perf-history` branch; the
+budget file is a decision worth reviewing in the application branch. init suggests the ignore rule
+that separates them—`.perf/*` with `!.perf/budgets.json`.
 </Note>
 
 ## analyze
@@ -87,10 +88,13 @@ npx @moumensoliman/crust analyze [--routes] [--verbose] [--report [file]] [--jso
 | `--no-save` | Do not write into `.perf/`. |
 
 By default, `analyze` compares against the newest local snapshot with the same snapshot schema,
-bundler, Next.js major, and at least one matching route identity. Use `diff [ref]` when you need an
-explicit baseline. Its concise view includes build health, measurable analysis confidence,
-actionable regressions, the largest first-party contributor, shared causes, and trimmed cause
-chains. `--verbose` expands the coverage denominators and unresolved evidence.
+bundler, Next.js major, and at least one matching route identity. Its concise view explains this
+build: build health, measurable analysis confidence, actionable regressions, the largest
+first-party contributor, shared causes, and trimmed cause chains. `--verbose` expands the coverage
+denominators and unresolved evidence.
+
+Use `diff [base] [head]` for the decision-first comparison surface. It can compare the current
+`.next` build with one stored baseline or resolve both sides independently from stored snapshots.
 
 ## diff
 
@@ -157,9 +161,11 @@ npx @moumensoliman/crust findings dispute <id> [--note "..."]
 npx @moumensoliman/crust findings rate
 ```
 
-`ci` writes one row per blocking breach. Each row has a fresh occurrence id (what you mark) and a
-stable key (same failure across PRs). `rate` reports `disputed / (agreed + disputed)` and leaves the
-rate unmeasured until something has been marked — an empty log is not a 0% disagreement rate.
+`ci` writes one row per blocking breach. Each row has a fresh occurrence id, which is what you mark,
+and a content key for identical breaches. Mode and cache failures retain that key across runs; byte,
+growth, and shell checks can receive a new key when the measured values in their message change.
+`rate` reports `disputed / (agreed + disputed)` and leaves the rate unmeasured until something has
+been marked—an empty log is not a 0% disagreement rate.
 
 Target before ownership routing ships: fewer than 1 in 10 resolved findings disputed.
 

@@ -9,6 +9,7 @@ description: "What crust writes, what to commit, and the two escape hatches."
   budgets.json             your budgets (you write this)
   aliases.json             route renames (optional)
   overrides.json           unresolvable imports (optional)
+  findings.jsonl           blocking findings + author verdicts
   builds/ab/ab3f91c2.json  one file per snapshot
   modules/9f/9f2c81.json   content-addressed module tables
   runs/01J8X…/             synthetic run samples
@@ -29,6 +30,22 @@ because a future tool version must not reinterpret old evidence using newer anal
 
 Add `index.db` to `.gitignore`. It is derived and rebuilt by scan, and publishing it just creates
 conflicts between machines that built it at different times.
+
+## findings.jsonl
+
+`crust ci` appends one row for every blocking breach. Each occurrence has a unique id to mark and a
+content key for identical breaches. Mode and cache keys remain stable across runs; byte, growth, and
+shell keys can change with the measured values included in their message:
+
+```bash
+crust findings list --open
+crust findings agree <id>
+crust findings dispute <id> --note "why"
+crust findings rate
+```
+
+The log is evidence for measuring disagreement, not a generated claim. Open findings do not enter
+the rate, and an empty log remains unmeasured.
 
 ## aliases.json
 

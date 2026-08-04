@@ -21,7 +21,7 @@ is implemented. Milestone 4 remains planned.
 4. **Action before observation.** Every finding should name what caused it, what it affected, and what the developer can do next.
 5. **CI must be quiet and trustworthy.** Fail only on comparable, evidence-backed regressions or explicit project budgets.
 
-## Priority 1: Complete cause chains
+## Priority 1: Complete cause chains — implemented
 
 Show the source relationship from a route to the call or import responsible for its behavior.
 
@@ -55,7 +55,7 @@ Show the source relationship from a route to the call or import responsible for 
 - Include the complete import chain in JSON and HTML while keeping the terminal summary concise.
 - Report the unresolved segment when a chain cannot be completed.
 
-## Priority 2: Confidence and coverage
+## Priority 2: Confidence and coverage — implemented
 
 Every conclusion should communicate how strongly Crust can support it.
 
@@ -77,7 +77,7 @@ Analysis confidence: 92%
 
 Confidence must be derived from measurable coverage, not an arbitrary score. Keep the underlying counts available in JSON.
 
-## Priority 3: Shared-cause blast radius
+## Priority 3: Shared-cause blast radius — implemented
 
 Find problems introduced by shared layouts, providers, client boundaries, and barrel files. Report one root cause with all affected routes instead of repeating the same finding per route.
 
@@ -131,31 +131,32 @@ crust init [--cwd <dir>] [--ci github|gitlab|circleci|none] [--force] [--dry-run
 
 Generated budgets must be reviewable. Crust should never silently convert the current build into an unquestionable standard. In practice that meant three rules: every number states its derivation in the file itself, a number crust *chose* rather than measured says so, and a threshold with nothing to derive it from is left out with the reason rather than filled in with a default.
 
-## Priority 6: Exceptional CI output
+## Priority 6: Exceptional CI output — core implemented
 
 CI should answer whether the change can merge and show only blocking evidence by default.
 
 ```text
-Merge verdict: fail
+### crust: `/courses/[slug]` became dynamic
 
-1 blocking regression
-/courses/[slug] became dynamic
-Cause: uncached fetch at packages/core/src/services/index.ts:29
-Introduced by: <CoursePage>
-Owner: packages/core
-Suggested fix: cache _GetCourseData or isolate request-specific work
+**`/courses/[slug]`**
+- rendering: **static → dynamic**
+- Cause: `uncached fetch at packages/core/src/services/index.ts:29`
+- Introduced by: `<CoursePage>`
+- **Do this:** Cache that read (`use cache`, or `fetch(…, { next: { revalidate } })`) and the route can prerender again.
+
+**Failing check**
+- `/courses/[slug]` - rendering mode dropped static → dynamic
 ```
 
-### Integrations
+The decision-first comment, grouped causes, source blame, actions, and stable update marker are
+implemented. The remaining integrations are:
 
 - GitHub source-line annotations
 - SARIF output
 - CODEOWNERS-aware ownership
 - Acknowledged regressions with a reason and expiry date
-- Stable check identifiers for updating existing comments
-- No regression failure when the comparison or cause is ambiguous
 
-## Priority 7: Configuration-change detection
+## Priority 7: Configuration-change detection — implemented
 
 Separate framework and build-configuration changes from application-source regressions.
 

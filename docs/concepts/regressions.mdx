@@ -13,6 +13,22 @@ a 60% shell ratio.
 
 That distinction determines which checks need configuration.
 
+## The comparison decision
+
+`crust diff` and `crust ci` summarize the same evidence with one of four decisions:
+
+- **BLOCK** - an automatic regression or configured budget was breached
+- **REVIEW** - meaningful movement needs judgment but is not enforceable
+- **CLEAR** - the comparison found no blocking regression
+- **CANNOT DECIDE** - missing or incompatible evidence makes a reliable delta comparison impossible
+
+`diff` reports that decision without enforcing it. `ci` exits non-zero only for blocking breaches.
+The verdict is followed by regressions and improvements, their strongest grouped cause, attribution
+coverage, and the likely next action.
+
+Absolute ceilings describe the current build, so they still run without a comparable baseline. A
+ceiling breach is therefore **BLOCK** even when route-to-route deltas cannot be decided.
+
 ## Automatic regression checks
 
 As soon as a comparable baseline exists, `crust ci` fails without a budget file when:
