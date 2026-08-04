@@ -28,6 +28,20 @@
         "3222"
       ],
       "port": 3222
+    },
+    {
+      "name": "crust-site-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "crust-site",
+        "exec",
+        "next",
+        "dev",
+        "--port",
+        "3223"
+      ],
+      "port": 3223
     }
   ]
 }

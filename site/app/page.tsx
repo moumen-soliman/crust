@@ -1,5 +1,5 @@
 import { DOCS, GITHUB, SiteFooter, SiteNav } from './chrome'
-import { CodePanel, type CodeTab } from './code-panel'
+import { HeroPanel, type CodeTab } from './hero-panel'
 
 const TABS: CodeTab[] = [
   {
@@ -214,9 +214,9 @@ export default function Home() {
             <span className="after:text-border after:content-['_/'] last:after:content-none">Turbopack</span>
           </div>
           <h1 className="m-0 text-h1 font-medium leading-[1.12] tracking-[-0.028em] text-balance">
-            The production-build diff that tells you{' '}
+            The production-build diff that helps you{' '}
             <span className="underline decoration-faint decoration-dotted decoration-1 underline-offset-[6px]">
-              what can ship
+              decide what can ship
             </span>
           </h1>
           <p className="mt-5 max-w-[46ch] text-small leading-[1.65] text-muted text-pretty">
@@ -233,7 +233,10 @@ export default function Home() {
             </a>
           </div>
         </div>
-        <CodePanel tabs={TABS} />
+        <HeroPanel
+          video={{ src: '/crust3.mp4', poster: '/crust3-poster.jpg', name: 'watch' }}
+          tabs={TABS}
+        />
       </header>
 
       <section className="border-t border-border">

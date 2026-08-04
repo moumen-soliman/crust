@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://crust.moumen.dev'),
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'crust - the production-build diff that tells you what can ship',
+    title: 'crust - the production-build diff that helps you decide what can ship',
     description:
       'Compare two Next.js builds, lead with the merge decision, and group every affected route by the component, import, package, or source line that caused it.',
     type: 'website',
