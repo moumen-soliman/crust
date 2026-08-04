@@ -270,7 +270,7 @@ function DiffView({ diff, width }: { diff: Diff; width: number }) {
       <Box flexDirection="column">
         <Header
           command="diff"
-          id={`${diff.base.buildId} → ${diff.head.buildId}`}
+          id={`${baseLabel(diff.base)} → ${diff.head.buildId}`}
           meta="not comparable"
           width={width}
         />
@@ -469,6 +469,16 @@ function medianFirstLoad(routes: RouteSnapshot[]): number {
 
 function humanBytes(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : kb(bytes)
+}
+
+/**
+ * Build IDs are opaque, so a baseline resolved from the wrong branch looks
+ * exactly like the right one. Naming the branch and commit it came from makes
+ * that visible in the header instead of only in `crust list`.
+ */
+function baseLabel(base: Snapshot): string {
+  const where = [base.branch, base.gitSha?.slice(0, 8)].filter(Boolean).join('@')
+  return where ? `${base.buildId} (${where}${base.dirty ? '+dirty' : ''})` : base.buildId
 }
 
 function shortBuild(buildId: string): string {

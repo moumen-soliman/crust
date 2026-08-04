@@ -12,6 +12,45 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-04
+
+### Fixed
+
+- `diff` and `ci` compare against the ref you named. Three faults in baseline resolution compounded
+  into one symptom: every branch name reported a clean build.
+  - Only the literal strings `main` and `master` were treated as branches. `develop`,
+    `chore/crust-ci`, `release/*` - any other name - fell through to the ancestry fallback without
+    ever being resolved.
+  - That fallback walked `HEAD`, not the ref. So a question about another branch was answered with
+    whatever was newest on the current one, and two different refs returned the same snapshot.
+  - Nothing excluded the head build from its own baseline. `analyze` writes a snapshot for the commit
+    being measured, so the record for `HEAD` is usually already stored; the walk found it first and
+    compared the build against itself.
+  A build diffed against itself reports `0 changed` under the same green tick a genuinely clean diff
+  gets, which is the failure this file's preamble calls the one crust cannot afford - stated there
+  about incomparable baselines, and true in exactly the same way of a baseline that was never the one
+  requested. Refs now resolve through `git rev-parse` (branch, tag, or short SHA), anchor at
+  `merge-base` so a moved-on base branch does not attribute its own commits to the pull request, and
+  walk the resolved ref's ancestry rather than HEAD's. A ref git does not recognise returns no
+  baseline instead of a substituted one, which surfaces as the "no stored snapshot" warning that
+  should have been printed all along. Found by running `crust diff` against a real repository with
+  two feature branches, not by a test.
+- A clean snapshot beats a dirty one at the same commit. Both are stored, `resolve` took whichever
+  `list()` happened to return first, and uncommitted work is not what a branch contains.
+
+### Changed
+
+- The `diff` header names the baseline's branch and short SHA beside its build ID
+  (`8419459abc25c9ef (chore/crust-ci@ff3ef93b) → c11296307919edf0`). Build IDs are opaque, so a
+  baseline resolved from the wrong branch was indistinguishable from the right one without running
+  `crust list` - which is most of why the faults above survived as long as they did.
+
+**What an existing `.perf/` does on upgrade:** nothing is rewritten, re-read, or invalidated, so this
+is not a schema event. Verdicts can change, and that is the point: a repository that was comparing
+against the wrong baseline - or against itself - starts comparing against the right one, and a
+project whose named branch has no snapshot starts being told so instead of shown a clean result. Runs
+that were already resolving correctly are unaffected.
+
 ## [0.1.6] - 2026-08-04
 
 ### Added

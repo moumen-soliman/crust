@@ -1,12 +1,30 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { shardPath, shortHash } from '../core/hash.ts'
-import { mergeBase, revList } from '../core/git.ts'
+import { mergeBase, revList, revParse } from '../core/git.ts'
 import { comparableBuilds } from '../diff/compatible.ts'
 import { normalizeSnapshot } from './normalize.ts'
 import { SCHEMA_VERSION, type Snapshot } from './snapshot.ts'
 
 export const STORE_DIR = '.perf'
+
+/**
+ * Newest commit in `ancestry`, at or after `startIndex`, that has a snapshot.
+ * Returns null rather than reaching for anything outside that ancestry: a
+ * baseline the requested ref cannot reach is not that ref's baseline.
+ */
+function walk(
+  bySha: Map<string, Snapshot[]>,
+  ancestry: string[],
+  startIndex: number,
+  pick: (candidates: Snapshot[]) => Snapshot | null,
+): Snapshot | null {
+  for (let i = startIndex; i < ancestry.length; i++) {
+    const snapshot = pick(bySha.get(ancestry[i]!) ?? [])
+    if (snapshot) return snapshot
+  }
+  return null
+}
 
 /**
  * On-disk layout (plan §6):
@@ -217,48 +235,71 @@ export class SnapshotStore {
     if (all.length === 0) return null
 
     /**
+     * A build is never its own baseline. `analyze` writes a snapshot on every
+     * run, so the record for the commit being measured is usually already in the
+     * store; returning it compares a build against itself and reports "0 changed"
+     * with the same green tick a genuinely clean diff gets.
+     */
+    const usable = head ? all.filter((snapshot) => snapshot.buildId !== head.buildId) : all
+    if (usable.length === 0) return null
+
+    /**
      * One commit can carry several snapshots: every `analyze` and `ci` run on it
      * writes one, and a crust from before a schema bump left records the current
      * comparison refuses. Given `head`, prefer a record that can actually be
      * compared - returning an incomparable one when a usable sibling exists for
      * the same commit runs no regression check at all, and reports that as "not
      * comparable to the baseline" rather than as a store wanting a prune.
+     *
+     * A clean tree wins over a dirty one at the same commit for the same reason:
+     * uncommitted work is not what the branch contains.
      */
     const pick = (candidates: Snapshot[]): Snapshot | null => {
       if (candidates.length === 0) return null
       if (!head) return candidates[0]!
-      return candidates.find((candidate) => comparableBuilds(candidate, head)) ?? candidates[0]!
+      const comparable = candidates.filter((candidate) => comparableBuilds(candidate, head))
+      const pool = comparable.length > 0 ? comparable : candidates
+      return pool.find((candidate) => !candidate.dirty) ?? pool[0]!
     }
 
-    const direct = pick(all.filter((s) => s.buildId === ref || s.gitSha === ref))
+    const direct = pick(usable.filter((s) => s.buildId === ref || s.gitSha === ref))
     if (direct) return direct
 
-    const base = ref.includes('..') || ref === 'main' || ref === 'master' ? await mergeBase(cwd, ref) : null
-    if (base) {
-      const match = pick(all.filter((s) => s.gitSha === base))
-      if (match) return match
-    }
-
-    // Walk this branch's ancestry and take the newest commit we have a snapshot for.
-    const ancestry = await revList(cwd, 200)
     const bySha = new Map<string, Snapshot[]>()
-    for (const snapshot of all) {
+    for (const snapshot of usable) {
       if (!snapshot.gitSha) continue
       const list = bySha.get(snapshot.gitSha)
       if (list) list.push(snapshot)
       else bySha.set(snapshot.gitSha, [snapshot])
     }
-    const offset = /^HEAD~(\d+)$/.exec(ref)
-    const startIndex = offset ? Number(offset[1]) : 0
 
-    for (let i = startIndex; i < ancestry.length; i++) {
-      const snapshot = pick(bySha.get(ancestry[i]!) ?? [])
-      if (snapshot) return snapshot
+    // `HEAD~n` is positional along this branch, so it stays a walk from an offset.
+    const offset = /^HEAD~(\d+)$/.exec(ref)
+    if (offset) return walk(bySha, await revList(cwd, 200), Number(offset[1]), pick)
+
+    /**
+     * Any other ref is resolved by git rather than pattern-matched. Recognising
+     * only `main` and `master` as branches left every other branch name falling
+     * through to a walk of HEAD's own ancestry, which answers a question about
+     * `develop` with whatever is newest on the current branch.
+     */
+    if (ref !== 'HEAD') {
+      const resolved = await revParse(cwd, ref)
+      // Git does not know this ref. A baseline invented here would be a wrong
+      // answer wearing the same tick as a right one.
+      if (!resolved) return null
+
+      // Where the branches parted, not where the other branch is now: comparing a
+      // feature branch against a moved-on `main` attributes that branch's commits
+      // to this pull request.
+      const anchor = (await mergeBase(cwd, ref)) ?? resolved
+      const atAnchor = pick(bySha.get(anchor) ?? [])
+      if (atAnchor) return atAnchor
+
+      return walk(bySha, await revList(cwd, 200, anchor), 0, pick)
     }
 
-    // Squash merges orphan snapshots: the pre-squash SHAs stop existing, so nothing
-    // in the ancestry matches. Content re-linking is the fallback (R13).
-    return null
+    return walk(bySha, await revList(cwd, 200), 0, pick)
   }
 
   /** Find a snapshot whose analysed source matches, ignoring git identity entirely. */

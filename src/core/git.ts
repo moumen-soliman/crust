@@ -61,6 +61,16 @@ export async function mergeBase(cwd: string, ref: string): Promise<string | null
 }
 
 /**
+ * Full SHA for any commit-ish - branch, tag, short SHA, `HEAD~3`. Null when git
+ * does not recognise it, which is the difference between "this branch has no
+ * snapshot yet" and "you typed a branch that does not exist". Both deserve an
+ * answer; neither deserves a silently substituted baseline.
+ */
+export async function revParse(cwd: string, ref: string): Promise<string | null> {
+  return git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], cwd)
+}
+
+/**
  * The branch pull requests target. `origin/HEAD` is the remote's own answer, so
  * it beats guessing between `main` and `master`; a local-only repository falls
  * back to whichever of the two exists. Null when neither does - the caller has
@@ -81,8 +91,13 @@ export async function remoteUrl(cwd: string, remote = 'origin'): Promise<string 
   return git(['remote', 'get-url', remote], cwd)
 }
 
-/** Commits from HEAD backwards, newest first. Trend ordering is topological, not clock. */
-export async function revList(cwd: string, limit: number): Promise<string[]> {
-  const out = await git(['rev-list', `--max-count=${limit}`, 'HEAD'], cwd)
+/**
+ * Commits from `start` backwards, newest first. Trend ordering is topological,
+ * not clock. `start` defaults to HEAD, but a baseline lookup passes the resolved
+ * ref: walking HEAD's ancestry to answer `diff <other-branch>` finds whatever is
+ * newest on the current branch and calls it that branch's baseline.
+ */
+export async function revList(cwd: string, limit: number, start = 'HEAD'): Promise<string[]> {
+  const out = await git(['rev-list', `--max-count=${limit}`, start], cwd)
   return out ? out.split('\n') : []
 }
