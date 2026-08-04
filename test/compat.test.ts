@@ -24,8 +24,26 @@ interface FixtureCase {
   distDir: string
   bundler: Bundler
   nextMajor: number
+  /**
+   * Minimum minor, for a case whose subject only exists from one. A floor rather
+   * than an exact pin so the canary job - which builds this fixture against
+   * `next@canary` - reports a detector that stopped firing instead of failing on
+   * the version number every time the minor moves.
+   */
+  nextMinorAtLeast?: number
   /** Rendering mode expected per route pattern. */
   routes: Record<string, RenderingMode | 'unknown'>
+  /** Build-level navigation config this build must record, exactly. */
+  navigation?: { partialPrefetching: boolean | 'unstable_eager'; instantValidation: string | null }
+  /** Route pattern -> the whole segment config crust must record for it. */
+  segmentConfig?: Record<string, Record<string, string | number | boolean>>
+  /**
+   * Route pattern -> substring of the warning that must name a segment export the
+   * build declared and crust could not read. Absent from `segmentConfig` and
+   * absent from here would mean the route was quietly reported as declaring
+   * nothing.
+   */
+  unreadableConfig?: Record<string, string>
   /** Patterns whose build emitted a readable shell. */
   shells?: string[]
   /** Workspace-relative sources that must be attributed somewhere. */
@@ -108,6 +126,38 @@ const CASES: FixtureCase[] = [
     attributes: ['fixtures/basic/components/Gallery.tsx'],
   },
   {
+    // The declared navigation axis. Everything pinned here is something the build
+    // stated outright; nothing in it is measured, because 16.3 emits no artifact
+    // that distinguishes an instant route from a plain one.
+    name: 'next 16.3 · webpack · instant navigations',
+    cwd: 'fixtures/instant',
+    distDir: '.next',
+    bundler: 'webpack',
+    nextMajor: 16,
+    nextMinorAtLeast: 3,
+    routes: {
+      '/': 'STATIC',
+      '/eager': 'STATIC',
+      '/instant': 'STATIC',
+      '/opaque': 'STATIC',
+      '/section/nested': 'STATIC',
+    },
+    // `'manual-warning'` is not Next's default, so reading it back proves crust
+    // reports what the build said rather than the default it would have guessed.
+    navigation: { partialPrefetching: true, instantValidation: 'manual-warning' },
+    segmentConfig: {
+      '/': {},
+      '/instant': { instant: true },
+      '/eager': { prefetch: 'unstable_eager' },
+      // Declared on the layout, recorded against the page that inherits it and
+      // keyed by the file that set it - so the diff can blame the layout.
+      '/section/nested': { 'fixtures/instant/app/section/layout.tsx:prefetch': 'force-disabled' },
+      // The options-object form. Empty here, and named in `unreadableConfig`.
+      '/opaque': {},
+    },
+    unreadableConfig: { '/opaque': 'route segment config `instant` is not a literal' },
+  },
+  {
     name: 'next 15 · webpack · legacy rule set',
     cwd: 'fixtures/legacy',
     distDir: '.next',
@@ -176,6 +226,9 @@ for (const fixture of CASES) {
       const result = await analyze()
       expect(result.bundler).toBe(fixture.bundler)
       expect(Number(result.nextVersion.split('.')[0])).toBe(fixture.nextMajor)
+      if (fixture.nextMinorAtLeast !== undefined) {
+        expect(Number(result.nextVersion.split('.')[1])).toBeGreaterThanOrEqual(fixture.nextMinorAtLeast)
+      }
     })
 
     it('classifies every route', async () => {
@@ -192,6 +245,37 @@ for (const fixture of CASES) {
       expect(result.coverage.confidence).toBeGreaterThan(0)
       expect(result.coverage.confidence).toBeLessThanOrEqual(1)
     })
+
+    if (fixture.navigation) {
+      it('records the build-level navigation config the build resolved', async () => {
+        const result = await analyze()
+        expect(result.config?.partialPrefetching).toBe(fixture.navigation!.partialPrefetching)
+        expect(result.config?.instantValidation).toBe(fixture.navigation!.instantValidation)
+      })
+    }
+
+    if (fixture.segmentConfig) {
+      it('records each route\'s navigation segment config, and invents none', async () => {
+        const result = await analyze()
+        for (const [pattern, expected] of Object.entries(fixture.segmentConfig!)) {
+          const route = result.routes.find((r) => r.pattern === pattern)
+          expect(route, `no route ${pattern}`).toBeDefined()
+          // Whole-object equality on purpose: a route that gains a key it never
+          // declared is the failure this pins, and a subset check would pass.
+          expect(route?.config).toEqual(expected)
+        }
+      })
+    }
+
+    if (fixture.unreadableConfig) {
+      it('says which segment exports it could not read, rather than reporting them unset', async () => {
+        const result = await analyze()
+        for (const [pattern, expected] of Object.entries(fixture.unreadableConfig!)) {
+          const route = result.routes.find((r) => r.pattern === pattern)
+          expect(route?.warnings.join(' '), `${pattern} recorded no unknown`).toContain(expected)
+        }
+      })
+    }
 
     if (fixture.shells) {
       it('finds the shells the build emitted', async () => {
@@ -261,6 +345,7 @@ describe('compatibility matrix', () => {
       '16:webpack:.next-cc',
       '16:webpack:.next',
       '16:turbopack:.next-turbo',
+      '16:webpack:.next',
       '15:webpack:.next',
       '16:webpack:.next-cc',
     ])

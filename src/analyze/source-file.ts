@@ -109,7 +109,33 @@ export interface SuspenseFacts {
 }
 
 const DYNAMIC_APIS = new Set(['cookies', 'headers', 'draftMode', 'connection'])
-const ROUTE_CONFIG_KEYS = new Set(['dynamic', 'revalidate', 'runtime', 'fetchCache', 'experimental_ppr', 'maxDuration'])
+/**
+ * Segment exports worth recording. Names verified against next@16.3.0's
+ * `AppSegmentConfigSchema` (`dist/build/segment-config/app/app-segment-config.js`).
+ *
+ * `instant` and `prefetch` are the Instant Navigations pair. `instant` accepts
+ * `true`, `false`, or an options object; only the literal forms are recorded, and
+ * the object form lands in `facts.unresolved` like any other non-literal - which
+ * is the right answer, because a declaration crust cannot read is unknown rather
+ * than absent.
+ */
+/**
+ * Prefix on the note left when a segment export exists but cannot be read.
+ * Matched by the analyzer to raise it as a route warning, so "unreadable" never
+ * reaches a snapshot looking like "unset".
+ */
+export const SEGMENT_CONFIG_UNREADABLE = 'route segment config'
+
+const ROUTE_CONFIG_KEYS = new Set([
+  'dynamic',
+  'revalidate',
+  'runtime',
+  'fetchCache',
+  'experimental_ppr',
+  'maxDuration',
+  'instant',
+  'prefetch',
+])
 
 export async function readSourceFacts(absPath: string, relPath: string): Promise<SourceFacts> {
   const facts: SourceFacts = {
@@ -550,8 +576,11 @@ function collectRouteConfig(node: OxcNode, facts: SourceFacts): void {
       facts.routeConfig[key] = init.value
     } else {
       // A computed route config can't be read statically, and guessing at it
-      // would produce a confidently wrong rendering mode.
-      facts.unresolved.push(`export const ${key} is computed; value unknown`)
+      // would produce a confidently wrong rendering mode. `instant` also has a
+      // legal options-object form, unreadable for the same reason - and recording
+      // nothing for it would read as "this route declares no instant contract",
+      // which is an inferred absence rather than an unknown.
+      facts.unresolved.push(`${SEGMENT_CONFIG_UNREADABLE} \`${key}\` is not a literal; value unknown`)
     }
   }
 }

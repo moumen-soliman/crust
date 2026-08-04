@@ -191,6 +191,69 @@ describe('configuration changes', () => {
     expect(compareConfig(withConfig({}), withConfig({}))).toEqual([])
   })
 
+  it('reports partial prefetching without withholding the numbers it cannot move', () => {
+    const [change] = compareConfig(
+      withConfig({ partialPrefetching: false }),
+      withConfig({ partialPrefetching: true }),
+    )
+
+    expect(change?.key).toBe('partialPrefetching')
+    expect(change?.summary).toBe('partialPrefetching changed: false -> true')
+    expect(change?.explains).toContain('only the static part')
+    // Measured, not assumed: two 16.3.0 builds differing only in this flag emit
+    // an identical artifact tree, so there is nothing for it to invalidate.
+    expect(change?.incomparable).toBe(false)
+  })
+
+  it('keeps `unstable_eager` distinct from `true`, which is the flip that changes most', () => {
+    const [change] = compareConfig(
+      withConfig({ partialPrefetching: true }),
+      withConfig({ partialPrefetching: 'unstable_eager' }),
+    )
+
+    expect(change?.summary).toBe('partialPrefetching changed: true -> unstable_eager')
+    expect(change?.explains).toContain('eagerly')
+  })
+
+  it('calls out losing build-time enforcement of the instant contract', () => {
+    const [change] = compareConfig(
+      withConfig({ instantValidation: 'experimental-error' }),
+      withConfig({ instantValidation: 'warning' }),
+    )
+
+    expect(change?.key).toBe('experimental.instantInsights.validationLevel')
+    expect(change?.summary).toContain('weakened')
+    expect(change?.explains).toContain('now ship instead of failing the build')
+  })
+
+  it('does not call a strengthened validation level a weakening', () => {
+    const [change] = compareConfig(
+      withConfig({ instantValidation: 'warning' }),
+      withConfig({ instantValidation: 'experimental-error' }),
+    )
+
+    expect(change?.summary).toContain('changed')
+    expect(change?.summary).not.toContain('weakened')
+  })
+
+  it('describes an `instant` change as navigation, not as rendering', () => {
+    const before = snapshot({ routes: [route({ config: { instant: true } })] })
+    const after = snapshot({ routes: [route({ config: {} })] })
+
+    const change = compareConfig(before, after).find((c) => c.setting === 'instant')
+    expect(change?.summary).toBe('/: instant changed: true -> unset')
+    expect(change?.explains).toContain('instant-navigation contract')
+    expect(change?.explains).not.toContain('rendering')
+  })
+
+  it('attributes a layout-declared prefetch change to the layout that set it', () => {
+    const before = snapshot({ routes: [route({ config: {} })] })
+    const after = snapshot({ routes: [route({ config: { 'app/layout.tsx:prefetch': 'force-disabled' } })] })
+
+    const change = compareConfig(before, after).find((c) => c.setting?.includes('prefetch'))
+    expect(change?.explains).toContain('prefetching was changed deliberately')
+  })
+
   it('reads only the experimental flags that change emitted output', () => {
     const config = readBuildConfig({
       resolved: { experimental: { ppr: true, someInternalKnob: 'x', optimizePackageImports: ['a'] } },

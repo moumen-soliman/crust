@@ -54,7 +54,9 @@ export function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
     sourceSignature: 'sig',
     modules: {},
     sharedCauses: [],
-    config: { cacheComponents: false, experimental: {}, sourceMaps: true },
+    // A 16.2.x build, matching `nextVersion` above: no Instant Navigations keys
+    // to read, so opted out and no validation level rather than unrecorded.
+    config: { cacheComponents: false, experimental: {}, sourceMaps: true, partialPrefetching: false, instantValidation: null },
     warnings: [],
     ...overrides,
     routes,

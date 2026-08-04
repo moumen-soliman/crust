@@ -1,5 +1,6 @@
 packages:
   - "fixtures/basic"
+  - "fixtures/instant"
   - "fixtures/legacy"
   - "fixtures/monorepo/apps/*"
   - "fixtures/monorepo/packages/*"

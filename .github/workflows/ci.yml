@@ -45,6 +45,11 @@ jobs:
       - run: CRUST_FIXTURE_MODE=cc pnpm --filter crust-fixture-basic exec next build --webpack
       - run: CRUST_FIXTURE_MODE=turbo pnpm --filter crust-fixture-basic exec next build --turbopack
 
+      # Next 16.3: Instant Navigations. Added alongside `basic` rather than by
+      # upgrading it, so the rendering axis keeps being proved on 16.2.x while the
+      # declared navigation axis is proved here.
+      - run: pnpm --filter crust-fixture-instant exec next build --webpack
+
       # Next 15: the inverted rule set, plus the route segment config Next 16
       # rejects under cacheComponents - force-dynamic, revalidate, edge runtime.
       - run: pnpm --filter crust-fixture-legacy exec next build

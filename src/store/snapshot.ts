@@ -5,7 +5,7 @@ import type { Bundler, RenderingMode } from '../adapters/types.ts'
  * version that wrote it, and silently reinterpreting old records under new
  * semantics is how a history feature starts lying about the past.
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 export interface Snapshot {
   schemaVersion: number
@@ -195,6 +195,30 @@ export interface BuildConfig {
   experimental: Record<string, string | number | boolean>
   /** Whether the build emitted browser source maps, which attribution needs. */
   sourceMaps: boolean
+  /**
+   * Top-level `partialPrefetching` (Next 16.3+), recorded raw.
+   *
+   * Three states, not two: `'unstable_eager'` makes every `<Link>` behave as
+   * `prefetch={true}`, which is a different app than `true`. Collapsing it to a
+   * boolean would report no change on the one flip that changes most.
+   *
+   * Optional because a v4 record predates the field, and `false` there would be
+   * a claim about a build crust never measured. A v5 record always has it: the
+   * key being absent from a real resolved config means opted out, which Next
+   * documents as equivalent to `false`.
+   */
+  partialPrefetching?: boolean | 'unstable_eager'
+  /**
+   * `experimental.instantInsights.validationLevel` - how hard Next enforces the
+   * `instant` contract. Recorded because it is the enforcement itself, not a
+   * description of it: at `experimental-error` a route that breaks instant
+   * navigation fails the build, and at `warning` the same route ships.
+   *
+   * `null` means this Next has no such setting (pre-16.3). Not folded into
+   * `experimental` above, which records objects as bare `true` - that would keep
+   * the flag and discard the only part that matters.
+   */
+  instantValidation?: string | null
 }
 
 export interface CauseLink {

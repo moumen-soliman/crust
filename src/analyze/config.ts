@@ -47,7 +47,39 @@ export function readBuildConfig(input: {
     cacheComponents: resolved['cacheComponents'] === true,
     experimental: material,
     sourceMaps: input.sourceMaps,
+    partialPrefetching: readPartialPrefetching(resolved),
+    instantValidation: readInstantValidation(experimental),
   }
+}
+
+/**
+ * `partialPrefetching` is a top-level key, beside `cacheComponents` - not an
+ * `experimental.*` one. Verified against next@16.3.0
+ * (`dist/server/config-shared.d.ts`), and read back out of a real build's
+ * `required-server-files.json`, where it appears at the root of `.config`.
+ *
+ * Absent is recorded as `false` rather than left unset: Next documents omitted
+ * and `false` as the same behaviour, so a build without the key genuinely is a
+ * build that opted out. That keeps `undefined` meaning one thing only - a record
+ * written before crust read this field.
+ */
+function readPartialPrefetching(resolved: Record<string, unknown>): boolean | 'unstable_eager' {
+  const value = resolved['partialPrefetching']
+  if (value === 'unstable_eager') return 'unstable_eager'
+  return value === true
+}
+
+/**
+ * Next resolves the default into the config rather than leaving it implicit - a
+ * 16.3 build with no `instantInsights` block still records
+ * `{validationLevel: 'warning'}`. So the raw value is the whole story, and `null`
+ * is reserved for a Next that has no such key at all.
+ */
+function readInstantValidation(experimental: Record<string, unknown>): string | null {
+  const insights = experimental['instantInsights']
+  if (!insights || typeof insights !== 'object') return null
+  const level = (insights as Record<string, unknown>)['validationLevel']
+  return typeof level === 'string' ? level : null
 }
 
 export interface ConfigChange {
@@ -130,6 +162,54 @@ export function compareConfig(base: Snapshot, head: Snapshot): ConfigChange[] {
     })
   }
 
+  // Both sides must have recorded it. `undefined -> false` on a baseline that
+  // predates the field is the same fabricated change the guard below exists for,
+  // and it would land on every route in the app at once.
+  if (
+    before?.partialPrefetching !== undefined &&
+    after?.partialPrefetching !== undefined &&
+    before.partialPrefetching !== after.partialPrefetching
+  ) {
+    changes.push({
+      key: 'partialPrefetching',
+      before: String(before.partialPrefetching),
+      after: String(after.partialPrefetching),
+      summary: `partialPrefetching changed: ${String(before.partialPrefetching)} -> ${String(after.partialPrefetching)}`,
+      explains: partialPrefetchingExplains(after.partialPrefetching),
+      // Comparable, and that is measured rather than assumed. Two 16.3.0 builds of
+      // one app differing only in this flag emit the same artifact tree file for
+      // file, a byte-identical `server/prefetch-hints.json`, and per-segment
+      // payloads within a few bytes of each other. It moves what the client
+      // fetches at navigation time, which no build artifact records - so it cannot
+      // move a number in this diff, and refusing the comparison would withhold
+      // nothing while discarding every unrelated regression in the same PR.
+      incomparable: false,
+    })
+  }
+
+  if (
+    before?.instantValidation !== undefined &&
+    after?.instantValidation !== undefined &&
+    before.instantValidation !== after.instantValidation
+  ) {
+    const lost = enforcesAtBuild(before.instantValidation) && !enforcesAtBuild(after.instantValidation)
+    changes.push({
+      key: 'experimental.instantInsights.validationLevel',
+      before: before.instantValidation ?? 'unset',
+      after: after.instantValidation ?? 'unset',
+      summary: `instant validation ${lost ? 'weakened' : 'changed'}: ${before.instantValidation ?? 'unset'} -> ${after.instantValidation ?? 'unset'}`,
+      // This one is worth saying out loud even though it emits nothing. At an
+      // error level, a route that declares `instant` and then reads an
+      // undeclared cookie fails the build outright. Below it, the same route
+      // ships and the guarantee is gone with a green build - which is precisely
+      // the class of change that gets noticed in production instead of in CI.
+      explains: lost
+        ? 'instant navigation is no longer enforced at build time: routes that break their `instant` contract now ship instead of failing the build'
+        : 'how strictly Next checks the `instant` contract; no effect on emitted output',
+      incomparable: false,
+    })
+  }
+
   if (before && after && before.sourceMaps !== after.sourceMaps) {
     changes.push({
       key: 'productionBrowserSourceMaps',
@@ -203,7 +283,7 @@ function compareRouteConfig(base: RouteSnapshot[], head: RouteSnapshot[]): Confi
         before: a === undefined ? 'unset' : String(a),
         after: b === undefined ? 'unset' : String(b),
         summary: `${route.pattern}: ${key} changed: ${a === undefined ? 'unset' : String(a)} -> ${b === undefined ? 'unset' : String(b)}`,
-        explains: `this route's rendering was changed deliberately by route segment config`,
+        explains: routeConfigExplains(key),
         incomparable: false,
       })
     }
@@ -212,4 +292,40 @@ function compareRouteConfig(base: RouteSnapshot[], head: RouteSnapshot[]): Confi
   return changes
 }
 
+/**
+ * `instant` and `prefetch` govern navigation, not rendering. Saying "this route's
+ * rendering was changed" about them would be confidently wrong in the one voice
+ * the diff reserves for things it has proved.
+ *
+ * The key may arrive layout-prefixed (`app/layout.tsx:prefetch`), so the setting
+ * is read off the end.
+ */
+function routeConfigExplains(key: string): string {
+  switch (key.slice(key.lastIndexOf(':') + 1)) {
+    case 'instant':
+      return "this route's instant-navigation contract was changed deliberately; Next enforces it at build time only at an `experimental-error` validation level"
+    case 'prefetch':
+      return "this route's prefetching was changed deliberately by route segment config"
+    default:
+      return `this route's rendering was changed deliberately by route segment config`
+  }
+}
+
 const major = (version: string): string => version.split('.')[0] ?? version
+
+function partialPrefetchingExplains(after: boolean | 'unstable_eager'): string {
+  if (after === 'unstable_eager') {
+    return 'every `<Link>` now prefetches eagerly by default; navigation payload volume rises without any link changing'
+  }
+  if (after === true) {
+    return 'prefetches now carry only the static part of a route, never its dynamic data'
+  }
+  return 'prefetches include dynamic data again, the pre-16.3 behaviour'
+}
+
+/**
+ * The two `*error*` levels validate at build time; the `warning` levels only in
+ * development. Crossing that line is the difference between a broken instant
+ * route failing CI and shipping.
+ */
+const enforcesAtBuild = (level: string | null): boolean => level === 'experimental-error' || level === 'experimental-manual-error'

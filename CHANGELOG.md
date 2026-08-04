@@ -12,6 +12,43 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+### Added
+
+- Instant Navigations (Next 16.3) is now recorded and diffed as **declared intent**. Build level:
+  top-level `partialPrefetching` (kept raw, so `'unstable_eager'` stays distinct from `true`) and
+  `experimental.instantInsights.validationLevel`. Route level: the `instant` and `prefetch` segment
+  exports, inherited from layouts like every other segment key. All four report in the
+  **build configuration changed** section rather than as per-route regressions, because a flag flip
+  is one decision, not forty defects.
+- Dropping from an `experimental-error` validation level to a warning level is called out as
+  *weakened*: at an error level a route that breaks its `instant` contract fails the build, and below
+  it the same route ships. That transition is silent in the build output and is the reason this axis
+  is worth reporting at all.
+
+  What crust deliberately does **not** claim is that it measured instant navigation. It did not.
+  Verified against `next@16.3.0`: two builds of the same app differing only in `partialPrefetching`
+  emit an identical artifact tree, a byte-identical `server/prefetch-hints.json`, and per-segment
+  payloads within five bytes of each other; `instant` appears in no build manifest. Next enforces the
+  contract by *failing the build* (`INSTANT_VALIDATION_ERROR`), so a route that is no longer instant
+  does not produce a comparable snapshot to regress against - it produces a red build. crust reports
+  the declaration and the enforcement level, which is what a green build can actually hide.
+
+### Changed
+
+- **[schema]** `SCHEMA_VERSION` is now **5**. `BuildConfig` gains `partialPrefetching` and
+  `instantValidation`, and `route.config` can now carry `instant` and `prefetch`.
+
+  On upgrade, an existing `.perf/` history is **not** silently reinterpreted: a v4 baseline is
+  refused with `snapshot schema changed: v4 -> v5 - re-run \`crust analyze\` on the baseline commit`,
+  and `crust analyze` reaches further back for a comparable record rather than picking a bad one. The
+  bump is the point. `route.config` is an open map, so without it a v4 baseline that predates the
+  `instant` key would have diffed as `unset -> true` on every instant route in the app - a fabricated
+  change, in the voice reserved for real ones. Superseded records can be left in place or cleared
+  with `crust prune`.
+
+  The two new `BuildConfig` fields are optional and stay absent on a normalised v4 record. Defaulting
+  them to opted-out would be a claim about a build crust never measured.
+
 ## [0.2.1] - 2026-08-04
 
 No schema change. CLI and terminal-output fixes only.

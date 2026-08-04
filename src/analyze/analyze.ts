@@ -39,6 +39,7 @@ import {
   type ModuleGraph,
   type Reachability,
 } from './module-graph.ts'
+import { SEGMENT_CONFIG_UNREADABLE } from './source-file.ts'
 
 export interface AnalyzeOptions {
   cwd: string
@@ -296,6 +297,16 @@ async function analyzeRoute(ctx: RouteContext): Promise<RouteSnapshot> {
     for (const layout of layouts) {
       for (const [key, value] of Object.entries(graph.nodes.get(layout)?.facts.routeConfig ?? {})) {
         routeConfig[`${layout}:${key}`] = value
+      }
+    }
+
+    // A segment export crust could not read is unknown, not absent. `instant`
+    // accepts an options object as well as a literal, and an unrecorded one would
+    // be indistinguishable from a route that declares no instant contract at all -
+    // so the omission is said out loud instead of inferred away.
+    for (const file of [pageFile, ...layouts]) {
+      for (const note of graph.nodes.get(file)?.facts.unresolved ?? []) {
+        if (note.startsWith(SEGMENT_CONFIG_UNREADABLE)) warnings.push(`${file}: ${note}`)
       }
     }
 

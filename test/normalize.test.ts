@@ -8,7 +8,7 @@ import { renderDiffTerminal } from '../src/terminal-ui/views.tsx'
 import { SnapshotStore } from '../src/store/store.ts'
 import { normalizeSnapshot } from '../src/store/normalize.ts'
 import { SCHEMA_VERSION, type Snapshot } from '../src/store/snapshot.ts'
-import { snapshot } from './factories.ts'
+import { route, snapshot } from './factories.ts'
 
 /**
  * A snapshot exactly as crust v3 wrote it: no `config`, no `sharedCauses`, no
@@ -55,6 +55,92 @@ const V3_ON_DISK = {
     },
   ],
 } as unknown as Snapshot
+
+/**
+ * A snapshot exactly as crust v4 wrote it: it *has* a `config`, so it is not
+ * caught by the "recorded no config at all" path above, but that config predates
+ * `partialPrefetching` and `instantValidation`. Written out in full for the same
+ * reason as `V3_ON_DISK` - derived from the factory it would quietly gain both
+ * fields and stop testing anything.
+ */
+const V4_ON_DISK = {
+  schemaVersion: 4,
+  toolVersion: '0.2.1',
+  buildId: 'bbbbbbbbbbbbbbbb',
+  createdAt: '2026-02-01T00:00:00.000Z',
+  gitSha: null,
+  committedAt: null,
+  parentSha: null,
+  branch: 'main',
+  dirty: false,
+  nextVersion: '16.2.12',
+  nodeMajor: 22,
+  bundler: 'webpack',
+  sourceSignature: 'sig',
+  modules: {},
+  sharedCauses: [],
+  config: { cacheComponents: false, experimental: {}, sourceMaps: true },
+  warnings: [],
+  routes: [
+    {
+      id: 'app/page.tsx',
+      pattern: '/',
+      filePath: 'app/page.tsx',
+      renderingMode: 'STATIC',
+      renderingModeReason: null,
+      firstLoadBytes: 100_000,
+      routeBytes: 10_000,
+      sharedBytes: 90_000,
+      unattributedBytes: 4_000,
+      modules: {},
+      dependencies: {},
+      dynamicReasons: [],
+      causes: [],
+      clientBoundaries: [],
+      barrels: [],
+      layouts: [],
+      sharedChunks: [],
+      // The trap this fixture exists for: an instant route recorded before crust
+      // read the key looks identical to one that never declared it.
+      config: {},
+      shell: null,
+      warnings: [],
+      conservativeModules: 0,
+    },
+  ],
+} as unknown as Snapshot
+
+describe('adding a route config key to an existing history', () => {
+  it('refuses the pair outright rather than reporting `unset -> true` on every instant route', () => {
+    // `route.config` is an open map, so a v4 baseline that never read `instant`
+    // would diff as though someone had just added it to every route in the app -
+    // a fabricated change, in the voice reserved for real ones. The schema guard
+    // makes that impossible instead of merely unlikely.
+    const head = snapshot({ schemaVersion: SCHEMA_VERSION, routes: [route({ config: { instant: true } })] })
+    const diff = diffSnapshots(normalizeSnapshot(V4_ON_DISK), head)
+
+    expect(diff.incomparable.join(' ')).toContain(`snapshot schema changed: v4 -> v${SCHEMA_VERSION}`)
+    expect(SCHEMA_VERSION).toBeGreaterThan(4)
+  })
+
+  it('invents no build-level Instant Navigations change against a v4 config', () => {
+    // The v4 record has a config, so it survives the `!before || !after` guard.
+    // Only the per-field `undefined` checks stop `false -> false` being announced
+    // as a flag flip nobody performed.
+    const changes = compareConfig(normalizeSnapshot(V4_ON_DISK), snapshot())
+
+    expect(changes.map((change) => change.key)).not.toContain('partialPrefetching')
+    expect(changes.map((change) => change.key)).not.toContain('experimental.instantInsights.validationLevel')
+  })
+
+  it('leaves the unrecorded fields absent rather than defaulting them to opted-out', () => {
+    const config = normalizeSnapshot(V4_ON_DISK).config
+
+    expect(config).not.toBeNull()
+    expect(config?.partialPrefetching).toBeUndefined()
+    expect(config?.instantValidation).toBeUndefined()
+  })
+})
 
 describe('reading a snapshot written by an older crust', () => {
   it('fills in every field added since, without inventing evidence', () => {

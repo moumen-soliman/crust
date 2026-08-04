@@ -27,3 +27,12 @@ jobs:
       - run: CRUST_FIXTURE_MODE=turbo pnpm --filter crust-fixture-basic exec next build --turbopack
       - run: node dist/cli.js analyze --cwd fixtures/basic --dist-dir .next-cc --no-save
       - run: node dist/cli.js analyze --cwd fixtures/basic --dist-dir .next-turbo --no-save
+
+      # Instant Navigations separately, because what it depends on is different in
+      # kind: not manifest shapes but the names of two segment exports and one
+      # config key. A rename lands as a silently empty `route.config` - a detector
+      # that stops firing rather than one that starts failing - so the assertion is
+      # that the values still come back, not merely that analyze exits 0.
+      - run: pnpm --filter crust-fixture-instant add next@canary
+      - run: pnpm --filter crust-fixture-instant exec next build --webpack
+      - run: pnpm exec vitest run test/compat.test.ts -t 'instant navigations'

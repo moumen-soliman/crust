@@ -11,7 +11,7 @@ There are **four** versioned surfaces, and they do not move together.
 |---|---|---|
 | CLI - commands, flags, exit codes | package semver | `crust --help` |
 | Node API - `.` and the subpath exports | package semver | `exports` in `package.json` |
-| Snapshot schema - the on-disk record | independent integer, currently **4** | `SCHEMA_VERSION` in [`src/store/snapshot.ts`](src/store/snapshot.ts) |
+| Snapshot schema - the on-disk record | independent integer, currently **5** | `SCHEMA_VERSION` in [`src/store/snapshot.ts`](src/store/snapshot.ts) |
 | Build inputs - Next.js, bundler, Node | support range, not semver | [README requirements](README.md#requirements) |
 
 While the package is `0.x`, the minor position carries breaking changes and the patch position does
