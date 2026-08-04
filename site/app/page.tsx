@@ -214,9 +214,7 @@ export default function Home() {
             <span className="after:text-border after:content-['_/'] last:after:content-none">Turbopack</span>
           </div>
           <h1 className="m-0 text-h1 font-medium leading-[1.12] tracking-[-0.028em] text-balance">
-            The production-build diff
-            <br />
-            that tells you{' '}
+            The production-build diff that tells you{' '}
             <span className="underline decoration-faint decoration-dotted decoration-1 underline-offset-[6px]">
               what can ship
             </span>
