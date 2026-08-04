@@ -1,4 +1,5 @@
 import { DOCS, GITHUB, SiteFooter, SiteNav } from './chrome'
+import { BlastDiagram, ChainDiagram, DiffDiagram, SnapshotDiagram } from './diagrams'
 import { HeroPanel, type CodeTab } from './hero-panel'
 
 const TABS: CodeTab[] = [
@@ -352,6 +353,13 @@ export default function Home() {
             crust compared the emitted shells, followed the source chain, and named the edit that
             changed the merge decision.
           </p>
+
+          {/* The paragraph above says "followed the source chain" and asks the
+              reader to take the hops on trust. The drawing is the same claim
+              with its links visible. */}
+          <div className="mt-[clamp(28px,3.5vw,40px)]">
+            <ChainDiagram />
+          </div>
         </div>
       </section>
 
@@ -362,6 +370,28 @@ export default function Home() {
             Production artifacts prove what changed. Source explains why. History makes it comparable.
           </p>
         </div>
+
+        {/* Two halves of the same mechanism, in order: one build becomes a
+            record, then any two records become a decision. Read together they
+            answer the question the six steps below only answer in prose —
+            where the base build comes from if nobody rebuilt it. */}
+        <div className="grid gap-[clamp(32px,4vw,48px)] px-pad py-[clamp(28px,4vw,44px)]">
+          {/* Grid items need `min-w-0` or the diagrams inside them widen the
+              track rather than scrolling within it. */}
+          <div className="min-w-0">
+            <h3 className="mb-4 text-small font-[550] tracking-[-0.006em]">
+              Every production build becomes one comparable record
+            </h3>
+            <SnapshotDiagram />
+          </div>
+          <div className="min-w-0">
+            <h3 className="mb-4 text-small font-[550] tracking-[-0.006em]">
+              Any two records become one decision
+            </h3>
+            <DiffDiagram />
+          </div>
+        </div>
+
         <div className={grid}>
           {WORKFLOW.map((step) => (
             <div key={step.title} className={gridCell}>
@@ -381,6 +411,13 @@ export default function Home() {
             Rendering, caching, shell composition and client cost support the same verdict.
           </p>
         </div>
+
+        {/* "One cause, every route" is a feature cell below. It is also the
+            hardest claim on the page to picture, so it gets the drawing. */}
+        <div className="px-pad py-[clamp(28px,4vw,44px)]">
+          <BlastDiagram />
+        </div>
+
         <div className={grid}>
           {FEATURES.map((feature) => (
             <div key={feature.title} className={gridCell}>
