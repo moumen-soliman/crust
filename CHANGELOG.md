@@ -12,6 +12,8 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-05
+
 ### Added
 
 - Instant Navigations (Next 16.3) is now recorded and diffed as **declared intent**. Build level:
