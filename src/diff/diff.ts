@@ -82,10 +82,88 @@ export interface ModuleDelta {
   status: 'added' | 'removed' | 'changed'
 }
 
+/**
+ * A package whose attributed cost moved, stated once with the routes it reached.
+ *
+ * This is the unit a reviewer acts on: "someone added `date-fns`" is one
+ * decision, where the same fact spread across nine route rows is nine numbers
+ * and no decision. Requires source-map attribution - without it `dependencies`
+ * is empty on every route and this list is too, which is correct rather than
+ * silent, because the coverage figure beside the verdict says why.
+ */
+export interface DependencyDelta {
+  pkg: string
+  /**
+   * The worst single route, never a sum across routes. A shared chunk is
+   * counted in the first load of every route it serves, so adding those
+   * together invents bytes that nobody downloads.
+   */
+  delta: number
+  before: number
+  after: number
+  status: 'added' | 'removed' | 'changed'
+  /**
+   * The routes this package's change moved, worst first, each with the bytes it
+   * moved *there*.
+   *
+   * Per route rather than a bare pattern list because a consumer that suppresses
+   * a route's own detail has to be able to check that this finding accounts for
+   * the whole movement: a route that gained 200 kB where this package explains
+   * 48 kB still owes the reader the other 152 kB.
+   */
+  routes: { pattern: string; delta: number }[]
+}
+
+/**
+ * A `'use client'` boundary whose attributed subtree cost moved, or that started
+ * or stopped reaching routes.
+ *
+ * Same reporting contract as `DependencyDelta`: every number is the worst single
+ * route's, never a sum across routes.
+ */
+export interface BoundaryDelta {
+  file: string
+  /** Its default-exported component, when either build named one. */
+  component: string | null
+  delta: number
+  before: number
+  after: number
+  status: 'added' | 'removed' | 'changed'
+  routes: { pattern: string; delta: number }[]
+}
+
+/** A barrel import whose drag cost moved, with what it started dragging. */
+export interface BarrelDelta {
+  file: string
+  delta: number
+  before: number
+  after: number
+  status: 'added' | 'removed' | 'changed'
+  /** Files reaching the worst route *only* through this barrel, before and after. */
+  draggedBefore: number
+  draggedAfter: number
+  /** The ones that are new, for naming a couple of them. */
+  newlyDragged: string[]
+  routes: { pattern: string; delta: number }[]
+}
+
 export interface Diff {
   base: Snapshot
   head: Snapshot
   routes: RouteDelta[]
+  /**
+   * Package-level movement, grouped across routes. Stated before the route
+   * table because one named package answers what a column of byte deltas only
+   * describes.
+   */
+  dependencies: DependencyDelta[]
+  /**
+   * `'use client'` boundaries whose cost moved. The axis that names a component
+   * crossing to the client, which per-file attribution can only describe.
+   */
+  clientBoundaries: BoundaryDelta[]
+  /** Barrel imports whose drag cost moved. Names the import style, not the files. */
+  barrels: BarrelDelta[]
   /** True when the two snapshots are not safely comparable. */
   incomparable: string[]
   /**
@@ -146,7 +224,349 @@ export function diffSnapshots(base: Snapshot, head: Snapshot, aliases: RouteAlia
     (a, b) => rank[a.severity] - rank[b.severity] || Math.abs(b.firstLoadDelta) - Math.abs(a.firstLoadDelta),
   )
 
-  return { base, head, routes, incomparable, configChanges }
+  return {
+    base,
+    head,
+    routes,
+    dependencies: compareDependencies(beforeById, afterById),
+    clientBoundaries: compareBoundaries(beforeById, afterById),
+    barrels: compareBarrels(beforeById, afterById),
+    incomparable,
+    configChanges,
+  }
+}
+
+/** One route's contribution to a grouped cause. */
+interface RouteBytes {
+  /**
+   * The trend key - the page file path, aliased. Kept beside the pattern because
+   * looking a route up again by pattern misses it whenever an alias renamed the
+   * URL: the two sides of the comparison then have different patterns for one page.
+   */
+  id: string
+  pattern: string
+  delta: number
+  before: number
+  after: number
+}
+
+/**
+ * Per-route attributed byte movement, grouped by key.
+ *
+ * Shared by every attributed axis - packages, client boundaries, barrels - because
+ * the grouping question is identical and only the key differs. `bytesOf` says what
+ * a route attributes to each key; a key absent from a route contributes zero there,
+ * which is what makes "added on this route" and "removed from that one" the same
+ * arithmetic.
+ *
+ * Routes are keyed the way the route table is, so an aliased or renamed page
+ * contributes one entry rather than an add and a remove.
+ */
+function groupMovement(
+  beforeById: Map<string, RouteSnapshot>,
+  afterById: Map<string, RouteSnapshot>,
+  bytesOf: (route: RouteSnapshot) => Map<string, number>,
+): Map<string, RouteBytes[]> {
+  const byKey = new Map<string, RouteBytes[]>()
+
+  for (const id of new Set([...beforeById.keys(), ...afterById.keys()])) {
+    const before = beforeById.get(id)
+    const after = afterById.get(id)
+    const was = before ? bytesOf(before) : new Map<string, number>()
+    const now = after ? bytesOf(after) : new Map<string, number>()
+
+    for (const key of new Set([...was.keys(), ...now.keys()])) {
+      const from = was.get(key) ?? 0
+      const to = now.get(key) ?? 0
+      if (from === to) continue
+
+      const entry: RouteBytes = {
+        id,
+        pattern: after?.pattern ?? before?.pattern ?? id,
+        delta: to - from,
+        before: from,
+        after: to,
+      }
+      const list = byKey.get(key)
+      if (list) list.push(entry)
+      else byKey.set(key, [entry])
+    }
+  }
+
+  return byKey
+}
+
+/**
+ * One key's routes split by direction, growth first.
+ *
+ * A package or a boundary can shrink on one route and grow on another - a provider
+ * moved out of one layout and into another does exactly that. Reported as one row it
+ * takes the worst route's direction, so the line says "removed" while the routes it
+ * covers include one where it was *added*, and a reader who suppressed that route's
+ * detail on the strength of the line was told the opposite of what happened there.
+ *
+ * Two directions are two facts, so they get two rows: "added, +48 kB on `/b`" and
+ * "removed, -84 kB on `/a`" are both true and each explains its own routes.
+ */
+function splitByDirection(routes: RouteBytes[]): RouteBytes[][] {
+  const grew = routes.filter((route) => route.delta > 0)
+  const shrank = routes.filter((route) => route.delta < 0)
+  return [grew, shrank].filter((group) => group.length > 0)
+}
+
+/**
+ * The worst single route, and every number reported alongside it taken from *that*
+ * route.
+ *
+ * `before` and `after` used to be per-key maxima collected independently, so a
+ * package removed from one route and added to another reported the larger `before`,
+ * the larger `after`, and a `status` of `changed` - three numbers describing no
+ * build that exists, with `after - before` not equal to the delta beside them.
+ * Everything here comes from one route, which is the only way the row is a fact.
+ *
+ * Expects a single direction (see `splitByDirection`), so `status` describes every
+ * route in the row rather than only the worst one.
+ *
+ * Returns null when the movement is inside the floor the route table already
+ * treats as no movement: content-hashed chunks move attributed bytes by a few
+ * dozen on a whitespace commit.
+ */
+function worstOf(routes: RouteBytes[]): {
+  worstId: string
+  summary: {
+    delta: number
+    before: number
+    after: number
+    status: 'added' | 'removed' | 'changed'
+    routes: { pattern: string; delta: number }[]
+  }
+} | null {
+  const worst = routes.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a))
+  if (Math.abs(worst.delta) <= NOISE_FLOOR_BYTES) return null
+
+  return {
+    worstId: worst.id,
+    summary: {
+      delta: worst.delta,
+      before: worst.before,
+      after: worst.after,
+      status: worst.before === 0 ? 'added' : worst.after === 0 ? 'removed' : 'changed',
+      routes: routes
+        .slice()
+        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+        .map(({ pattern, delta }) => ({ pattern, delta })),
+    },
+  }
+}
+
+function compareDependencies(
+  beforeById: Map<string, RouteSnapshot>,
+  afterById: Map<string, RouteSnapshot>,
+): DependencyDelta[] {
+  const grouped = groupMovement(beforeById, afterById, (route) => new Map(Object.entries(route.dependencies)))
+
+  const deltas: DependencyDelta[] = []
+  for (const [pkg, routes] of grouped) {
+    for (const group of splitByDirection(routes)) {
+      const found = worstOf(group)
+      if (found) deltas.push({ pkg, ...found.summary })
+    }
+  }
+  return deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+}
+
+/**
+ * Client-boundary movement: a `'use client'` file whose attributed subtree cost
+ * changed, or that started or stopped reaching a route at all.
+ *
+ * This is the axis that names the edit rather than its consequence. "A component
+ * crossed from server to client" is one decision with a measured subtree behind
+ * it, where the same fact at file granularity is a column of modules that each
+ * look like an ordinary import.
+ */
+function compareBoundaries(
+  beforeById: Map<string, RouteSnapshot>,
+  afterById: Map<string, RouteSnapshot>,
+): BoundaryDelta[] {
+  const grouped = groupMovement(
+    beforeById,
+    afterById,
+    (route) => new Map(route.clientBoundaries.map((boundary) => [boundary.file, boundary.bytes])),
+  )
+
+  // The component is a property of the file, not of the route, so the first name
+  // any side gives it is the name. Null stays null rather than becoming the file.
+  const components = new Map<string, string | null>()
+  for (const route of [...beforeById.values(), ...afterById.values()]) {
+    for (const boundary of route.clientBoundaries) {
+      if (!components.get(boundary.file)) components.set(boundary.file, boundary.component)
+    }
+  }
+
+  const deltas: BoundaryDelta[] = []
+  for (const [file, routes] of grouped) {
+    for (const group of splitByDirection(routes)) {
+      const found = worstOf(group)
+      if (found) deltas.push({ file, component: components.get(file) ?? null, ...found.summary })
+    }
+  }
+  return deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+}
+
+/**
+ * Barrel movement: an import style whose drag cost changed.
+ *
+ * `dragged` is what the analyzer proved by re-walking the graph with the barrel
+ * removed, so the file count is what deleting the barrel import would actually
+ * save - not everything the barrel exports. Reported because it is the difference
+ * between "this route got heavier" and "this route pulled in eleven components it
+ * never renders".
+ */
+function compareBarrels(
+  beforeById: Map<string, RouteSnapshot>,
+  afterById: Map<string, RouteSnapshot>,
+): BarrelDelta[] {
+  const grouped = groupMovement(
+    beforeById,
+    afterById,
+    (route) => new Map(route.barrels.map((barrel) => [barrel.file, barrel.bytes])),
+  )
+
+  // By id, never by pattern. Both sides are keyed on the aliased trend key, so a
+  // page whose URL was renamed has two different patterns and one id: looking the
+  // baseline up by the head's pattern finds nothing there and reports every file
+  // the barrel already dragged as newly dragged.
+  const draggedOn = (byId: Map<string, RouteSnapshot>, id: string, file: string): string[] =>
+    byId.get(id)?.barrels.find((barrel) => barrel.file === file)?.dragged ?? []
+
+  const deltas: BarrelDelta[] = []
+  for (const [file, routes] of grouped) {
+    for (const group of splitByDirection(routes)) {
+      const found = worstOf(group)
+      if (!found) continue
+
+      // From the worst route, for the same reason its bytes are: a count summed
+      // across routes counts the same dragged file once per route that loads it.
+      const was = new Set(draggedOn(beforeById, found.worstId, file))
+      const now = draggedOn(afterById, found.worstId, file)
+
+      deltas.push({
+        file,
+        draggedBefore: was.size,
+        draggedAfter: now.length,
+        newlyDragged: now.filter((dragged) => !was.has(dragged)),
+        ...found.summary,
+      })
+    }
+  }
+  return deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+}
+
+/**
+ * Whether bytes are the only thing that got worse on this route.
+ *
+ * Keyed on what moved, not on which branch of `causeOf` happened to fire: the
+ * same byte-only regression is labelled `module-size` when source maps name a
+ * file and `unknown` when they do not, and a route that also lost caching or
+ * dropped out of the shell has a cause no package line explains.
+ */
+export function movedOnlyInBytes(route: RouteDelta): boolean {
+  return (
+    !route.modeChange &&
+    !route.cacheChange &&
+    route.newHoles.length === 0 &&
+    !(route.shellRatioDelta !== null && route.shellRatioDelta < 0) &&
+    !(route.shellRatioBefore !== null && route.shellRatioAfter === null)
+  )
+}
+
+/** Any grouped cause whose byte movement is attributed per route. */
+export interface AttributedCause {
+  routes: { pattern: string; delta: number }[]
+}
+
+export interface ExplainedAxis {
+  causes: AttributedCause[]
+  /**
+   * Whether the axis partitions a route's bytes, so two of its causes on one route
+   * can be added together.
+   *
+   * True for packages: a file in `node_modules` has exactly one owning package, so
+   * two package rows are two disjoint sets of bytes.
+   *
+   * False for client boundaries and barrels. Two boundaries can import the same
+   * module, and barrels nest - `components/index.ts` and `components/ui/index.ts`
+   * may each count the same dragged files - so their costs overlap by unknown
+   * amounts. Adding them would over-explain a route and suppress detail for
+   * movement nothing named.
+   */
+  disjoint: boolean
+}
+
+/**
+ * Bytes per route that a given set of grouped causes accounts for.
+ *
+ * Combined by the weakest sound rule available at each level: summed within an axis
+ * only when that axis partitions the bytes, and never summed across axes, because a
+ * boundary's subtree cost already *contains* the packages it imports. Everywhere
+ * else the largest single contribution wins.
+ *
+ * The consequence is deliberate: overlapping causes under-credit a route, the route
+ * looks less explained than it might be, and it keeps its detail. Erring toward
+ * printing detail that was arguably redundant is recoverable; erring toward
+ * suppressing a regression nothing named is the failure this guards.
+ *
+ * Only the causes passed in count: callers pass the ones they will print, because
+ * a finding the reader never sees explains nothing.
+ */
+export function explainedBytes(axes: ExplainedAxis[]): Map<string, number> {
+  const best = new Map<string, number>()
+
+  for (const axis of axes) {
+    const perRoute = new Map<string, number>()
+    for (const cause of axis.causes) {
+      for (const route of cause.routes) {
+        const running = perRoute.get(route.pattern)
+        perRoute.set(
+          route.pattern,
+          running === undefined
+            ? route.delta
+            : axis.disjoint
+              ? running + route.delta
+              : Math.max(running, route.delta),
+        )
+      }
+    }
+    for (const [pattern, bytes] of perRoute) {
+      const current = best.get(pattern)
+      if (current === undefined || bytes > current) best.set(pattern, bytes)
+    }
+  }
+
+  return best
+}
+
+/**
+ * Whether the package findings a reader can see account for everything this
+ * route did - the test for dropping its own detail.
+ *
+ * Both halves are necessary. The movement has to be bytes only, because no
+ * package line explains a rendering-mode drop or a lost cache. And the bytes
+ * those findings attribute here have to cover the bytes the route gained: a route
+ * that grew 200 kB where the named packages explain 48 kB is mostly unexplained,
+ * and dropping its detail would answer the smaller half of the regression while
+ * hiding the larger one.
+ *
+ * Shared by the PR comment and the terminal so one grouped finding replaces route
+ * detail identically in both. A grouping that prints above the rows it explains
+ * has made the output longer, which is the failure the whole axis exists to fix.
+ */
+export function fullyExplained(route: RouteDelta, explainedBytes: Map<string, number>): boolean {
+  const explained = explainedBytes.get(route.pattern)
+  if (explained === undefined || !movedOnlyInBytes(route)) return false
+  // The floor the route table already treats as no movement, applied to the
+  // remainder: a content-hash shift is not an unexplained regression.
+  return route.firstLoadDelta - explained <= NOISE_FLOOR_BYTES
 }
 
 function compareRoute(before: RouteSnapshot | undefined, after: RouteSnapshot | undefined): RouteDelta {

@@ -12,6 +12,160 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-04
+
+No schema change: every axis added here reads fields the analyzer already wrote, so a `.perf/` history
+recorded by 0.1.x gains the new comparisons **retroactively** with nothing to migrate. No published
+export changed - `src/index.ts` is untouched, and everything below is CLI behaviour and output.
+
+### Added
+
+- `crust diff [base] [head]` takes two positionals, like `git diff a b`. With one, the head is still
+  the build in `.next`; with two, both sides are read from the store and nothing is rebuilt.
+  Comparing a release against a branch, or two stored snapshots against each other, no longer
+  requires checking either one out. Either side accepts a branch, tag, commit or build ID.
+- Package-level comparison. `Diff.dependencies` groups attributed package movement across the routes
+  it reached, so a package that was added, removed or grew is stated once with its blast radius
+  rather than once per affected route. The reported delta is the worst single route, never a sum:
+  a shared chunk counts in the first load of every route it serves, and adding those together would
+  report bytes nobody downloads. Requires source-map attribution; without it the list is empty, which
+  is the same reason per-file attribution is empty.
+- The PR comment leads with those package lines and **drops the route blocks they explain**. A route
+  whose only movement is that package's bytes no longer restates the finding — it is still counted in
+  the verdict and still fails its budget, but it does not get a block repeating a cause already
+  named. A route that also lost caching, dropped out of the shell, or changed rendering mode keeps
+  its block, because the package does not explain those.
+- Two conditions on that suppression, so a dropped block never costs a reader the only statement of a
+  cause. The package finding has to be **visible** — one collapsed into "and N more packages"
+  explains nothing, and its routes keep their blocks. And it has to account for the **whole**
+  movement: a route that gained 200 kB where the named packages explain 48 kB keeps its block for the
+  other 152 kB. The rule lives in `diff/` and is applied by the comment and the terminal alike.
+- `crust diff` shows the same grouping. A `PACKAGES` section above the route table, and the route
+  detail those lines account for is dropped from `WHY IT MOVED` — grouping that printed above the
+  rows it explained would only have made the output longer. The route keeps its row in
+  `CHANGED ROUTES`; the inventory never loses an entry.
+- Attribution sits beside the verdict in `crust diff`: `attribution 94%`, or `attribution 90% → 40%`
+  when it moved. The share of client bytes traced to a file or a package — not the blended
+  `confidence` the analyze view leads with — because that is the number the sections above it stand
+  on. An empty `PACKAGES` section reads as "nothing moved" at 94% and as "nothing was measured" at
+  10%, and those were previously indistinguishable.
+
+- **Every command leads with the answer.** `crust diff main`, `crust diff v1.2.0 feature` and
+  `crust ci main` now open with the same five things, derived once in `diff/lead.ts` and only
+  rendered per surface: the decision, the changes behind it, the cause those changes share, how much
+  of the build backs it up, and the likely next action.
+  - **Decision.** One sentence naming the worst single thing, with a level - `BLOCK` for a route that
+    stopped being static, stopped being cached, lost its shell, or broke a ceiling; `REVIEW` for
+    movement with none of those; `CLEAR`; `CANNOT DECIDE` when there is no comparable baseline. It
+    used to exist only in the PR comment, so `crust diff` opened with three counts and left the
+    reader to find the answer in the route table.
+  - **Improvements are led with, not folded away.** They share the changes list with regressions, and
+    when nothing regressed they *are* the decision: "1 route improved, nothing regressed" where the
+    old heading said "1 route changed". A route that became static again outranks one that shed 2 kB.
+  - **Shared cause and blast radius.** Three or more regressions at one call site collapse into one
+    line with the routes it reached, and it pays for itself: the comment prints blocks for the worst
+    two of the group instead of one per route, each of which used to end in the same sentence. The
+    grouping is derived from the diff, never from a snapshot's own `sharedCauses` - a provider that
+    reaches nineteen routes in the head probably reached nineteen in the base, and calling that a
+    cause of *the change* would be a guess.
+  - **Coverage beside the verdict**, in the comment as well as the terminal, because it bounds what
+    the verdict is worth.
+  - **Source location and likely action** on every led change and every route block: the strongest
+    location the evidence carries, then what to do. Where nothing can be blamed it states the missing
+    evidence instead - "this build has no browser source maps" - because an instruction with nothing
+    behind it costs more trust than an admission. One action per cause, never once per affected route.
+- `crust diff` reads `.perf/budgets.json` so its decision is the one `ci` would reach on the same
+  pair. It still only exits non-zero when a side has no snapshot; enforcement stays in `ci`.
+- **Blocking-finding measurement log.** Every `ci` run that would fail the build appends those
+  breaches to `.perf/findings.jsonl` with a stable key and a per-occurrence id. `crust findings
+  list|agree|dispute|rate` marks each one and reports the disagreement rate over resolved rows only
+  (`disputed / (agreed + disputed)`). An empty log reports the rate as unmeasured, never as 0% — the
+  number Focus 3 requires still has to come from a live PR stream.
+- **Client-boundary and barrel comparison**, the two remaining axes the analyzer measured and the diff
+  never read. `Diff.clientBoundaries` names a component crossing from server to client with the
+  subtree cost already measured; `Diff.barrels` names an import style with the count of files that
+  reach a route *only* through the barrel, which is what deleting the import would actually save.
+  Both group across routes and report the worst single route, like packages.
+  - Every axis shares **one capped cause section** in both surfaces, so comparing another one can
+    never add a section or lengthen the output.
+  - Bytes are summed **within** an axis and maximised **across** them, because the axes nest: a
+    boundary's subtree cost already contains the packages it imports, and crediting a route with both
+    would explain 96 kB of a 48 kB regression and suppress detail for movement nothing named.
+  - The lead names one route per cause rather than one per affected route. Found on a real build: a
+    provider crossing to the client on three routes printed its fix three times over.
+
+### Fixed
+
+- A static → partial regression no longer tells the author to wrap the dynamic read in
+  `<Suspense>` when that is already what produced the partial shell. Found by comparing
+  two real commits of the Cache Components fixture: `/` dropped to partial via
+  `cookies()` inside `<Theme>` under Suspense, and the lead still said "move it into
+  Suspense". Partial now advises caching the read or accepting the hole.
+- A cause that moved in both directions is two rows, not one. A package or boundary can shrink on one
+  route and grow on another - a provider moved out of one layout and into another does exactly that -
+  and a single row took the worst route's direction. It said "removed" while covering a route where it
+  was *added*, and a reader who lost that route's detail on the strength of that line was told the
+  opposite of what happened there. Each direction now gets its own row, its own worst route and its
+  own radius.
+- `changed` is no longer rendered as "grew". A package going 100 kB → 50 kB said "grew" beside a
+  negative delta; the same applied to boundary subtrees and barrel costs.
+- Barrel costs are no longer added together within their axis. Barrels nest -
+  `components/index.ts` and `components/ui/index.ts` can each count the same dragged files - so
+  summing them over-explained a route and suppressed detail for movement nothing named. The axis now
+  credits its largest single contribution, like the across-axis rule. Packages still sum, because a
+  file in `node_modules` has exactly one owning package; client boundaries no longer do, since two of
+  them can import the same module.
+- Actions and lead selection are ranked by what a cause did **on the route in front of you**. Both
+  used each cause's worst route anywhere, so a package worth 200 kB on `/heavy` and 1 kB on `/a`
+  supplied `/a`'s action and even collapsed `/a` out of the lead - a cause accounting for 2% of it -
+  while the client boundary responsible for the other 98% went unmentioned.
+- Barrel metadata is looked up by route id, not by pattern. With an alias plus a URL rename the two
+  sides of the comparison hold different patterns for one page, so the baseline lookup missed and
+  every file the barrel already dragged was reported as newly dragged.
+- Dependency rows are one route's facts. `before`, `after` and `status` were per-package maxima
+  collected independently of each other and of `delta`, so a package removed from one route and added
+  to another reported the larger `before`, the larger `after` and `changed` - three numbers describing
+  no build that exists, where `after - before` did not equal the delta printed beside them. Every
+  number now comes from the worst single route, and the same rule covers the two new axes.
+- The suppressed-block count no longer says "and 3 more" when no block was printed at all. With every
+  block explained away by a cause line, "more" read as three regressions on top of three.
+- Boundary actions are backticked, so the component name survives Markdown. GitHub parsed
+  `<AnalyticsProvider>` as an HTML tag and rendered the sentence without it.
+- Both refs of a two-reference comparison resolve from the refs. The anchor for a named ref was
+  `merge-base HEAD <ref>`, which is the right question only while HEAD is the other side of the
+  comparison — true for `ci` and for `crust diff <base>`, false the moment both sides are named. On a
+  third branch, `crust diff feature release` answered with the commit the working copy happened to
+  share with each ref: a build nobody asked about, reported as confidently as the right one. The
+  one-ref form keeps merge-base semantics, because there HEAD *is* the head under review.
+- The content-signature fallback no longer fires for a ref git does not recognise. It exists to
+  re-link snapshots orphaned by a squash merge, where the ref is real and its ancestry is not; behind
+  a branch that does not exist it answered with a snapshot of the current source, which reports "no
+  regressions" for the one reason a reviewer would never suspect. A ref git cannot resolve now says
+  so. It also no longer fires behind an explicitly named head, where matching on the head's source
+  can answer "what is `release`" with a snapshot recorded on neither ref.
+- The `diff` header names branch and short SHA for **both** sides on the comparable path, not only
+  for the baseline and not only when the two builds cannot be compared. With two stored refs the head
+  is no more "the current build" than the base is, and a bare pair of build IDs does not say which
+  ref either one came from.
+
+### Known limitations
+
+- **The findings log is not concurrency-safe yet, so treat its denominator as a floor.**
+  `.perf/findings.jsonl` is one mutable file, and `crust history push` overlays the local copy onto the
+  history branch. Two CI jobs that start from the same tip therefore overwrite each other's rows, and
+  because the second push is a fast-forward it reports success - a row can disappear with nothing in
+  any log to say so. Proven with two clones of one remote: three rows expected, two on the branch. The
+  fix is one file per run so the log inherits the merge behaviour snapshots already have.
+- **`findings` keys are stable only for categorical breaches.** The key hashes the breach message, and
+  the byte and percentage kinds interpolate measured values, so the same route over the same ceiling on
+  two commits 200 bytes apart produces two keys. `rendering-mode` and `cache` group correctly; the rest
+  group per occurrence.
+- **A re-run of one CI job records its breaches twice.** Appends are not idempotent, which is right for
+  two commits and wrong for a retry of one.
+- **Attributed comparison still needs `productionBrowserSourceMaps: true`.** Without it, packages,
+  client boundaries and barrels are all empty - the boundary axis included, since its subtree bytes come
+  from the same attribution. The output states this rather than implying nothing moved.
+
 ## [0.1.7] - 2026-08-04
 
 ### Fixed

@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import './globals.css'
 
-const title = 'crust - catch Next.js regressions before they merge'
+const title = 'crust - the production-build diff for Next.js'
 const description =
-  'Production-build regression analysis for Next.js App Router. Explain route modes, static-shell composition, bundle attribution, and complete source cause chains.'
+  'Compare Next.js App Router production builds, decide what can ship, and trace rendering, caching, shell, and client-cost regressions to source.'
 
 export const metadata: Metadata = {
   title,
@@ -12,9 +12,9 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://crust.moumen.dev'),
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'crust - know what became slower before it merges',
+    title: 'crust - the production-build diff that tells you what can ship',
     description:
-      'Compare production builds, trace regressions to a component, import, and source line, and see every route sharing the cause.',
+      'Compare two Next.js builds, lead with the merge decision, and group every affected route by the component, import, package, or source line that caused it.',
     type: 'website',
     url: '/',
     siteName: 'crust',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title,
     description:
-      'Route modes, shell composition, bundle attribution, complete cause chains, and regression blame for Next.js App Router.',
+      'Compare Next.js production builds and trace rendering, caching, shell, and client-cost regressions to source.',
   },
   icons: { icon: '/icon.svg' },
 }

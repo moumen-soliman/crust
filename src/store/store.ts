@@ -8,6 +8,22 @@ import { SCHEMA_VERSION, type Snapshot } from './snapshot.ts'
 
 export const STORE_DIR = '.perf'
 
+/** How `resolve` should read a ref. */
+export interface ResolveOptions {
+  /**
+   * Resolve the ref's own tip and ancestry rather than where it parted from the
+   * checkout.
+   *
+   * `crust diff <base>` compares a base against the build in front of it, so
+   * HEAD is one side of the comparison and a merge base is the honest anchor.
+   * `crust diff <base> <head>` names both sides, and then neither one has
+   * anything to do with what happens to be checked out: comparing a release
+   * against a branch has to answer with those two builds while sitting on a
+   * third.
+   */
+  exact?: boolean
+}
+
 /**
  * Newest commit in `ancestry`, at or after `startIndex`, that has a snapshot.
  * Returns null rather than reaching for anything outside that ancestry: a
@@ -230,7 +246,7 @@ export class SnapshotStore {
    * this branch's history, and a snapshot recorded later on another branch must
    * not be mistaken for an ancestor just because its timestamp is larger.
    */
-  async resolve(ref: string, cwd: string, head?: Snapshot): Promise<Snapshot | null> {
+  async resolve(ref: string, cwd: string, head?: Snapshot, options: ResolveOptions = {}): Promise<Snapshot | null> {
     const all = await this.list()
     if (all.length === 0) return null
 
@@ -292,7 +308,14 @@ export class SnapshotStore {
       // Where the branches parted, not where the other branch is now: comparing a
       // feature branch against a moved-on `main` attributes that branch's commits
       // to this pull request.
-      const anchor = (await mergeBase(cwd, ref)) ?? resolved
+      //
+      // That anchor is `merge-base HEAD <ref>`, which is only the right question
+      // while HEAD is the other side of the comparison - true for `ci` and for
+      // `crust diff <base>`, false the moment the user names both refs. Then the
+      // ref means the build at that ref, and the checkout is a bystander whose
+      // divergence point would silently substitute a third commit for the one
+      // that was asked for.
+      const anchor = options.exact ? resolved : ((await mergeBase(cwd, ref)) ?? resolved)
       const atAnchor = pick(bySha.get(anchor) ?? [])
       if (atAnchor) return atAnchor
 

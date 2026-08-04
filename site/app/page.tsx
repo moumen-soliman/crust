@@ -6,29 +6,29 @@ const TABS: CodeTab[] = [
     name: 'diff',
     lines: [
       <>
-        <span className="text-muted">$</span> next build <span className="text-muted">&amp;&amp;</span> npx
-        @moumensoliman/crust diff main
+        <span className="text-muted">$</span> npx @moumensoliman/crust diff main feature
       </>,
       <></>,
       <>
-        crust diff <span className="text-muted">cfdcf500 → 4a802397</span>
+        <span className="text-red">BLOCK</span> <span className="text-muted">· attribution 94%</span>
       </>,
       <></>,
-      <span className="text-red">/products/[slug] ▼</span>,
+      <span className="text-red">/products/[slug] is no longer static</span>,
       <>
-        {'  '}rendering <span className="text-red">static → partial</span>
+        {'  '}rendering <span className="text-red">static → partial</span> <span className="text-muted">· shell 100% → 45%</span>
       </>,
       <>
-        {'  '}shell <span className="text-red">100% → 45%</span>
+        {'  '}at <span className="text-blue">lib/http.ts:3</span> in <span className="text-blue">&lt;ProductGallery&gt;</span>
       </>,
       <>
-        {'  '}cause <span className="text-green">uncached fetch at lib/http.ts:3</span>
-      </>,
-      <>
-        {'  '}introduced by <span className="text-blue">&lt;ProductGallery&gt;</span>
+        {'  '}→ <span className="text-green">cache that read and the route can prerender again</span>
       </>,
       <></>,
-      <span className="text-red">1 failing check · exit 1</span>,
+      <span className="text-blue">CAUSES</span>,
+      <>
+        {'  '}date-fns added <span className="text-red">+48.2 kB</span> on /checkout, +8 more
+      </>,
+      <>  &lt;AnalyticsProvider&gt; became client <span className="text-red">+82.0 kB</span> on 3 routes</>,
     ],
   },
   {
@@ -37,7 +37,7 @@ const TABS: CodeTab[] = [
       <>
         crust <span className="text-muted">4a802397 · next 16.2 · turbopack</span>
       </>,
-      <span className="text-green">92% confidence · 3/3 routes classified</span>,
+      <span className="text-green">92% confidence · 14/14 routes classified</span>,
       <></>,
       <span className="text-blue">Fix first</span>,
       <></>,
@@ -86,79 +86,79 @@ const TABS: CodeTab[] = [
 
 const WORKFLOW = [
   {
-    title: '1. Build production',
-    body: 'crust reads the .next output you actually ship. It refuses to turn HMR-heavy development output into performance claims.',
+    title: '1. Build what ships',
+    body: 'crust reads completed .next output, not HMR-heavy development bundles or a generic lab score.',
   },
   {
-    title: '2. Join source to artifacts',
-    body: 'Route manifests, chunks, source maps, component imports, cache directives, Suspense boundaries and shell HTML become one model.',
+    title: '2. Record the evidence',
+    body: 'Route modes, shell HTML, chunks, source maps, cache decisions and source relationships become one compatible snapshot.',
   },
   {
-    title: '3. Explain each route',
-    body: 'See rendering mode, first-load JavaScript, shell composition, client boundaries and the source reason behind each dynamic edge.',
+    title: '3. Choose two builds',
+    body: 'Compare branches, commits, tags or build ids without checking either ref out or rebuilding it.',
   },
   {
-    title: '4. Store a real identity',
-    body: 'Git state, lockfile, Next version, Node major, bundler and resolved config form a build id, so unlike builds never share a trend.',
+    title: '4. Get the decision first',
+    body: 'BLOCK, REVIEW, CLEAR or CANNOT DECIDE leads the output, followed by the few changes that drove it.',
   },
   {
-    title: '5. Compare safely',
-    body: 'Only compatible builds produce deltas. A bundler, Next major or schema change stops comparison before framework noise becomes blame.',
+    title: '5. Follow cause to source',
+    body: 'One package, client boundary, barrel or call site is stated once with its blast radius and strongest source location.',
   },
   {
-    title: '6. Enforce the result',
-    body: 'One PR comment leads with the worst proven regression. CI fails on strict direction or a project-defined ceiling-not on a guess.',
+    title: '6. Enforce what is proven',
+    body: 'CI blocks strict regressions and your chosen ceilings, records the finding, and never turns missing evidence into a guess.',
   },
 ]
 
 const FEATURES = [
   {
-    title: 'Route explanations',
-    body: 'Why every page is static, ISR, partial, dynamic or a route handler, with the API, read or configuration that decided it.',
+    title: 'Two-build comparison',
+    body: 'Compare a base and head by branch, tag, commit or build id. Both sides come from stored production evidence.',
   },
   {
-    title: 'Static shell composition',
-    body: 'What is prerendered, what is postponed, and the exact call site that pushed each component out of the shell.',
+    title: 'Decision before inventory',
+    body: 'The verdict, worst changes, evidence coverage and likely next action appear before route tables and raw totals.',
   },
   {
-    title: 'Route-level attribution',
-    body: 'First-load JavaScript traced through source maps to first-party files and packages across webpack and Turbopack.',
+    title: 'Rendering regressions',
+    body: 'Catch a route becoming less static, losing cache coverage or shrinking its emitted shell even when bundle bytes do not move.',
   },
   {
-    title: 'Regression blame',
-    body: 'Rendering mode, cache reasons, shell ratio and bytes compared together, with the strongest source evidence selected as the cause.',
+    title: 'Client-cost regressions',
+    body: 'Trace first-load growth to packages, complete client-boundary subtrees, barrel drag and first-party files.',
   },
   {
-    title: 'CI with useful defaults',
-    body: 'Mode drops, newly uncached reads and a vanished shell fail without configuration. Byte and ratio ceilings remain yours to choose.',
+    title: 'One cause, every route',
+    body: 'Group a provider, package, import style or call site once, then show every route sharing its blast radius.',
   },
   {
-    title: 'Durable history',
-    body: 'Conflict-free snapshots on an orphan branch, with route identity that survives URL changes and squash-merged commits.',
+    title: 'Improvements included',
+    body: 'See routes that became more static, regained caching or shed client JavaScript—not only what failed.',
   },
   {
     title: 'Complete cause chains',
-    body: 'Follow a route through components, bindings and imports to the exact call site, with verified, inferred or unknown evidence.',
+    body: 'Follow route → component → binding → import → call site, with verified, inferred or unknown evidence.',
   },
   {
-    title: 'Shared causes',
-    body: 'Group layouts, client boundaries, barrels, packages and call sites once with every route they affect.',
+    title: 'CI with useful defaults',
+    body: 'Mode drops, newly uncached reads and vanished shells fail without configuration. Size ceilings remain your decision.',
   },
   {
-    title: 'Actionable client cost',
-    body: 'Measure complete client-boundary subtrees and the modules a barrel import uniquely drags into a route.',
+    title: 'Measured trust',
+    body: 'Record whether authors agreed with each blocking finding and report the disagreement rate over reviewed findings.',
   },
   {
-    title: 'Measurable confidence',
-    body: 'See classified routes, measured shells, attributed bytes and conservative fallbacks behind every confidence line.',
+    title: 'Repository-owned history',
+    body: 'Keep snapshots and findings on a conflict-free history branch. No account, upload or hosted dashboard is required.',
   },
 ]
 
 const CERTAINTY = [
   ['Unknown is a result.', 'If a cause cannot be established, crust reports unknown instead of manufacturing a plausible answer.'],
+  ['Coverage sits beside the verdict.', 'A correct byte delta with weak attribution never looks more certain than its evidence.'],
   ['A new route is not a regression.', 'There was no baseline to become worse than; absolute budgets can still apply.'],
   ['Unlike builds are not compared.', 'Bundler, Next major and snapshot schema must agree before a delta can fail CI.'],
-  ['Tiny movement stays quiet.', 'Exact totals are stored, but content-hash-sized byte changes do not become review noise.'],
   ['Strict direction is automatic.', 'A static route becoming dynamic is a fact against your baseline and needs no threshold.'],
   ['Product limits are explicit.', 'First-load ceilings, growth percentages and shell floors remain in your budgets file.'],
 ]
@@ -179,7 +179,7 @@ const SECONDARY = [
 ]
 
 const NON_GOALS = [
-  ['Not Next DevTools.', 'DevTools explains the current page. crust explains what became worse across production builds.'],
+  ['Not a one-build bundle explorer.', 'Those tools show what a build contains. crust decides what changed between builds and why.'],
   ['Not a runtime APM.', 'No error tracking, distributed tracing or alerting platform.'],
   ['Not a Lighthouse replacement.', 'It measures what your build produced, not a generic lab score.'],
   ['Not multi-framework.', 'Next.js App Router only. Pages Router is detect-and-warn.'],
@@ -214,23 +214,24 @@ export default function Home() {
             <span className="after:text-border after:content-['_/'] last:after:content-none">Turbopack</span>
           </div>
           <h1 className="m-0 text-h1 font-medium leading-[1.12] tracking-[-0.028em] text-balance">
-            Know what became slower,
+            The production-build diff
             <br />
-            and{' '}
+            that tells you{' '}
             <span className="underline decoration-faint decoration-dotted decoration-1 underline-offset-[6px]">
-              the source line that did it
+              what can ship
             </span>
           </h1>
           <p className="mt-5 max-w-[46ch] text-small leading-[1.65] text-muted text-pretty">
-            crust explains why every App Router page is static, partial, ISR or dynamic-then keeps
-            enough build history to tell you what changed and whether the pull request should merge.
+            Compare two Next.js App Router production builds. crust leads with the decision, groups
+            every affected route by cause, and traces regressions to the component, import and source
+            line that introduced them.
           </p>
           <div className="mt-[30px] flex flex-wrap gap-2.5 max-[520px]:flex-col">
             <a className={btnPrimary} href={`${DOCS}/docs/quickstart`}>
               Read the quickstart
             </a>
             <a className={btnCmd} href="https://www.npmjs.com/package/@moumensoliman/crust">
-              <span className="text-faint">›</span> npx @moumensoliman/crust analyze
+              <span className="text-faint">›</span> npx @moumensoliman/crust diff main
             </a>
           </div>
         </div>
@@ -240,10 +241,10 @@ export default function Home() {
       <section className="border-t border-border">
         <div className={secHead}>
           <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">
-            The regression bundle budgets cannot see
+            Catch the regression a size budget cannot see
           </h2>
           <p className="m-0 text-small text-muted text-pretty">
-            No build error. No byte moved. The static shell still dropped from 100% to 45%.
+            No build error. No byte growth. A route still fell from static to partial.
           </p>
         </div>
         <div className="px-pad py-[clamp(28px,4vw,44px)]">
@@ -302,14 +303,21 @@ export default function Home() {
               </div>
               <div className="px-[18px] pt-4 pb-5 text-meta leading-[1.7]">
                 <h4 className="mb-2.5 text-small font-[550] text-red">
-                  crust: /products/[slug] is no longer static
+                  crust: BLOCK · /products/[slug] is no longer static
                 </h4>
+                <div className="mb-2 text-micro text-muted">attribution 94%</div>
                 <div className="mb-2 flex gap-2 text-muted text-pretty">
                   <span className="mt-2 block size-[5px] shrink-0 rounded-full bg-faint" />
                   <span>
                     rendering: <b className="text-fg">static → partial</b>
                     <br />
                     static shell: <b className="text-red">100% → 45%</b>
+                  </span>
+                </div>
+                <div className="mb-2 flex gap-2 text-muted text-pretty">
+                  <span className="mt-2 block size-[5px] shrink-0 rounded-full bg-faint" />
+                  <span>
+                    Do this: <span className="text-green">cache that read so the route can prerender again</span>
                   </span>
                 </div>
                 <div className="mb-2 flex gap-2 text-muted text-pretty">
@@ -339,9 +347,9 @@ export default function Home() {
           </div>
           <p className="mt-5 max-w-[70ch] text-small leading-[1.65] text-muted text-pretty">
             A <code className="font-mono">use cache</code> directive was removed three call frames
-            below the page. Conventional size checks passed because the JavaScript was identical.
-            crust joined source analysis to the emitted shell and named both the call site and the
-            component that left it.
+            below the page. Conventional bundle checks passed because the JavaScript was identical.
+            crust compared the emitted shells, followed the source chain, and named the edit that
+            changed the merge decision.
           </p>
         </div>
       </section>
@@ -350,7 +358,7 @@ export default function Home() {
         <div className={secHead}>
           <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">How it works</h2>
           <p className="m-0 text-small text-muted text-pretty">
-            Source explains why. Production artifacts prove what. History reveals what changed.
+            Production artifacts prove what changed. Source explains why. History makes it comparable.
           </p>
         </div>
         <div className={grid}>
@@ -366,10 +374,10 @@ export default function Home() {
       <section className="border-t border-border">
         <div className={secHead}>
           <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">
-            One route-level model
+            One decision from every build signal
           </h2>
           <p className="m-0 text-small text-muted text-pretty">
-            Rendering, caching, shell composition and bundles are evidence for the same verdict.
+            Rendering, caching, shell composition and client cost support the same verdict.
           </p>
         </div>
         <div className={grid}>
@@ -385,10 +393,10 @@ export default function Home() {
       <section className="border-t border-border">
         <div className={secHead}>
           <h2 className="m-0 text-h2 font-medium tracking-[-0.02em] text-balance">
-            How crust decides
+            Conservative enough to keep enabled
           </h2>
           <p className="m-0 text-small text-muted text-pretty">
-            A check that fails on guesses gets switched off.
+            Missing evidence lowers confidence; it never becomes confident-looking blame.
           </p>
         </div>
         <div className="px-pad py-[clamp(28px,4vw,44px)]">
@@ -439,18 +447,18 @@ export default function Home() {
 
       <section className="border-t border-border px-pad py-[clamp(48px,7vw,88px)] text-center">
         <h2 className="mb-3 text-h2 font-medium tracking-[-0.02em] text-balance">
-          Start with one production build
+          Give your next pull request a build diff
         </h2>
         <p className="mx-auto max-w-[44ch] text-small text-muted text-pretty">
-          Explain every route now. Add a baseline, and the next pull request has something honest to
-          compare against.
+          Initialize once, keep the snapshots in your repository, and let every later build answer
+          what changed, why, and whether it should ship.
         </p>
         <div className="mt-[30px] flex flex-wrap justify-center gap-2.5 max-[520px]:flex-col">
           <a className={btnPrimary} href={`${DOCS}/docs/quickstart`}>
             Get started
           </a>
           <a className={btnCmd} href={`${DOCS}/docs/reference/cli`}>
-            <span className="text-faint">›</span> npx @moumensoliman/crust report --open
+            <span className="text-faint">›</span> npx @moumensoliman/crust init
           </a>
         </div>
       </section>

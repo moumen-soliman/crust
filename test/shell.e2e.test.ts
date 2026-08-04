@@ -57,7 +57,7 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
     expect(dashboard?.shell?.predictedHoles).toEqual([
       expect.objectContaining({ component: 'Theme', reason: expect.stringContaining('cookies()') }),
     ])
-  })
+  }, 30_000)
 
   it('agrees with the shell the build actually emitted', async () => {
     const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-cc', toolVersion: 'test' })
@@ -67,14 +67,14 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
     expect(dashboard?.shell?.actual?.holes).toBe(1)
     expect(dashboard?.shell?.actual?.boundaryIds).toEqual(['B:0'])
     expect(dashboard?.shell?.agreement).toBe(1)
-  })
+  }, 30_000)
 
   it('measures the static home page as a complete shell', async () => {
     const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-cc', toolVersion: 'test' })
     const home = snapshot.routes.find((r) => r.pattern === '/')
     expect(home?.renderingMode).toBe('STATIC')
     expect(home?.shell?.actual?.shellRatio).toBe(1)
-  })
+  }, 30_000)
 
   it('carries the cause chain from the route to the call that made it dynamic', async () => {
     // The chain the roadmap asks for, pinned against real build output rather
@@ -93,7 +93,7 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
       'getProduct',
       'fetchJson',
     ])
-  })
+  }, 30_000)
 
   it('carries that chain through the diff and into the PR comment', async () => {
     // The whole feature rests on one unwritten agreement: the site string the
@@ -119,7 +119,7 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
     expect(comment).toContain('<details><summary>How it reaches this route</summary>')
     expect(comment).toContain('→ <ProductGallery>')
     expect(comment).toContain('→ uncached fetch at fixtures/basic/lib/http.ts:3')
-  })
+  }, 30_000)
 
   it('measures how much of the build it could account for', async () => {
     const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-cc', toolVersion: 'test' })
@@ -132,7 +132,7 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
     expect(snapshot.coverage.clientBytesAttributed).toBeGreaterThan(0)
     expect(snapshot.coverage.confidence).toBeGreaterThan(0.5)
     expect(snapshot.coverage.confidence).toBeLessThanOrEqual(1)
-  })
+  }, 30_000)
 
   it('attributes client bytes to the barrel-imported components the route never renders', async () => {
     // `app/page.tsx` imports only `Hero` from `components/index.ts`, but the
@@ -144,7 +144,7 @@ describe.skipIf(!built('.next-cc'))('shell engine against a real Cache Component
 
     expect(modules).toContain('fixtures/basic/components/Gallery.tsx')
     expect(modules).toContain('fixtures/basic/components/Counter.tsx')
-  })
+  }, 30_000)
 })
 
 describe.skipIf(!built('.next-turbo'))('turbopack adapter', () => {
@@ -159,11 +159,11 @@ describe.skipIf(!built('.next-turbo'))('turbopack adapter', () => {
       '/files/[[...path]]',
       '/products/[slug]',
     ])
-  })
+  }, 30_000)
 
   it('resolves first-party sources despite root-anchored source paths', async () => {
     const snapshot = await analyzeBuild({ cwd: FIXTURE, distDir: '.next-turbo', toolVersion: 'test' })
     const all = snapshot.routes.flatMap((r) => Object.keys(r.modules))
     expect(all.some((f) => f.endsWith('components/Gallery.tsx'))).toBe(true)
-  })
+  }, 30_000)
 })

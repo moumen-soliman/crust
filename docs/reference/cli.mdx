@@ -94,15 +94,34 @@ chains. `--verbose` expands the coverage denominators and unresolved evidence.
 
 ## diff
 
-Compare this build against a stored snapshot. Exits non-zero if no baseline is found.
+Compare two builds. Exits non-zero if either side has no stored snapshot.
 
 ```bash
-npx @moumensoliman/crust diff [ref]
+npx @moumensoliman/crust diff [base] [head]
 ```
 
-`ref` accepts a build id, a git SHA, a branch name, or `HEAD~3`. Defaults to `HEAD~1`. Material
-configuration changes that make the builds unsafe to compare appear as comparison warnings and
-suppress enforceable route-level conclusions.
+Each side accepts a build id, a git SHA, a tag, a branch name, or `HEAD~3`. `base` defaults to
+`HEAD~1`.
+
+With one argument the head is the build in `.next`, and a branch base resolves to its merge base with
+`HEAD` - the head under review is this working copy, so the point the two share is what the change
+should be blamed against.
+
+With two arguments nothing is rebuilt and neither side has anything to do with what is checked out:
+each ref resolves to the snapshot at that ref, or the newest one its own ancestry can reach. That is
+what makes `crust diff v1.2.0 release/next` answer about those two builds while you sit on a third
+branch.
+
+Output leads with the decision (`BLOCK`, `REVIEW`, `CLEAR`, `CANNOT DECIDE`), the changes behind it -
+regressions and improvements together, each with the strongest source location and the likely next
+action - the cause those changes share, and the attribution the comparison rests on. The route table
+and per-route detail follow.
+
+`diff` reads `.perf/budgets.json` so the decision it prints is the one `ci` would reach on the same
+pair. It does not enforce: the exit code is non-zero only when a side has no stored snapshot.
+
+Material configuration changes that make the builds unsafe to compare appear as comparison warnings
+and suppress enforceable route-level conclusions.
 
 ## ci
 
@@ -123,6 +142,26 @@ ceilings. See [regressions](/docs/concepts/regressions) and
 
 Every `ci` run records the current build before exiting, including runs that find a breach. If no
 baseline exists, crust warns that regressions cannot be detected; absolute ceilings still apply.
+
+Blocking breaches are also appended to `.perf/findings.jsonl` so agreement can be measured over time
+— see [`findings`](#findings).
+
+## findings
+
+Record and score whether authors agreed that a blocking finding was a real regression.
+
+```bash
+npx @moumensoliman/crust findings list [--open]
+npx @moumensoliman/crust findings agree <id> [--note "..."]
+npx @moumensoliman/crust findings dispute <id> [--note "..."]
+npx @moumensoliman/crust findings rate
+```
+
+`ci` writes one row per blocking breach. Each row has a fresh occurrence id (what you mark) and a
+stable key (same failure across PRs). `rate` reports `disputed / (agreed + disputed)` and leaves the
+rate unmeasured until something has been marked — an empty log is not a 0% disagreement rate.
+
+Target before ownership routing ships: fewer than 1 in 10 resolved findings disputed.
 
 ## report
 

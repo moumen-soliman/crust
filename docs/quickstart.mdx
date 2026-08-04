@@ -120,11 +120,14 @@ crust diff  cfdcf50068722687 -> 4a80239769ea8b93
 ```
 
 <Tip>
-`crust diff` accepts a build id, a git SHA, a branch name, or `HEAD~3`. History is walked
+`crust diff` accepts a build id, a git SHA, a tag, a branch name, or `HEAD~3`. History is walked
 topologically, so a snapshot recorded later on another branch is never mistaken for an ancestor.
 For a branch name such as `main`, crust resolves the merge-base commit rather than comparing with
-the latest build at the branch tip. In CI, the [GitHub Action](/docs/guides/ci) fetches shared
-baselines from `perf-history`.
+the latest build at the branch tip.
+
+Name two refs - `crust diff v1.2.0 release/next` - and both sides come from the store: nothing is
+rebuilt, and neither ref has to be checked out. In CI, the [GitHub Action](/docs/guides/ci) fetches
+shared baselines from `perf-history`.
 </Tip>
 
 The two builds must use the same bundler, Next.js major, and snapshot schema. If they do not, crust

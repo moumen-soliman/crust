@@ -1,6 +1,13 @@
 import { causeChainLines } from '../analyze/cause.ts'
 import type { ConfigChange } from '../analyze/config.ts'
-import { NOISE_FLOOR_BYTES, type Diff, type RouteDelta } from '../diff/diff.ts'
+import { NOISE_FLOOR_BYTES, fullyExplained, type Diff, type RouteDelta } from '../diff/diff.ts'
+import {
+  actionFor,
+  buildLead,
+  coveredBySite,
+  explainedByCauses,
+  type LeadCause,
+} from '../diff/lead.ts'
 import { modeLabel } from '../diff/mode.ts'
 import type { CauseChain, Snapshot } from '../store/snapshot.ts'
 import { kb, pct, signed, type Breach } from './budgets.ts'
@@ -12,6 +19,84 @@ type Basis = 'comparable' | 'incomparable' | 'no-baseline'
 const ROUTE_BLOCK_LIMIT = 10
 /** Configuration changes listed in the note before it collapses to a count. */
 const CONFIG_NOTE_LIMIT = 8
+/**
+ * Grouped causes listed before the rest collapse to a count. One cap for every
+ * axis together, so comparing another one cannot make this comment longer.
+ */
+const CAUSE_LIMIT = 6
+/** Affected routes named on a cause line before it says "+N more". */
+const DEPENDENCY_ROUTE_LIMIT = 2
+/**
+ * Route blocks kept per shared cause. The cause line above states the call site,
+ * the component and the radius; the blocks add each route's before and after,
+ * which is worth having twice and not nine times.
+ */
+const BLOCKS_PER_SITE = 2
+
+/**
+ * Drops the route blocks a shared-cause line has already accounted for, past the
+ * first couple.
+ *
+ * The cap is what makes the cause line cheaper than the rows it replaces. Without
+ * it the section is an addition, and a comment that grew is the failure this whole
+ * axis exists to fix. Order is preserved, so the routes that keep blocks are the
+ * worst ones - `diffSnapshots` sorted them by magnitude.
+ */
+function capBySite(regressions: RouteDelta[], siteCauses: LeadCause[]): RouteDelta[] {
+  if (siteCauses.length === 0) return regressions
+
+  const siteOf = new Map<string, string>()
+  for (const cause of siteCauses) {
+    for (const route of cause.routes) siteOf.set(route, cause.label)
+  }
+
+  const kept = new Map<string, number>()
+  return regressions.filter((route) => {
+    const site = siteOf.get(route.pattern)
+    if (site === undefined) return true
+    const seen = kept.get(site) ?? 0
+    kept.set(site, seen + 1)
+    return seen < BLOCKS_PER_SITE
+  })
+}
+
+/**
+ * One cause, one line, plus its action.
+ *
+ * `date-fns` added · +48.2 kB on `/checkout`, `/cart`, +7 more
+ * `<Provider>` became a client boundary · +84.0 kB on `/`, +18 more
+ * `uncached fetch at lib/http.ts:3` · 9 routes: `/a`, `/b`, +7 more
+ *
+ * The worst route is named because that is where the cost is worth arguing about;
+ * the count behind it is the blast radius, which is what makes one line worth more
+ * than the rows it replaces.
+ */
+function causeLines(cause: LeadCause): string[] {
+  const named = cause.routes.slice(0, DEPENDENCY_ROUTE_LIMIT).map((route) => `\`${route}\``).join(', ')
+  const rest = cause.routes.length - DEPENDENCY_ROUTE_LIMIT
+  const where = rest > 0 ? `${named}, +${rest} more` : named
+
+  // A named component beats its file: `<Provider>` is what a reviewer recognises,
+  // and the file is one click away in the chain. A call site's `what` already
+  // contains the site, so it is the subject rather than a suffix repeating it.
+  const subject =
+    cause.kind === 'site'
+      ? cause.what
+      : cause.kind === 'boundary' && cause.component
+        ? `<${cause.component}>`
+        : cause.label
+  const verb = cause.kind === 'site' ? '' : ` ${cause.what}`
+  const radius =
+    cause.bytesPerRoute === null
+      ? `${cause.routes.length} route${cause.routes.length === 1 ? '' : 's'}: ${where}`
+      : `${signed(cause.bytesPerRoute)} on ${where}`
+
+  const lines = [`- \`${subject}\`${verb} · ${radius}`]
+  // The action belongs here rather than on each route's block: one cause, one fix,
+  // and the blocks below are about what each route lost.
+  if (cause.action) lines.push(`  - ${cause.action}`)
+  return lines
+}
 
 /**
  * The PR comment is the growth mechanism (plan §8). Every comment is read by every
@@ -47,17 +132,54 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
   const configChanges = diff?.configChanges ?? []
   const blockingConfig = configChanges.filter((change) => change.incomparable)
 
+  // The same decision, changes, causes and coverage `crust diff` leads with, so
+  // the two commands cannot reach different conclusions about the same pair.
+  const lead = buildLead(snapshot, diff, breaches)
+
+  // One capped list for every axis - packages, client boundaries, barrels, call
+  // sites - so comparing another axis can never add a section.
+  //
+  // A route whose only movement is a named cause's bytes would otherwise restate
+  // that line, once per route, which is the shape the section exists to remove. It
+  // still counts as a regression in the verdict and still fails its budget; it just
+  // does not get a block repeating a cause already named. Anything with a stronger
+  // cause - a mode drop, a cache change, a new shell hole - keeps its block,
+  // because bytes do not explain those.
+  //
+  // Only printed lines can do that work, so the set is `shownCauses` rather than
+  // every cause found: one collapsed into "and N more" explains nothing, and
+  // suppressing a route on its behalf leaves a regression counted in the verdict
+  // with no stated cause anywhere in the comment.
+  const shownCauses = lead.causes.slice(0, CAUSE_LIMIT)
+  const siteCauses = shownCauses.filter((cause) => cause.kind === 'site')
+  const statedBySite = coveredBySite(siteCauses)
+  const explained = explainedByCauses(shownCauses)
+
+  const regressionBlocks = capBySite(
+    regressions.filter((route) => !fullyExplained(route, explained)),
+    siteCauses,
+  )
+
   // Segment config appears beside the route it governs, so repeating it here would
   // say the same thing twice. Only for routes that get a block: a declaration on a
   // route behind the fold has nowhere else to appear.
-  const printedRoutes = new Set(regressions.slice(0, ROUTE_BLOCK_LIMIT).map((route) => route.pattern))
+  const printedRoutes = new Set(regressionBlocks.slice(0, ROUTE_BLOCK_LIMIT).map((route) => route.pattern))
   const configEvidence = configChanges.filter(
     (change) => !change.incomparable && !(change.route !== undefined && printedRoutes.has(change.route)),
   )
 
   lines.push('<!-- crust-report -->')
-  lines.push(`### ${verdict(breaches, regressions, others, basis, configEvidence)}`)
+  lines.push(`### crust: ${lead.decision.headline}`)
   lines.push('')
+
+  // Coverage beside the verdict, because it bounds what the verdict is worth: the
+  // same deltas measured at 40% attribution are correct about bytes and much
+  // weaker about causes, and nothing else in the comment tells those apart.
+  if (lead.coverage) {
+    const missing = lead.coverage.weak && lead.coverage.missing ? ` - missing ${lead.coverage.missing}` : ''
+    lines.push(`<sub>${lead.coverage.text}${missing}</sub>`)
+    lines.push('')
+  }
 
   if (diff?.incomparable.length) {
     // Every entry says what it explains where crust knows. A schema mismatch has
@@ -87,13 +209,62 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
     lines.push('')
   }
 
-  for (const route of regressions.slice(0, ROUTE_BLOCK_LIMIT)) {
-    lines.push(...routeBlock(route, configChanges))
+  // Improvements, led rather than folded away. A build-comparison tool that only
+  // reports failures cannot tell anyone whether a refactor worked, and a removed
+  // package or a route that became static again is the evidence that it did.
+  // Regressions are not repeated here - the heading names the worst one and each
+  // gets a block below, so a matching list of one-liners would only be the same
+  // routes twice.
+  const improved = lead.changes.filter((change) => change.direction === 'improvement')
+  if (improved.length > 0) {
+    lines.push('**Improved**')
+    lines.push('')
+    for (const change of improved) lines.push(`- \`${change.route}\` - ${change.headline}`)
+    const rest = others.filter((route) => route.severity === 'improvement').length - improved.length
+    if (rest > 0) lines.push(`- … and ${rest} more improved route${rest === 1 ? '' : 's'}`)
     lines.push('')
   }
 
-  if (regressions.length > ROUTE_BLOCK_LIMIT) {
-    lines.push(`<sub>… and ${regressions.length - ROUTE_BLOCK_LIMIT} more regressed routes.</sub>`)
+  // One cause, one line, with everything it reached. Stated before the route
+  // blocks because a named cause *is* the decision - "someone added `date-fns`",
+  // "<Provider> crossed to the client" - where the same fact spread down a byte
+  // column is nine numbers and no decision. They pay for their lines by removing
+  // route detail: see `fullyExplained` and `capBySite`.
+  if (shownCauses.length > 0) {
+    lines.push(`**Cause${shownCauses.length === 1 ? '' : 's'}**`)
+    lines.push('')
+    for (const cause of shownCauses) lines.push(...causeLines(cause))
+    const hidden = lead.causes.length - shownCauses.length
+    if (hidden > 0) lines.push(`- … and ${hidden} more cause${hidden === 1 ? '' : 's'}`)
+    lines.push('')
+  }
+
+  for (const route of regressionBlocks.slice(0, ROUTE_BLOCK_LIMIT)) {
+    lines.push(
+      ...routeBlock(route, configChanges, {
+        causes: lead.causes,
+        head: snapshot,
+        // A shared cause line above already gave the fix for every route it
+        // reached, so repeating it per block would print one action three times.
+        withAction: !statedBySite.has(route.pattern),
+      }),
+    )
+    lines.push('')
+  }
+
+  // Covers both truncation and the routes the cause lines already explained, so the
+  // count is of regressions without a block rather than of a slice. "More" only
+  // when something came before it: with every block suppressed, "and 3 more" reads
+  // as three on top of three.
+  const printed = Math.min(regressionBlocks.length, ROUTE_BLOCK_LIMIT)
+  const withoutBlock = regressions.length - printed
+  if (withoutBlock > 0) {
+    const routes = `regressed route${withoutBlock === 1 ? '' : 's'}`
+    lines.push(
+      printed > 0
+        ? `<sub>… and ${withoutBlock} more ${routes}.</sub>`
+        : `<sub>${withoutBlock} ${routes}, each explained by the causes above.</sub>`,
+    )
     lines.push('')
   }
 
@@ -139,7 +310,16 @@ export function renderComment(snapshot: Snapshot, diff: Diff | null, breaches: B
  * an unchanged shell percentage, because a number that never moves is a number
  * people stop reading.
  */
-function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): string[] {
+/**
+ * `context` carries what the action sentence needs: the causes it can point at and
+ * the head snapshot, whose `sourceMaps` flag decides whether an unblamable byte
+ * change is a missing map or genuinely vendor internals.
+ */
+function routeBlock(
+  route: RouteDelta,
+  configChanges: ConfigChange[] = [],
+  context?: { causes: LeadCause[]; head: Snapshot; withAction: boolean },
+): string[] {
   const lines = [`**\`${route.pattern}\`**${route.status === 'added' ? ' 🆕' : ''}`]
   // A route that dropped to dynamic because someone wrote `export const dynamic` is
   // still a regression, it is just not a mystery. Naming the declaration is the
@@ -187,6 +367,12 @@ function routeBlock(route: RouteDelta, configChanges: ConfigChange[] = []): stri
     lines.push(`- Also left the shell: ${extras.map((h) => `\`<${h.component}>\``).join(', ')}`)
   }
 
+  // The block states what changed and where; without this it never says what to
+  // do about it, which leaves the reader to derive the fix from a call site. Comes
+  // from the same `actionFor` the terminal uses, so the two never disagree.
+  const action = context?.withAction ? actionFor(route, context.causes, context.head) : null
+  if (action) lines.push(`- **Do this:** ${action}`)
+
   lines.push(...chainBlock(route.causeChain))
 
   return lines
@@ -230,47 +416,7 @@ function routeRow(route: RouteDelta): string {
   return `| \`${route.pattern}\`${marker} | ${kb(route.firstLoadAfter)} | ${delta} | ${shellAfter} | ${shellDelta} |`
 }
 
-/**
- * The heading is the only part guaranteed to be read - it is what shows in the
- * notification email and the PR timeline. So it names the single worst thing,
- * with the route, rather than a count of everything that moved.
- */
-function verdict(
-  breaches: Breach[],
-  regressions: RouteDelta[],
-  others: RouteDelta[],
-  basis: Basis,
-  configEvidence: ConfigChange[],
-): string {
-  if (basis !== 'comparable') {
-    const why = basis === 'no-baseline' ? 'no baseline yet' : 'baseline not comparable'
-    return breaches.length > 0
-      ? `crust: ${breaches.length} budget breach${breaches.length === 1 ? '' : 'es'} (${why})`
-      : `crust: ${why}, so nothing to compare`
-  }
-
-  const modeDrop = regressions.find((r) => r.modeChange?.direction === 'regression')
-  if (modeDrop) {
-    return `crust: \`${modeDrop.pattern}\` is no longer ${modeLabel(modeDrop.modeChange!.before)}${suffix(regressions.length)}`
-  }
-
-  const shrank = regressions.filter((r) => (r.shellRatioDelta ?? 0) < 0 || (r.shellRatioBefore !== null && r.shellRatioAfter === null))
-  if (shrank.length > 0) {
-    return `crust: static shell shrank on ${shrank.length} route${shrank.length === 1 ? '' : 's'}`
-  }
-
-  const uncached = regressions.find((r) => (r.cacheChange?.introduced.length ?? 0) > 0)
-  if (uncached) return `crust: \`${uncached.pattern}\` stopped being cached${suffix(regressions.length)}`
-
-  if (breaches.length > 0) return `crust: ${breaches.length} budget breach${breaches.length === 1 ? '' : 'es'}`
-  if (regressions.length > 0) return `crust: ${regressions.length} route${regressions.length === 1 ? '' : 's'} grew`
-  if (others.length > 0) return `crust: ${others.length} route${others.length === 1 ? '' : 's'} changed, nothing regressed`
-  // "No change" would be false on a build whose configuration moved, and it is the
-  // heading most likely to be the only line anyone reads.
-  if (configEvidence.length > 0) {
-    return `crust: ${configEvidence.length} configuration change${configEvidence.length === 1 ? '' : 's'}, no route regressed`
-  }
-  return 'crust: no change'
-}
-
-const suffix = (total: number): string => (total > 1 ? `, +${total - 1} more` : '')
+// The heading, the changes it names, the causes and the coverage all come from
+// `diff/lead.ts` now. It used to be computed here, which is how `crust diff` ended
+// up with no decision at all: the sentence a reviewer reads first existed only in
+// the PR comment.

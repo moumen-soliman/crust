@@ -347,8 +347,9 @@ totals and shell ratios are kept forever.
 |---|---|
 | `crust init` | Guided setup: first snapshot, starter budgets, CI configuration for the detected provider |
 | `crust analyze` | Explain build health and changes, then save a snapshot; add `--routes` or `--report` for detail |
-| `crust diff [ref]` | Compare the current build with a build id, Git ref, branch, or ancestor |
+| `crust diff [base] [head]` | Compare two builds by build id, Git ref, tag, branch, or ancestor. One argument compares the current build against a base; two compare stored snapshots without checking either ref out |
 | `crust ci [ref]` | Enforce regressions and budgets; optionally write a PR comment |
+| `crust findings` | List, agree/dispute, and score blocking findings from `ci` |
 | `crust report` | Generate a self-contained HTML report |
 | `crust manifest` | Generate the data consumed by the optional in-app panel |
 | `crust history fetch` | Restore snapshots from the `perf-history` branch |

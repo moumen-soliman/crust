@@ -8,10 +8,20 @@ import pc from 'picocolors'
 import { analyzeBuild } from './analyze/analyze.ts'
 import { checkBudgets, kb, readBudgets } from './ci/budgets.ts'
 import { renderComment } from './ci/comment.ts'
+import {
+  appendFindings,
+  findingsPath,
+  findingsRate,
+  markFinding,
+  readFindings,
+  recordedFromBreaches,
+} from './ci/findings-log.ts'
+import { STORE_DIR } from './store/store.ts'
 import { renderReportHtml } from './report/render.ts'
 import { diffSnapshots, type RouteAliases } from './diff/diff.ts'
 import { latestCompatibleBaseline } from './diff/compatible.ts'
 import { findWorkspaceRoot } from './core/workspace.ts'
+import { revParse } from './core/git.ts'
 import { runInit, type CiChoice } from './init/init.ts'
 import { renderInitTerminal } from './init/render.tsx'
 import { SnapshotStore } from './store/store.ts'
@@ -120,19 +130,37 @@ cli
   })
 
 cli
-  .command('diff [ref]', 'Compare this build against a stored snapshot')
+  // Two positionals, like `git diff a b`: with one, the head is the build in
+  // `.next`; with two, both sides come from the store and nothing is rebuilt.
+  // Comparing a release against a branch should not require checking either out.
+  .command('diff [base] [head]', 'Compare two builds; the head defaults to the current one')
   .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
   .option('--dist-dir <dir>', 'Build output directory', { default: '.next' })
-  .action(async (ref: string | undefined, options: CommonOptions) => {
-    const { head, base, aliases } = await loadPair(ref ?? 'HEAD~1', options)
-    if (!base) {
-      console.log(pc.yellow(`No stored snapshot found for "${ref ?? 'HEAD~1'}". Run \`crust analyze\` on that commit first.`))
+  .action(async (base: string | undefined, head: string | undefined, options: CommonOptions) => {
+    const baseRef = base ?? 'HEAD~1'
+    const pair = await loadPair(baseRef, options, head)
+
+    if (!pair.head) {
+      console.log(pc.yellow(`No stored snapshot found for "${head!}". Run \`crust analyze\` on that commit first.`))
+      process.exitCode = 1
+      return
+    }
+    if (!pair.base) {
+      console.log(pc.yellow(`No stored snapshot found for "${baseRef}". Run \`crust analyze\` on that commit first.`))
       process.exitCode = 1
       return
     }
 
-    const diff = diffSnapshots(base, head, aliases)
-    console.log(renderDiffTerminal(diff))
+    const diff = diffSnapshots(pair.base, pair.head, pair.aliases)
+
+    // Budgets are read here so the decision this prints is the one `ci` would
+    // reach on the same pair. They are the *current* file even when both sides are
+    // old builds, which is the useful question ("would this pair pass today's
+    // rules") and the only one a working copy can answer.
+    const root = await findWorkspaceRoot(resolve(options.cwd))
+    const breaches = checkBudgets(pair.head, await readBudgets(root), diff)
+
+    console.log(renderDiffTerminal(diff, { breaches }))
   })
 
 cli
@@ -157,6 +185,20 @@ cli
     const comment = renderComment(head, diff, breaches)
     if (options.comment) await writeFile(options.comment, comment + '\n', 'utf8')
     else console.log(comment)
+
+    // Every blocking breach is a measurement opportunity. Appended here so the
+    // disagreement rate Focus 3 needs can be collected from a live PR stream;
+    // the rate itself is never invented from an empty log.
+    if (breaches.length > 0) {
+      const recorded = recordedFromBreaches(breaches, head, base)
+      await appendFindings(join(root, STORE_DIR), recorded)
+      console.error(
+        pc.dim(
+          `\nRecorded ${recorded.length} blocking finding${recorded.length === 1 ? '' : 's'} → ${relative(process.cwd(), findingsPath(join(root, STORE_DIR)))}`,
+        ),
+      )
+      console.error(pc.dim('  Mark each with `crust findings agree <id>` or `crust findings dispute <id>`.'))
+    }
 
     if (!base) {
       console.error(
@@ -240,6 +282,77 @@ cli
   })
 
 cli
+  // Same positional shape as `history`: `findings rate`, not a nested command.
+  .command('findings <action> [id]', 'Record and score blocking-finding agreement (list | agree | dispute | rate)')
+  .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
+  .option('--note <text>', 'Why this finding was agreed or disputed')
+  .option('--open', 'With list: only unfinished rows')
+  .action(async (
+    action: string,
+    id: string | undefined,
+    options: CommonOptions & { note?: string; open?: boolean },
+  ) => {
+    const root = await findWorkspaceRoot(resolve(options.cwd))
+    const perfDir = join(root, STORE_DIR)
+
+    if (action === 'list') {
+      const rows = await readFindings(perfDir)
+      const shown = options.open ? rows.filter((row) => row.verdict === 'open') : rows
+      if (shown.length === 0) {
+        console.log(pc.dim(options.open ? 'No open findings.' : 'No findings recorded yet. Blocking `ci` runs append here.'))
+        return
+      }
+      for (const row of shown) {
+        const mark =
+          row.verdict === 'open' ? pc.yellow('open') : row.verdict === 'agreed' ? pc.green('agreed') : pc.red('disputed')
+        console.log(`${pc.bold(row.id)}  ${mark}  ${pc.cyan(row.kind)}  ${row.pattern}  ${pc.dim(row.message)}`)
+        if (row.blame) console.log(pc.dim(`  blame ${row.blame}`))
+        if (row.note) console.log(pc.dim(`  note  ${row.note}`))
+      }
+      return
+    }
+
+    if (action === 'rate') {
+      const rate = findingsRate(await readFindings(perfDir))
+      console.log(`${pc.bold('crust findings')}  ${pc.dim(relative(process.cwd(), findingsPath(perfDir)) || findingsPath(perfDir))}`)
+      console.log(`  open      ${rate.open}`)
+      console.log(`  agreed    ${rate.agreed}`)
+      console.log(`  disputed  ${rate.disputed}`)
+      console.log(`  resolved  ${rate.resolved}`)
+      if (rate.disagreementRate === null) {
+        console.log(pc.dim('\nNo marked findings yet — disagreement rate is unmeasured, not 0%.'))
+        console.log(pc.dim('Target: fewer than 1 in 10 resolved findings disputed.'))
+      } else {
+        const pct = `${(rate.disagreementRate * 100).toFixed(1)}%`
+        const ok = rate.disagreementRate < 0.1
+        console.log(`\n  disagreement  ${ok ? pc.green(pct) : pc.red(pct)}  ${pc.dim('(target < 10%)')}`)
+      }
+      return
+    }
+
+    if (action === 'agree' || action === 'dispute') {
+      if (!id) {
+        console.error(pc.red(`Usage: crust findings ${action} <id> [--note "..."]`))
+        process.exitCode = 1
+        return
+      }
+      try {
+        const updated = await markFinding(perfDir, id, action === 'agree' ? 'agreed' : 'disputed', options.note ?? null)
+        console.log(
+          `${pc.green('✓')} ${updated.id}  ${action === 'agree' ? pc.green('agreed') : pc.red('disputed')}  ${updated.pattern}`,
+        )
+      } catch (error) {
+        console.error(pc.red(error instanceof Error ? error.message : String(error)))
+        process.exitCode = 1
+      }
+      return
+    }
+
+    console.error(pc.red(`Unknown findings action "${action}". Expected list, agree, dispute, or rate.`))
+    process.exitCode = 1
+  })
+
+cli
   .command('prune', 'Apply the retention ladder to stored snapshots')
   .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
   .option('--dry-run', 'Report what would be removed without removing it')
@@ -306,23 +419,63 @@ async function withHistory(snapshot: Snapshot, cwd: string): Promise<Snapshot> {
   return { ...snapshot, history }
 }
 
-async function loadPair(ref: string, options: CommonOptions): Promise<{ head: Snapshot; base: Snapshot | null; aliases: RouteAliases }> {
-  const head = await analyzeBuild({
-    cwd: options.cwd,
-    ...(options.distDir ? { distDir: options.distDir } : {}),
-    toolVersion: VERSION,
-  })
+// Overloaded so the callers that never name a head - `ci`, which must measure
+// the build in front of it - keep a non-null `head` without asserting.
+async function loadPair(
+  ref: string,
+  options: CommonOptions,
+): Promise<{ head: Snapshot; base: Snapshot | null; aliases: RouteAliases }>
+async function loadPair(
+  ref: string,
+  options: CommonOptions,
+  headRef: string | undefined,
+): Promise<{ head: Snapshot | null; base: Snapshot | null; aliases: RouteAliases }>
+async function loadPair(
+  ref: string,
+  options: CommonOptions,
+  headRef?: string,
+): Promise<{ head: Snapshot | null; base: Snapshot | null; aliases: RouteAliases }> {
   const root = await findWorkspaceRoot(resolve(options.cwd))
   const store = new SnapshotStore(root)
+  const aliases = await readAliases(root)
+
+  // A named head is read from the store; only the implicit head is analysed.
+  // Rebuilding a commit in order to compare it is the cost this avoids.
+  //
+  // Both refs then resolve from themselves. Two names mean two builds, and the
+  // branch that happens to be checked out is not one of them: anchoring either
+  // side on a merge base with HEAD answers with the commit this working copy
+  // shares with the ref, which is a third build nobody asked about.
+  const exact = headRef !== undefined
+  const head = headRef
+    ? await store.resolve(headRef, options.cwd, undefined, { exact })
+    : await analyzeBuild({
+        cwd: options.cwd,
+        ...(options.distDir ? { distDir: options.distDir } : {}),
+        toolVersion: VERSION,
+      })
+  if (!head) return { head: null, base: null, aliases }
+
   // `head` is passed so that a commit holding several snapshots yields one this
   // build can be compared against, rather than whichever was written first.
-  let base = await store.resolve(ref, options.cwd, head)
+  let base = await store.resolve(ref, options.cwd, head, { exact })
 
   // Squash merges orphan snapshots - the pre-squash SHAs stop existing, so
-  // ancestry lookup finds nothing. Fall back to matching by analysed content (R13).
-  base ??= await store.findBySourceSignature(head.sourceSignature, head.buildId)
+  // ancestry lookup finds nothing. Fall back to matching by analysed content
+  // (R13), but only for a ref git recognises. Re-linking by content behind a ref
+  // that does not exist answers a question about a branch nobody has with a
+  // snapshot of the current source, which reports "no regressions" for the one
+  // reason a reviewer would never suspect.
+  //
+  // Not for an explicitly named head either. The fallback matches on the head's
+  // source, so behind two named refs it can answer "what is `release`" with a
+  // snapshot recorded on neither ref - the same substitution, one step further
+  // from the question.
+  if (!base && !headRef && (await revParse(options.cwd, ref))) {
+    base = await store.findBySourceSignature(head.sourceSignature, head.buildId)
+  }
 
-  return { head, base, aliases: await readAliases(root) }
+  return { head, base, aliases }
 }
 
 async function readAliases(root: string): Promise<RouteAliases> {
