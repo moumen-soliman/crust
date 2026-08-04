@@ -158,6 +158,36 @@ describe('terminal UI', () => {
     expect(output).toContain('✓ /')
     expect(output).toContain('-78.1 kB')
   })
+
+  it('renders diffs where route patterns and package names repeat without throwing', () => {
+    // Added and removed routes can share `/`; package add/remove pairs share a
+    // label. React keys used to collide and warn on those rows.
+    const base = snapshot(
+      [
+        route({ id: 'apps/a/page.tsx', pattern: '/', firstLoadBytes: 528_000, dependencies: { next: 245_000 } }),
+        route({ id: 'apps/a/feed/page.tsx', pattern: '/feed', firstLoadBytes: 528_000, dependencies: { next: 245_000 } }),
+      ],
+      'base',
+    )
+    const head = snapshot(
+      [
+        route({ id: 'apps/b/page.tsx', pattern: '/', firstLoadBytes: 543_000, dependencies: { next: 246_000 } }),
+        route({
+          id: 'apps/b/products/page.tsx',
+          pattern: '/products/[slug]',
+          firstLoadBytes: 543_000,
+          dependencies: { next: 246_000 },
+        }),
+      ],
+      'head',
+    )
+
+    expect(() => renderDiffTerminal(diffSnapshots(base, head), 96)).not.toThrow()
+    const output = renderDiffTerminal(diffSnapshots(base, head), 96)
+    expect(output).toContain('SIZE MOVEMENT')
+    expect(output).toContain('next')
+    expect(output).toContain('/')
+  })
 })
 
 function snapshot(routes: RouteSnapshot[], buildId = 'build'): Snapshot {

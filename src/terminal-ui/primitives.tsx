@@ -32,6 +32,8 @@ export interface BarChartItem {
   value: number
   displayValue?: string
   color?: string
+  /** Stable React key when labels can repeat (added and removed routes sharing a pattern). */
+  key?: string
 }
 
 /** Horizontal bar chart based on termcn's BarChart API and visual grammar. */
@@ -47,11 +49,11 @@ export function BarChart({ data, width }: { data: BarChartItem[]; width: number 
 
   return (
     <Box flexDirection="column">
-      {data.map((item) => {
+      {data.map((item, index) => {
         const filled = max === 0 ? 0 : Math.max(1, Math.round((item.value / max) * barWidth))
         const label = truncate(item.label, labelWidth)
         return (
-          <Box key={item.label}>
+          <Box key={item.key ?? `${item.label}:${item.displayValue ?? item.value}:${index}`}>
             <Text>{label.padEnd(labelWidth)}  </Text>
             <Text color={item.color ?? colors.accent}>{full.repeat(filled)}</Text>
             <Text color={colors.mutedBar}>{empty.repeat(Math.max(0, barWidth - filled))}</Text>

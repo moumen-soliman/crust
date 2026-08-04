@@ -146,7 +146,19 @@ cli
       return
     }
     if (!pair.base) {
-      console.log(pc.yellow(`No stored snapshot found for "${baseRef}". Run \`crust analyze\` on that commit first.`))
+      const root = await findWorkspaceRoot(resolve(options.cwd))
+      const store = new SnapshotStore(root)
+      const stored = await store.list()
+      if (store.isSelfBaseline(baseRef, pair.head, stored)) {
+        console.log(pc.yellow(`"${baseRef}" is the same build as the head. A build cannot be compared to itself.`))
+        console.log(
+          pc.dim(
+            '  Pass a different baseline, or `crust diff <older-id> <newer-id>` to compare two stored snapshots.',
+          ),
+        )
+      } else {
+        console.log(pc.yellow(`No stored snapshot found for "${baseRef}". Run \`crust analyze\` on that commit first.`))
+      }
       process.exitCode = 1
       return
     }

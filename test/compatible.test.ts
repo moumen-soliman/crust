@@ -24,6 +24,27 @@ describe('automatic local baseline', () => {
   })
 })
 
+describe('isSelfBaseline', () => {
+  it('recognises the head build id so diff can explain why resolve returned null', () => {
+    const store = new SnapshotStore('/tmp')
+    const head = snapshot('same')
+
+    expect(store.isSelfBaseline('same', head, [head])).toBe(true)
+    expect(store.isSelfBaseline('other', head, [head])).toBe(false)
+  })
+
+  it('treats the head git SHA as self only when no sibling snapshot exists at that commit', () => {
+    const store = new SnapshotStore('/tmp')
+    const sha = 'a'.repeat(40)
+    const head = { ...snapshot('head'), gitSha: sha }
+    const sibling = { ...snapshot('sibling'), gitSha: sha }
+
+    expect(store.isSelfBaseline(sha, head, [head])).toBe(true)
+    expect(store.isSelfBaseline(sha.slice(0, 8), head, [head])).toBe(true)
+    expect(store.isSelfBaseline(sha, head, [head, sibling])).toBe(false)
+  })
+})
+
 describe('resolving a ref that has more than one snapshot', () => {
   it('prefers a comparable record over one the diff would refuse', async () => {
     const root = await mkdtemp(join(tmpdir(), 'crust-resolve-'))

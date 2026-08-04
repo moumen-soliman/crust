@@ -246,6 +246,27 @@ export class SnapshotStore {
    * this branch's history, and a snapshot recorded later on another branch must
    * not be mistaken for an ancestor just because its timestamp is larger.
    */
+  /**
+   * True when `ref` names the head build itself.
+   *
+   * `resolve` refuses that pair on purpose (a build is never its own baseline).
+   * Callers that surface "no snapshot found" must check this first - otherwise a
+   * `crust list` id that is also the current build looks missing rather than
+   * ineligible.
+   */
+  isSelfBaseline(ref: string, head: Snapshot, stored: Snapshot[] = []): boolean {
+    if (ref === head.buildId) return true
+
+    const sha = head.gitSha
+    if (sha && (ref === sha || (ref.length >= 7 && sha.startsWith(ref)))) {
+      // Another snapshot at the same SHA can still be a baseline (schema sibling,
+      // clean vs dirty). Only the head itself is ineligible.
+      return !stored.some((snapshot) => snapshot.gitSha === sha && snapshot.buildId !== head.buildId)
+    }
+
+    return stored.some((snapshot) => snapshot.buildId === ref && snapshot.buildId === head.buildId)
+  }
+
   async resolve(ref: string, cwd: string, head?: Snapshot, options: ResolveOptions = {}): Promise<Snapshot | null> {
     const all = await this.list()
     if (all.length === 0) return null

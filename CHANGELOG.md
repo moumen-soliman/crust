@@ -12,6 +12,21 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-04
+
+No schema change. CLI and terminal-output fixes only.
+
+### Fixed
+
+- `crust diff <buildId>` no longer claims a listed snapshot is missing when that id is the current
+  head. Resolve refuses a build as its own baseline on purpose, but the error said "No stored
+  snapshot found" — the same wording as a never-analyzed commit — so an id from `crust list` looked
+  gone. Self-baseline is detected first and reported as incomparable, with a hint to pass another
+  baseline or two stored ids.
+- The terminal diff no longer emits React duplicate-key warnings when the same package or route
+  appears more than once (for example `package:next` or `/` across added/grown rows). Chart and
+  cause list keys include enough of the row identity to stay unique.
+
 ## [0.2.0] - 2026-08-04
 
 No schema change: every axis added here reads fields the analyzer already wrote, so a `.perf/` history

@@ -56,7 +56,7 @@ CHANGES
 CAUSES
   +48.2 kB  date-fns added  ·  package
              /products/[slug], /checkout, /analytics, +6 more  (9 routes)
-             → Check whether `date-fns` needs to be in the client bundle—a server component or a `next/dynamic` import removes it from first load.
+             → Check whether `date-fns` needs to be in the client bundle - a server component or a `next/dynamic` import removes it from first load.
 ```
 
 crust leads with the answer, not a route inventory:

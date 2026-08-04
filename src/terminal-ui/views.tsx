@@ -274,7 +274,7 @@ function Changes({ changes }: { changes: LeadChange[] }) {
   return (
     <Section title="CHANGES" hint="worst first, improvements included">
       {changes.map((change, index) => (
-        <Box key={`${change.direction}:${change.route}`} flexDirection="column" marginBottom={index < changes.length - 1 ? 1 : 0}>
+        <Box key={`${change.direction}:${change.route}:${change.headline}:${index}`} flexDirection="column" marginBottom={index < changes.length - 1 ? 1 : 0}>
           <Text>
             <Text bold color={change.direction === 'regression' ? colors.danger : colors.success}>
               {change.direction === 'regression' ? '✗ ' : '✓ '}
@@ -316,7 +316,7 @@ function Causes({ causes }: { causes: LeadCause[] }) {
   const hidden = causes.length - shown.length
   return (
     <Section title="CAUSES" hint={`${causes.length} found  ·  worst route, not the sum`}>
-      {shown.map((cause) => {
+      {shown.map((cause, index) => {
         const named = cause.routes.slice(0, CAUSE_ROUTE_LIMIT).join(', ')
         const rest = cause.routes.length - CAUSE_ROUTE_LIMIT
         // A call site's `what` already names the site, so it is the subject; a
@@ -328,7 +328,9 @@ function Causes({ causes }: { causes: LeadCause[] }) {
               ? `<${cause.component}>`
               : cause.label
         return (
-          <Box key={`${cause.kind}:${cause.label}`} marginBottom={1}>
+          // Package add/remove pairs share a label (`next`); include `what` and
+          // the index so React does not warn about colliding keys.
+          <Box key={`${cause.kind}:${cause.label}:${cause.what}:${index}`} marginBottom={1}>
             <Text color={(cause.bytesPerRoute ?? 0) > 0 ? colors.danger : cause.bytesPerRoute === null ? colors.warning : colors.success}>
               {(cause.bytesPerRoute === null ? '' : signed(cause.bytesPerRoute)).padStart(10)}
               {'  '}
@@ -406,6 +408,8 @@ function DiffView({ diff, options, width }: { diff: Diff; options: DiffTerminalO
     .sort((a, b) => Math.abs(b.firstLoadDelta) - Math.abs(a.firstLoadDelta))
     .slice(0, 8)
     .map((route) => ({
+      // Pattern alone is not unique: an added and a removed route can share `/`.
+      key: `${route.id}:${route.status}:${route.firstLoadDelta}`,
       label: route.pattern,
       value: Math.abs(route.firstLoadDelta),
       displayValue: signed(route.firstLoadDelta),
