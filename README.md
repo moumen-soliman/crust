@@ -1,333 +1,225 @@
 <p align="center">
   <a href="https://crust.moumen.dev/">
-    <img width="80" height="80" alt="crust" src="https://crust.moumen.dev/icon.svg" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/logo/dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="./docs/logo/light.svg">
+      <img width="72" height="72" alt="crust" src="./docs/logo/light.svg">
+    </picture>
   </a>
 </p>
 
 <h1 align="center">crust</h1>
 
 <p align="center">
-  <strong>The production-build diff for Next.js.</strong> Compare two App Router builds, decide
-  what can ship, and trace rendering, caching, shell, and client-cost regressions to the component,
-  import, package, and source line that introduced them.
+  <strong>The production-build diff for Next.js.</strong>
+  <br>
+  Compare two App Router builds, understand what changed and why, and decide what can ship.
 </p>
 
 <p align="center">
-  <a href="https://docs.crust.moumen.dev/docs/quickstart">Get started</a> ·
+  <a href="https://docs.crust.moumen.dev/docs/quickstart">Quickstart</a> ·
   <a href="https://docs.crust.moumen.dev/">Documentation</a> ·
-  <a href="https://github.com/moumen-soliman/crust/issues/new">Report a bug</a> ·
-  <a href="https://github.com/moumen-soliman/crust/issues/new">Request a feature</a>
+  <a href="https://crust.moumen.dev/">Website</a> ·
+  <a href="https://github.com/moumen-soliman/crust/issues/new">Feedback</a>
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/moumen-soliman/crust?label=license&logo=github" alt="License" /></a>
-  <a href="https://github.com/moumen-soliman/crust/actions/workflows/ci.yml"><img src="https://github.com/moumen-soliman/crust/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/moumen-soliman/crust/issues"><img src="https://img.shields.io/github/issues/moumen-soliman/crust" alt="Issues" /></a>
-  <a href="https://www.npmjs.com/package/@moumensoliman/crust"><img src="https://img.shields.io/npm/v/@moumensoliman/crust.svg" alt="npm" /></a>
-  <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha" />
+  <a href="https://www.npmjs.com/package/@moumensoliman/crust"><img src="https://img.shields.io/npm/v/@moumensoliman/crust.svg" alt="npm version"></a>
+  <a href="https://github.com/moumen-soliman/crust/actions/workflows/ci.yml"><img src="https://github.com/moumen-soliman/crust/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/moumen-soliman/crust?label=license" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha">
 </p>
 
-> Bundle explorers show what one build contains. `crust` tells you what changed between builds,
-> why it changed, everything affected, and whether it should ship.
+> **Pre-alpha:** the snapshot format, CLI output, and package API can still change.
 
-**Status: pre-alpha.** The snapshot format, CLI output, and package API can still change.
-
-## How crust builds a trustworthy comparison
-
-crust does not crawl a deployed URL, run Lighthouse, or estimate from `next dev`. It joins each
-completed production build in `.next` with the application's source graph and stores the result as
-a comparable snapshot. `crust diff [base] [head]` then leads with `BLOCK`, `REVIEW`, `CLEAR`, or
-`CANNOT DECIDE`, followed by the changes, grouped causes, evidence coverage, and likely next action.
-
-It reads these production artifacts:
-
-- `app-path-routes-manifest.json` for App Router route patterns
-- `prerender-manifest.json` for prerendering and ISR
-- per-route client-reference manifests plus `build-manifest.json` for client chunks
-- `required-server-files.json` for resolved Next.js configuration such as Cache Components
-- `server/app/**/*.html` for the shell Next.js actually emitted
-- `static/**/*.js` and their source maps for byte attribution
-
-It also parses `app/` or `src/app/`, layouts, and first-party imports. Source supplies the **why**;
-emitted build artifacts supply the **what**.
-
-| Report value | How it is calculated |
-|---|---|
-| **Rendering mode** | Route handlers come from route entries. Partial routes have pending boundaries in emitted HTML. ISR and static routes come from the prerender manifest. A non-prerendered route is dynamic only when source analysis finds a supported dynamic reason; otherwise it remains `unknown`. |
-| **First-load JavaScript** | `route chunks + shared route chunks + root runtime/polyfill chunks`, using uncompressed on-disk JavaScript bytes. It is not gzip size or a browser network measurement. Route handlers report zero client bytes. |
-| **Static shell** | crust removes `<head>` and scripts from emitted HTML, counts visible-text characters, and calculates `(all visible text - text inside pending boundaries) / all visible text`. A 100% shell means all measured visible text is outside pending boundaries—not that every component or byte is static. |
-| **File and package bytes** | Source-map generated ranges are assigned to workspace files or `node_modules` packages. Missing or ambiguous mappings stay unattributed. Per-file attribution requires `productionBrowserSourceMaps: true`; route totals do not. |
-| **Client-boundary cost** | Attributed bytes for the complete import subtree rooted at each first `'use client'` boundary. |
-| **Barrel cost** | Attributed modules reachable through a barrel minus those still reachable without that barrel—the measured drag introduced by the barrel path. |
-| **Shared cause** | The same layout, client boundary, barrel, package, chunk, or call site grouped across every affected route instead of repeated once per route. |
-| **Confidence** | The mean of measurable coverage ratios: classified routes, emitted shells that could be checked, and attributed client bytes. Unresolved and conservative relationships are reported separately. |
-
-### What function-level analysis looks for
-
-crust parses source without executing the application. It records:
-
-- calls to `cookies`, `headers`, `draftMode`, and `connection`
-- page `searchParams` usage
-- `fetch()` cache behavior, including `no-store`, default uncached reads under Cache Components,
-  and `'use cache'`
-- route exports such as `dynamic`, `revalidate`, `runtime`, and `fetchCache`
-- Suspense boundaries, rendered components, client boundaries, imports, exports, aliases, default
-  exports, and barrel re-exports
-
-It then walks from the page and layouts through reachable exported functions and imported bindings
-to the dynamic read or expensive module. Direct imports can be narrowed per function. Namespace
-imports, computed calls, `export *`, unresolved aliases, and components passed through props fall
-back to conservative module-level evidence or remain `unknown`; crust does not turn an incomplete
-chain into confident blame.
-
-Every cause is labeled:
-
-- **Verified** - production artifacts confirm the result and the source chain is complete.
-- **Inferred** - source relationships support the conclusion, but no emitted artifact confirms it.
-- **Unknown** - the relationship is incomplete or ambiguous.
-
-One snapshot explains one production build. The product decision comes from comparing two snapshots,
-and only when their schema, bundler, Next.js major, and route identities are compatible.
-
-## Features
-
-- **Two-build comparison** - compares branches, tags, commits, or build ids without checking either
-  ref out or rebuilding it.
-- **Decision before inventory** - leads with the verdict, worst changes, attribution coverage, and
-  likely next action before route tables and raw totals.
-- **Production-build analysis** - reads `.next` output instead of measuring unminified, HMR-heavy
-  development builds.
-- **Route explanations** - reports static, partial, ISR, dynamic, and route-handler modes with the
-  API or cache decision that produced them.
-- **Static-shell composition** - predicts the shell from source, verifies it against emitted HTML,
-  and names the component and call site behind each hole.
-- **Bundle attribution** - maps route bytes to first-party modules and dependencies through source
-  maps, with separate webpack and Turbopack adapters.
-- **Regression blame** - identifies rendering-mode drops, cache regressions, shell shrinkage, and
-  first-load growth while treating improvements as first-class evidence.
-- **Cause chains and confidence** - follows routes through components and imports to call sites,
-  labels the evidence, and reports measurable analysis coverage.
-- **Grouped causes and client cost** - groups package, client-boundary, barrel, and call-site movement
-  once with its route blast radius.
-- **Configuration-aware comparison** - separates framework and route configuration changes from
-  application regressions.
-- **CI enforcement** - fails strict regressions without configuration and supports explicit size,
-  growth, and shell-ratio budgets.
-- **Durable history** - stores one snapshot per build and can synchronize baselines through an
-  orphan `perf-history` branch.
-- **Measured trust** - records blocking findings and reports author agreement or disagreement over
-  reviewed occurrences instead of asserting a false-positive rate.
-- **Reports without a service** - produces a searchable, filterable self-contained HTML report and
-  an optional in-app panel. No account or hosted dashboard is required.
-
-**A one-build analyzer answers “what is in this bundle?” crust answers “what changed, why, and can
-this merge or ship?”**
-
-crust connects build artifacts, source relationships, and compatible snapshots so a rendering or
-client-JavaScript change can be traced back to the component, import, and call site responsible.
-
-The in-app panel, runtime collector, ingest endpoint, synthetic runner, and OpenTelemetry spans are
-deliberately secondary. The core workflow needs only source code and a production build.
-
-## How is this different from Next.js Bundle Analyzer?
-
-The experimental [`next experimental-analyze`](https://nextjs.org/docs/app/guides/package-bundling#nextjs-bundle-analyzer-experimental)
-is an interactive Turbopack module explorer. It is the better tool for inspecting the client and
-server module graph of one build, finding large dependencies, and following their import chains.
-
-crust is complementary: it reads completed webpack or Turbopack builds, records compatible
-snapshots, and compares them automatically. It covers more than bundle composition—rendering modes,
-cache decisions, static-shell changes, shared causes, and client-JavaScript growth—and turns those
-changes into CI findings and merge verdicts. The Next.js analyzer helps answer **"what is in this
-bundle?"**; crust focuses on **"what changed since the baseline, why did it change, and should this
-PR merge?"**
-
-## Requirements
-
-- Next.js 15 or 16
-- App Router (hybrid projects are supported, but Pages Router routes are not measured)
-- webpack or Turbopack
-- Node.js 20+
-- A completed production build
-
-Outside the supported Next.js range crust refuses to run instead of interpreting unverified build
-artifacts.
-
-## Install
-
-Install crust as a development dependency so local and CI runs use the same version:
-
-```bash
-npm install --save-dev @moumensoliman/crust
-```
-
-```bash
-pnpm add --save-dev @moumensoliman/crust
-```
-
-Or run it without adding a dependency:
-
-```bash
-npx @moumensoliman/crust analyze
-```
-
-The npm package is `@moumensoliman/crust`; the installed executable remains `crust`. Do not install the
-unscoped `crust` package-it is unrelated. Playwright is an optional peer dependency needed only by
-`crust synthetic`.
-
-## Quick start
-
-crust reads the output of a **production build**. Run one first - it refuses to measure
-`next dev`, because dev numbers are unminified, unbundled and HMR-laden.
-
-```bash
-next build
-npx @moumensoliman/crust init
-```
-
-`init` is the guided path: it finds the app (and refuses to guess between several in a monorepo),
-records the first snapshot, writes starter budgets with the derivation of every number beside it, and
-generates CI configuration pinned to the crust version that wrote it. It replaces nothing without
-`--force`, and `--dry-run` prints the plan first.
-
-Or go one command at a time:
-
-```bash
-npx @moumensoliman/crust analyze
-```
-
-The first thing it prints is the three things worth fixing, each with the call site and what to do
-about it - not a wall of routes:
-
-```text
-crust — 25 routes                                  Next 16.2.12 · turbopack
-
-BUILD HEALTH
-7 static · 11 dynamic · 7 handlers
-Median first load: 2.3 MB
-4 routes changed since the previous build
-Analysis confidence: 94% (25/25 routes classified)
-CI → fail (1 breach)
-
-FIX FIRST
-1. /courses/[slug] became dynamic
-   Cause: uncached fetch at packages/core/src/services/index.ts:29
-   Introduced by: <CoursePage>
-   Shell: 100% → unavailable
-
-LARGEST CLIENT CONTRIBUTOR
-packages/ui/src/icons/PackagesThumbnails.tsx — 220.8 kB
-
-3 regressions · 1 improvement
-Routes → crust analyze --routes
-Report → crust analyze --report
-```
-
-`analyze` automatically compares against the latest compatible local snapshot. Add `--routes` for
-the complete inventory, `--verbose` for coverage details and analysis gaps, or `--report` to write
-the full HTML report without dumping it into the terminal.
-
-Then, after a change:
+## See the build diff before you merge
 
 ```bash
 next build
 npx @moumensoliman/crust diff main
 ```
 
-The one-argument form compares the current `.next` build against the named baseline at its merge
-base with `HEAD`. With no argument, `diff` defaults the base to `HEAD~1`. `crust ci` separately
-defaults its baseline to `main`.
-
 ```text
 CRUST / DIFF  cfdcf50068722687 (main@cfdcf500) → 4a80239769ea8b93 (feature@4a802397)
-1 changed · 1 regression · attribution 94%
+10 changed  ·  9 regressions  ·  1 improvement  ·  attribution 94%
 
 DECISION  BLOCK
-`/products/[slug]` is no longer static
+`/products/[slug]` is no longer static, +8 more
 
 CHANGES
-✗ /products/[slug]  no longer static  ·  static shell 100% → 45%
+✗ /products/[slug]  no longer static  ·  static shell 100% → 45%  ·  +48.2 kB
     lib/http.ts:3 in <ProductGallery>
     → Cache that read (`use cache`, or `fetch(…, { next: { revalidate } })`) and the route can prerender again.
+
+✓ /account  -28.0 kB
+
+CAUSES
+  +48.2 kB  date-fns added  ·  package
+             /products/[slug], /checkout, /analytics, +6 more  (9 routes)
+             → Check whether `date-fns` needs to be in the client bundle—a server component or a `next/dynamic` import removes it from first load.
 ```
 
-Name two refs—`crust diff v1.2.0 release/next`—and both sides are read from stored snapshots. Neither
-ref needs to be checked out or rebuilt.
+crust leads with the answer, not a route inventory:
 
-That is the point. No build error was produced and not one byte moved—a `use cache` directive was
-removed three call frames below the page, and 55% of the route stopped being static.
+- **Decision:** `BLOCK`, `REVIEW`, `CLEAR`, or `CANNOT DECIDE`
+- **Changes:** regressions and improvements, with the strongest source location and likely action
+- **Causes:** packages, client boundaries, barrels, and call sites grouped once with their blast radius
+- **Coverage:** how much of the client JavaScript was attributed, shown beside the verdict
 
-### Module attribution needs source maps
-
-Route totals and shell analysis work out of the box. Blaming a specific *file* for those bytes
-needs source maps in the production build:
-
-```ts
-// next.config.ts
-export default { productionBrowserSourceMaps: true }
-```
-
-Without it crust still reports route sizes and shell composition, and says plainly that
-attribution is unavailable rather than guessing. Turn it on in a dedicated analyze build if you
-don't want maps in production.
-
-### Seeing it visually
-
-A self-contained HTML report - no integration, no server, one file you can open or attach to a PR:
+This is not a report about one bundle. It is a comparison of two production-build snapshots. With
+two refs, both sides come from the store and neither build needs to be checked out or rebuilt:
 
 ```bash
-npx @moumensoliman/crust report --open
+crust diff v1.2.0 release/next
 ```
 
-Search by route, component, or source file; filter and group routes; expand cause chains; and select
-a shared cause to see every affected route or copy a concise explanation into a review.
+## What crust catches
 
-### CI
+- A route moved from static to ISR, partial, or dynamic.
+- A cached read became uncached.
+- A component left the static shell.
+- First-load JavaScript grew, including the module or package responsible.
+- A `'use client'` boundary pulled a larger subtree into the browser.
+- A barrel import dragged additional modules onto one or many routes.
+- Build or route configuration changed in a way that explains the movement.
+- A refactor worked: improvements are shown alongside regressions.
+
+One cause is reported once. If a provider, package, barrel, or call site affects nine routes, crust
+shows one decision with nine-route blast radius instead of nine copies of the same finding.
+
+## Quickstart
+
+### Requirements
+
+- Next.js 15 or 16
+- App Router
+- webpack or Turbopack
+- Node.js 20+
+- A completed production build
+
+Hybrid projects are supported, but Pages Router routes are not measured. Outside the supported
+Next.js range, crust refuses to run instead of interpreting unverified build artifacts.
+
+### Install
+
+```bash
+npm install --save-dev @moumensoliman/crust
+# or
+pnpm add --save-dev @moumensoliman/crust
+```
+
+The npm package is `@moumensoliman/crust`; the installed executable is `crust`. The unscoped
+`crust` package is unrelated.
+
+### Initialize
+
+```bash
+next build
+npx @moumensoliman/crust init
+```
+
+`init` finds the app, records the first snapshot, writes explained starter budgets, and generates CI
+configuration pinned to the crust version that created it. It does not replace files without
+`--force`; use `--dry-run` to inspect the plan first.
+
+In a monorepo, point it at the app:
+
+```bash
+npx @moumensoliman/crust init --cwd apps/web
+```
+
+Or use the commands directly:
+
+```bash
+# Explain the current production build and save its snapshot
+npx @moumensoliman/crust analyze
+
+# Compare the current .next build with main at its merge base
+npx @moumensoliman/crust diff main
+
+# Compare two snapshots already in the store
+npx @moumensoliman/crust diff v1.2.0 release/next
+```
+
+`analyze --routes` adds the complete route inventory. `analyze --verbose` expands coverage and
+unresolved evidence. `analyze --report` writes the HTML report.
+
+## Use it as a merge gate
+
+`crust ci` applies the same comparison contract as `crust diff`, writes an updating PR comment, and
+exits non-zero on blocking findings:
 
 ```bash
 npx @moumensoliman/crust ci main --comment comment.md
 ```
 
-Exits non-zero and writes a PR comment. **Regressions are enforced with no configuration at all**,
-as soon as a baseline snapshot exists:
+Without a budget file, a comparable baseline is enough to block:
 
-- a route's rendering mode dropped (`static → partial`, `static → isr`, anything → `dynamic`)
-- a read that was cached stopped being cached
-- a route that emitted a static shell stopped emitting one
+- a rendering-mode downgrade
+- a newly uncached read
+- disappearance of a previously emitted static shell
 
-Those need no threshold - they are a strict downgrade against your own previous build. Only the
-direction is judged, and only when it is certain. A check that fails on a guess is a check that gets
-switched off, so no delta-based regression is enforced when the comparison itself is in doubt:
+Project-specific limits stay explicit in `.perf/budgets.json`:
 
-- if either side of the comparison is `unknown`, the change is reported and not failed
-- if the two builds are not comparable at all - a different bundler, a different Next major, a
-  different snapshot schema - no regression check runs, and the comment says so instead of
-  attributing a difference it cannot attribute
-- a newly added route is never a regression; there is no baseline for it to be worse than
-
-Ceilings still apply in all three cases, because they describe a single build rather than a change.
-
-The comment leads with the decision and evidence coverage. Improvements and grouped causes appear
-before route detail, and one cause replaces the repeated route blocks it fully explains:
-
-```markdown
-### crust: `/products/[slug]` is no longer static
-
-<sub>attribution 94%</sub>
-
-**Cause**
-- `date-fns` added · +48.2 kB on `/checkout`, +8 more
-
-**`/products/[slug]`**
-- rendering: **static → partial**
-- static shell: **100% → 45%**
-- Cause: `uncached fetch at lib/http.ts:3`
-- Introduced by: `<ProductGallery>`
-- **Do this:** Cache that read and the route can prerender again.
+```json
+{
+  "defaultFirstLoadBytes": 250000,
+  "firstLoadBytes": {
+    "/products/[slug]": 180000
+  },
+  "maxGrowth": 0.05,
+  "defaultMinShellRatio": 0.6,
+  "allowRegression": ["/admin/[...slug]"]
+}
 ```
 
-Every blocking `ci` breach is also appended to `.perf/findings.jsonl`. Mark what authors actually
-agreed with, then report the measured disagreement rate:
+Absolute ceilings still run when no comparable baseline exists because they describe the current
+build. A newly added route is not treated as a regression, and `unknown` evidence is never assigned
+a direction.
+
+### GitHub Action
+
+`.github/workflows/crust.yml`:
+
+```yaml
+name: crust
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  crust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx next build
+      - uses: moumen-soliman/crust/action@master
+        with:
+          baseline: main
+          crust-version: 0.2.0
+```
+
+The action fetches history, runs the check, publishes the current snapshot, and updates one PR
+comment. Run it on the base branch as well as pull requests so future branches have a merge-base
+snapshot.
+
+See the [CI guide](https://docs.crust.moumen.dev/docs/guides/ci) for permissions, monorepos,
+fork behavior, and the complete workflow.
+
+### Measure trust instead of claiming it
+
+Every blocking CI breach is appended to `.perf/findings.jsonl`. Mark whether authors agreed that it
+was a real regression:
 
 ```bash
 crust findings list --open
@@ -336,236 +228,146 @@ crust findings dispute <id> --note "why"
 crust findings rate
 ```
 
-The rate is `disputed / (agreed + disputed)`. With nothing reviewed it remains unmeasured—it is
-never presented as 0%.
+The reported rate is `disputed / (agreed + disputed)`. Open findings do not enter the denominator,
+and an empty log remains unmeasured rather than appearing as 0%.
 
-*Ceilings*, unlike regressions, cannot be guessed for someone else's app, so they do nothing until
-`.perf/budgets.json` names a number:
+## Evidence, not guesses
 
-```json
-{
-  "defaultFirstLoadBytes": 250000,
-  "firstLoadBytes": { "/products/[slug]": 180000 },
-  "maxGrowth": 0.05,
-  "defaultMinShellRatio": 0.6,
-  "allowRegression": ["/admin/[...slug]"]
-}
-```
+crust joins two kinds of evidence:
 
-`allowRegression` is the escape hatch for a downgrade that was the point of the PR. It is a list of
-routes rather than a global switch, so exempting one page cannot quietly exempt the rest of the app,
-and it exempts only the zero-config rules above - a `maxGrowth` or `firstLoadBytes` budget is a
-number you wrote down, and it keeps applying.
+- **Production artifacts provide the what:** route and prerender manifests, client-reference and
+  build manifests, resolved Next.js configuration, emitted HTML, JavaScript chunks, and source maps.
+- **Application source provides the why:** pages, layouts, rendered components, imports and exports,
+  Suspense and client boundaries, route configuration, dynamic APIs, fetch caching, and `'use cache'`.
 
-Both axes are covered on purpose: a check that only guards bytes will happily pass a PR that
-silently halved your static shell.
+It follows reachable functions and imported bindings from a route to the dynamic read or attributed
+module. Direct relationships can be narrowed per function. Computed calls, unresolved aliases,
+namespace imports, and other ambiguous paths remain conservative or `unknown`.
 
-Snapshots live in `.perf/` (one file per build - no merge conflicts) and sync through an orphan
-`perf-history` branch so a fresh CI checkout has a baseline:
+Every conclusion is labeled **verified**, **inferred**, or **unknown**. crust does not turn an
+incomplete chain into confident blame.
 
-```bash
-npx @moumensoliman/crust history fetch
-npx @moumensoliman/crust history push
-```
+### Compatibility gate
 
-The bundled GitHub Action ([action/action.yml](action/action.yml)) does both, posts the comment,
-and updates it in place on every push. Fork PRs get the comment but skip the push - their token is
-read-only on the base repo, by design. `npx @moumensoliman/crust prune` applies the retention ladder: the newest
-50 builds at full fidelity, then one per commit, then module detail dropped after 90 days; route
-totals and shell ratios are kept forever.
+Route deltas are enforced only when snapshots have compatible:
 
-## Command reference
+- snapshot schemas
+- bundlers
+- Next.js major versions
 
-| Command | Purpose |
-|---|---|
-| `crust init` | Guided setup: first snapshot, starter budgets, CI configuration for the detected provider |
-| `crust analyze` | Explain build health and changes, then save a snapshot; add `--routes` or `--report` for detail |
-| `crust diff [base] [head]` | Compare two builds by build id, Git ref, tag, branch, or ancestor. One argument compares the current build against a base; two compare stored snapshots without checking either ref out |
-| `crust ci [ref]` | Enforce regressions and budgets; optionally write a PR comment |
-| `crust findings list\|agree\|dispute\|rate` | Review and score blocking findings from `ci` |
-| `crust report` | Generate a self-contained HTML report |
-| `crust manifest` | Generate the data consumed by the optional in-app panel |
-| `crust history fetch` | Restore snapshots from the `perf-history` branch |
-| `crust history push` | Publish snapshots to the `perf-history` branch |
-| `crust prune` | Apply the snapshot-retention policy |
-| `crust list` | List saved snapshots |
-| `crust synthetic` | Measure routes on a running deployment with pinned Playwright throttling |
+If the builds cannot be compared safely, crust explains why and withholds enforceable deltas.
+Configured absolute ceilings can still block because they require only the current build.
 
-Every build command accepts `--cwd <dir>` for monorepos and `--dist-dir <dir>` for a custom Next.js
-output directory. See the [complete CLI reference](https://docs.crust.moumen.dev/docs/reference/cli).
+Routes are matched by their page-file identity rather than URL pattern, so URL refactors retain
+history. `.perf/aliases.json` can stitch history across page-file moves.
 
-## Beyond the build
+### Source maps and attribution
 
-Everything above works from build output alone, and that is the part to trust first. What follows
-observes a running app. It is genuinely useful and genuinely secondary - none of it is needed for
-the analyzer or the CI check, and it is listed last on purpose.
-
-### The in-app panel
-
-Run the report **inside your app** as a floating panel. Write the manifest where the app can fetch
-it, then mount the widget:
-
-```bash
-npx @moumensoliman/crust manifest --out public/crust-manifest.json
-```
-
-```tsx
-// components/CrustPanel.tsx
-'use client'
-
-import { useEffect } from 'react'
-
-export function CrustPanel() {
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_CRUST) return
-    let dispose: (() => void) | undefined
-    import('@moumensoliman/crust/widget').then((m) => {
-      dispose = m.mountCrustWidget()
-    })
-    return () => dispose?.()
-  }, [])
-
-  return null
-}
-```
-
-Render `<CrustPanel />` in your root layout and build with the gate on:
-
-```bash
-NEXT_PUBLIC_CRUST=1 next build
-```
-
-The gate is checked before the dynamic `import()`, so with the variable unset the bundler drops the
-widget entirely - it is never in your production bundle. The panel renders in a shadow root, so it
-cannot restyle your app and your CSS cannot break it, and the manifest is only fetched when you
-first open it, so it does not move the numbers it is reporting.
-
-**The manifest lists every route, source path and component name in your app.** Generate it in
-analyze builds only, never in the build you deploy.
-
-### Runtime measurement
-
-The collector observes real visits - Web Vitals via `PerformanceObserver`, long animation frames,
-an image audit, and the streaming waterfall (when each Suspense hole actually filled):
-
-```tsx
-import { startCollector } from '@moumensoliman/crust/collector'
-
-startCollector() // behind the same NEXT_PUBLIC_CRUST gate as the widget
-```
-
-The widget shows the live values for the current page. The streaming view sits behind a capability
-check and reports "unavailable on this Next version" rather than breaking when internals move.
-
-On staging, beacon samples to a write-only, authenticated, rate-limited endpoint:
+Route totals, rendering modes, caching, and shell analysis work without browser source maps. Tracing
+client bytes to files, packages, client boundaries, and barrels requires:
 
 ```ts
-// app/api/__crust/ingest/route.ts
-import { createIngestHandler } from '@moumensoliman/crust/ingest'
-
-export const POST = createIngestHandler({ secret: process.env.CRUST_INGEST_SECRET! })
-```
-
-And measure synthetically with pinned throttling (needs Playwright, an optional peer):
-
-```bash
-npx @moumensoliman/crust synthetic https://staging.example.com / /products/1 --cpu 4 --network fast-3g
-```
-
-The first iteration is discarded (cold start), the median is reported, and runs on different
-machines are never merged into one trend line. Staging numbers are labeled "vs. previous build" -
-never "is this fast" - because a seeded staging database is a fraction of production's size.
-
-### Server spans
-
-Minimal by design - most teams' APM already covers this. `crust/otel` exports a span processor
-that plugs into `instrumentation.ts` (a supported API; crust never patches server internals) and
-aggregates render and fetch time by route:
-
-```ts
-import { registerOTel } from '@vercel/otel'
-import { CrustSpanAggregator } from '@moumensoliman/crust/otel'
-
-export function register() {
-  registerOTel({ serviceName: 'my-app', spanProcessors: [new CrustSpanAggregator()] })
+// next.config.ts
+export default {
+  productionBrowserSourceMaps: true,
 }
 ```
 
-## Escape hatches
-
-Two optional JSON files in `.perf/`, for the tail the analyzer cannot resolve:
-
-- `aliases.json` - `{ "app/old/page.tsx": "app/new/page.tsx" }` stitches a moved route back onto
-  its history.
-- `overrides.json` - `{ "@weird/alias": "packages/ui/src/index.ts" }` answers import specifiers no
-  resolver can settle.
+Without maps, crust keeps the route totals, reports attribution as unavailable, and does not invent
+a cause. Use a dedicated analysis build if you do not want to deploy browser source maps.
 
 ## How it works
 
-### Architecture
+```text
+application source + production .next build
+                    │
+                    ▼
+        route, shell, cache, and byte analysis
+                    │
+                    ▼
+             comparable snapshot
+                    │
+       base snapshot ─── head snapshot
+                    │
+                    ▼
+        decision + changes + grouped causes
+                    │
+           ┌────────┴────────┐
+           ▼                 ▼
+       terminal          PR comment
+```
+
+Snapshots live in `.perf/` as one file per build and can synchronize through an orphan
+`perf-history` branch. Git state, lockfile, Next.js version, Node major, bundler, and resolved config
+participate in build identity so unrelated environments are not merged into one trend.
+
+<details>
+<summary>View the detailed architecture diagram</summary>
 
 <p align="center">
-  <img src="https://crust.moumen.dev/crust-architecture.svg" alt="crust architecture: production source and build artifacts become a comparable snapshot, findings, regression blame, CI checks, and reports" />
+  <img width="680" src="./site/public/crust-architecture.svg" alt="Application source and Next.js production artifacts become comparable snapshots, findings, reports, build diffs, CI decisions, and PR comments.">
 </p>
 
-The source graph supplies the **why**; production artifacts supply the **what**. crust joins both
-into one snapshot, then compares that snapshot only with a compatible baseline. Runtime tooling is
-optional and does not participate in the core build verdict.
+</details>
 
-### What happens on a pull request
+## HTML report
 
-<p align="center">
-  <img src="https://crust.moumen.dev/crust-pull-request.svg" alt="crust pull request workflow from production build through baseline comparison, PR comment, snapshot publication, and exit code" />
-</p>
+```bash
+npx @moumensoliman/crust report --open
+```
 
-The decision rule is intentionally conservative:
+The report is one self-contained file with no service or external requests. Search routes,
+components, and source files; filter and group routes; expand complete cause chains; and inspect
+shared-cause blast radius.
 
-<p align="center">
-  <img src="https://crust.moumen.dev/crust-decision-rule.svg" alt="crust decision rule: compare only compatible baselines, never fail on unknown evidence, and enforce proven regressions" />
-</p>
+## Compared with Next.js Bundle Analyzer
 
-1. **Detect the build** - crust reads the resolved Next.js version, bundler, route manifests,
-   prerender metadata, client-reference manifests, and emitted shell HTML.
-2. **Build the source graph** - imports, exports, server/client boundaries, dynamic APIs, fetch
-   caching, Suspense boundaries, and `use cache` directives are extracted without executing the
-   application.
-3. **Attribute bytes** - each route's chunks are mapped to workspace files and packages. Any byte
-   that cannot be proven is recorded as unattributed.
-4. **Predict and verify the shell** - source analysis explains *why* a component is postponed;
-   emitted HTML verifies *what* the production build actually prerendered.
-5. **Record identity** - Git state, lockfile, Next version, Node major, bundler, and resolved config
-   form a build id so unrelated environments are not merged into one trend.
-6. **Compare and enforce** - comparable snapshots produce route-level deltas, blame, automatic
-   regression checks, and optional project-defined ceilings.
+Next.js bundle analyzers are the better tools for exploring the client and server module graph of
+one build. They answer **“what is in this bundle?”**
+
+crust complements them by recording compatible production builds and answering **“what changed
+since the baseline, why did it change, everything affected, and should this merge?”** It compares
+rendering modes, cache decisions, static-shell composition, client JavaScript, and configuration—not
+only bundle contents.
+
+## Command map
+
+- `crust init` — guided setup, first snapshot, starter budgets, and CI configuration
+- `crust analyze` — explain the current build and save a snapshot
+- `crust diff [base] [head]` — compare the current build or any two stored refs
+- `crust ci [ref]` — enforce regressions and budgets; optionally write a PR comment
+- `crust findings list|agree|dispute|rate` — review and score blocking findings
+- `crust report` — generate a self-contained HTML report
+- `crust history fetch|push` — synchronize snapshots with `perf-history`
+- `crust list` — list saved snapshots
+- `crust prune` — apply snapshot retention
+
+Every build command accepts `--cwd <dir>` for monorepos and `--dist-dir <dir>` for a custom Next.js
+output directory. See the [CLI reference](https://docs.crust.moumen.dev/docs/reference/cli) for all
+flags and secondary commands.
+
+## Optional runtime tooling
+
+The merge decision needs only source code and a production build. The in-app panel, Web Vitals and
+streaming collector, authenticated staging ingest, synthetic runner, and OpenTelemetry span
+aggregator are optional and deliberately secondary:
+
+- [In-app panel](https://docs.crust.moumen.dev/docs/guides/widget)
+- [Runtime measurement](https://docs.crust.moumen.dev/docs/guides/runtime)
+- [Staging and synthetic runs](https://docs.crust.moumen.dev/docs/guides/staging)
 
 ## Non-goals
 
-These are permanent. They are written here before the first user arrives, on purpose.
-
-- **Not a runtime APM.** No error tracking, no distributed tracing, no alerting.
-- **No composite performance score.** Every result stays tied to measurable build or runtime evidence.
-- **Not multi-framework.** Next.js App Router only. Pages Router is detect-and-warn.
-- **Not a hosted service.** No accounts, no SaaS dashboard.
-- **Not a bundler.** It reads build output; it never changes how your app builds in production.
-- **No config file** until three separate people request the same option. Zero-config is a feature,
-  and config surface is permanent API you cannot remove.
-
-## Locked decisions
-
-| Decision | Choice | Why |
-|---|---|---|
-| Measurement target | Production builds only | Dev numbers are unminified, unbundled, HMR-laden fiction |
-| Dev mode | Static map only, never timings | Better to show nothing than wrong numbers |
-| Supported range | Two Next majors, both bundlers | Fail loudly outside it rather than emit wrong output |
-| Package shape | One CLI with optional subpath exports | `/widget`, `/collector`, `/ingest`, `/otel` |
-| Snapshot store | One file per record + derived SQLite index | Per-file avoids git conflicts; the index is rebuildable |
-| Prod safety | Build-time env gate, never a runtime flag | A runtime `if` still ships the code and the manifest |
-| Unknowns | Report `unknown`, never guess | A predictor that guesses wrong destroys trust in the whole tool |
+- **Not a runtime APM:** no error tracking, distributed tracing platform, or alerting service.
+- **Not a composite score:** every result stays tied to measurable build or runtime evidence.
+- **Not multi-framework:** Next.js App Router only; Pages Router is detect-and-warn.
+- **Not a hosted service:** no account or SaaS dashboard.
+- **Not a bundler:** crust reads build output and never changes how the application is bundled.
 
 ## Support
 
-Next.js 15 and 16, webpack and Turbopack. Outside that range the tool refuses to run rather than
-emit numbers it can't stand behind. Best-effort maintenance; issues triaged weekly.
+Next.js 15 and 16, webpack and Turbopack, on Node.js 20 or newer. Outside that range crust refuses
+to run rather than emit numbers it cannot support.
 
 ## Development
 
@@ -576,8 +378,8 @@ pnpm typecheck
 pnpm test
 ```
 
-The real-build tests use the apps under `fixtures/`. Build output is intentionally not committed.
-The Phase 0 spike and its measured webpack/Turbopack attribution results are documented in
+The real-build tests use the apps under `fixtures/`; build output is intentionally not committed.
+The Phase 0 webpack and Turbopack attribution results are in
 [`docs/phase-0-findings.md`](docs/phase-0-findings.md).
 
 ## License
