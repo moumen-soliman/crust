@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { cp, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -181,8 +182,16 @@ describe('snapshots already recorded at those commits', () => {
  * project's own store, and a checkout that never moved. The build command stands in
  * for `next build` by pointing the worktree at a build the fixture already carries -
  * what is under test is the orchestration, not Next.
+ *
+ * That build has to exist for these to mean anything: `ln -s` links a missing target
+ * without complaint, so an unbuilt fixture reaches the analysis as "no build found"
+ * and reads like a bug in the orchestration. Skipped when it is absent, and built by
+ * CI's `fixtures` job before it runs `pnpm test` - the same gate the other tests
+ * against a real build use.
  */
-describe('a pair built from two tips', () => {
+const fixtureBuilt = existsSync(join(FIXTURE, '.next', 'app-path-routes-manifest.json'))
+
+describe.skipIf(!fixtureBuilt)('a pair built from two tips', () => {
   const SOURCE = ['app', 'components', 'lib', 'next.config.ts', 'package.json', 'tsconfig.json', 'next-env.d.ts', 'pnpm-lock.yaml']
 
   async function appRepo(): Promise<Repo> {
