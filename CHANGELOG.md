@@ -12,6 +12,32 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-05
+
+### Added
+
+- `crust diff <base> <head> --build` records both refs before comparing them, in one command. Each
+  tip is built in its own detached git worktree, both snapshots are written to the project's single
+  `.perf/`, and the comparison that follows is the existing two-ref diff - same decision, same lead,
+  same exit codes. `--parallel` builds the two refs at once, `--keep-worktrees` leaves them on disk.
+
+  This closes the gap two named refs always had: `crust diff a b` rebuilds nothing, which means
+  somebody had to have measured both refs first - by hand, with two checkouts and a stash, on the
+  branch whose uncommitted work was the reason they wanted the comparison. The worktrees are detached
+  and live outside the repository, so the checkout never moves and a dirty working tree on an
+  unrelated branch is a normal starting point.
+
+  A tip that already has a comparable snapshot is not rebuilt. Comparability is checked as a *pair*:
+  two clean snapshots at the right commits that cannot be compared to each other - a bundler swap, a
+  Next major, or another package sharing the monorepo's `.perf/` - are rebuilt rather than reported
+  as `CANNOT COMPARE THESE BUILDS`.
+
+  Dependencies are linked from the current checkout, and crust refuses when the ref's lockfile is not
+  the installed one: a bundle built against dependencies that ref never had is a wrong answer wearing
+  the same tick as a right one. `--build 'pnpm install --frozen-lockfile && pnpm build'` measures it
+  properly. A failed build or analysis names the ref it failed on and exits non-zero; nothing falls
+  through to a comparison against an older snapshot.
+
 ## [0.2.2] - 2026-08-05
 
 ### Added

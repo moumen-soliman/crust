@@ -16,6 +16,7 @@ import {
   readFindings,
   recordedFromBreaches,
 } from './ci/findings-log.ts'
+import { buildPair, DEFAULT_BUILD_COMMAND } from './compare/build-pair.ts'
 import { STORE_DIR } from './store/store.ts'
 import { renderReportHtml } from './report/render.ts'
 import { diffSnapshots, type RouteAliases } from './diff/diff.ts'
@@ -136,9 +137,51 @@ cli
   .command('diff [base] [head]', 'Compare two builds; the head defaults to the current one')
   .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
   .option('--dist-dir <dir>', 'Build output directory', { default: '.next' })
-  .action(async (base: string | undefined, head: string | undefined, options: CommonOptions) => {
+  .option('--build [cmd]', `Build both refs first, in temporary worktrees (default: ${DEFAULT_BUILD_COMMAND})`)
+  .option('--parallel', 'With --build: build both refs at the same time')
+  .option('--keep-worktrees', 'With --build: leave the worktrees on disk')
+  .action(async (
+    base: string | undefined,
+    head: string | undefined,
+    options: CommonOptions & { build?: string | boolean; parallel?: boolean; keepWorktrees?: boolean },
+  ) => {
     const baseRef = base ?? 'HEAD~1'
-    const pair = await loadPair(baseRef, options, head)
+
+    // With `--build` the two refs are measured first, in their own worktrees, and
+    // the diff below then runs on the build ids that came back. Nothing about the
+    // comparison changes: this only fills the store with the pair it needs, which
+    // is otherwise two checkouts and two builds done by hand.
+    let baseTarget = baseRef
+    let headTarget = head
+    if (options.build) {
+      if (!base || !head) {
+        console.error(pc.red('--build needs both refs: `crust diff <base> <head> --build`.'))
+        console.error(pc.dim('  With one ref the head is the build in front of you, and there is nothing to build.'))
+        process.exitCode = 1
+        return
+      }
+      try {
+        const built = await buildPair({
+          cwd: options.cwd,
+          baseRef: base,
+          headRef: head,
+          ...(typeof options.build === 'string' ? { command: options.build } : {}),
+          ...(options.distDir ? { distDir: options.distDir } : {}),
+          parallel: options.parallel ?? false,
+          keepWorktrees: options.keepWorktrees ?? false,
+          toolVersion: VERSION,
+          onProgress: (line) => console.error(pc.dim(`• ${line}`)),
+        })
+        baseTarget = built.baseId
+        headTarget = built.headId
+      } catch (error) {
+        console.error(pc.red(error instanceof Error ? error.message : String(error)))
+        process.exitCode = 1
+        return
+      }
+    }
+
+    const pair = await loadPair(baseTarget, options, headTarget)
 
     if (!pair.head) {
       console.log(pc.yellow(`No stored snapshot found for "${head!}". Run \`crust analyze\` on that commit first.`))
@@ -149,7 +192,7 @@ cli
       const root = await findWorkspaceRoot(resolve(options.cwd))
       const store = new SnapshotStore(root)
       const stored = await store.list()
-      if (store.isSelfBaseline(baseRef, pair.head, stored)) {
+      if (store.isSelfBaseline(baseTarget, pair.head, stored)) {
         console.log(pc.yellow(`"${baseRef}" is the same build as the head. A build cannot be compared to itself.`))
         console.log(
           pc.dim(

@@ -73,6 +73,13 @@ two refs, both sides come from the store and neither build needs to be checked o
 crust diff v1.2.0 release/next
 ```
 
+No snapshots yet? `--build` records both tips first, each in its own detached git worktree, without
+moving your checkout - so it works from a dirty working tree on a third branch:
+
+```bash
+crust diff develop feature --build
+```
+
 ## What crust catches
 
 - A route moved from static to ISR, partial, or dynamic.
@@ -139,6 +146,9 @@ npx @moumensoliman/crust diff main
 
 # Compare two snapshots already in the store
 npx @moumensoliman/crust diff v1.2.0 release/next
+
+# Build both tips in temporary worktrees, then compare them
+npx @moumensoliman/crust diff develop feature --build
 ```
 
 `analyze --routes` adds the complete route inventory. `analyze --verbose` expands coverage and
@@ -301,6 +311,12 @@ Snapshots live in `.perf/` as one file per build and can synchronize through an 
 `perf-history` branch. Git state, lockfile, Next.js version, Node major, bundler, and resolved config
 participate in build identity so unrelated environments are not merged into one trend.
 
+The two snapshots a comparison needs usually arrive over time - each `analyze` or `ci` run records
+one. `crust diff <base> <head> --build` fills both at once instead: it builds each tip in a detached
+git worktree, writes the snapshots into that same `.perf/`, and skips any tip already measured. A
+build or analysis that fails names the ref it failed on rather than comparing one side against an
+older snapshot.
+
 <details>
 <summary>View the detailed architecture diagram</summary>
 
@@ -334,7 +350,8 @@ only bundle contents.
 
 - `crust init` — guided setup, first snapshot, starter budgets, and CI configuration
 - `crust analyze` — explain the current build and save a snapshot
-- `crust diff [base] [head]` — compare the current build or any two stored refs
+- `crust diff [base] [head]` — compare the current build or any two stored refs; `--build` records
+  both refs first, in temporary worktrees
 - `crust ci [ref]` — enforce regressions and budgets; optionally write a PR comment
 - `crust findings list|agree|dispute|rate` — review and score blocking findings
 - `crust report` — generate a self-contained HTML report

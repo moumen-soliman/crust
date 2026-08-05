@@ -137,6 +137,20 @@ rebuilt, and neither ref has to be checked out. In CI, the [GitHub Action](/docs
 shared baselines from `perf-history`.
 </Tip>
 
+### Compare two branches in one command
+
+The pair above needs a snapshot on each side, which the first comparison of two branches never has.
+`--build` records them for you:
+
+```bash
+npx @moumensoliman/crust diff develop feature --build
+```
+
+Each tip is built in its own detached git worktree, both snapshots land in the same `.perf/`, and the
+output is the diff above. Your checkout does not move - run it from a dirty working tree on a third
+branch. See the [CLI reference](/docs/reference/cli#diff) for `--parallel`, monorepo `--cwd`, and how
+a differing lockfile is handled.
+
 The two builds must use the same bundler, Next.js major, and snapshot schema. If they do not, crust
 names the incompatibility and refuses to assign a cause.
 

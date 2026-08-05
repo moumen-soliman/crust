@@ -18,6 +18,25 @@ async function git(args: string[], cwd: string): Promise<string | null> {
   }
 }
 
+/**
+ * Same call, but the failure is the interesting part. Reads answer "is there a
+ * snapshot for this ref" and can treat null as an answer; the writes below
+ * cannot - a worktree that did not appear has to say why, in git's own words,
+ * because the reason is usually actionable ("already checked out", "permission
+ * denied") and never guessable from the outside.
+ */
+async function gitOrThrow(args: string[], cwd: string): Promise<string> {
+  try {
+    const { stdout } = await exec('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 })
+    return stdout.trim()
+  } catch (error) {
+    const detail =
+      (error as { stderr?: string }).stderr?.trim() ||
+      (error instanceof Error ? error.message : String(error))
+    throw new Error(`git ${args.join(' ')} failed: ${detail}`)
+  }
+}
+
 export interface GitContext {
   /** Full SHA of HEAD, or null outside a repo / on an empty repo. */
   sha: string | null
@@ -89,6 +108,39 @@ export async function defaultBranch(cwd: string): Promise<string | null> {
 /** A remote's URL - tells GitHub from GitLab in a repository with no CI directory yet. */
 export async function remoteUrl(cwd: string, remote = 'origin'): Promise<string | null> {
   return git(['remote', 'get-url', remote], cwd)
+}
+
+/**
+ * Root of the working tree `cwd` sits in - the directory `git worktree` commands
+ * have to run from, and the anchor a monorepo package path is measured against.
+ * Null outside a repository, which is the difference between "no git here" and a
+ * git failure worth reporting.
+ */
+export async function repoRoot(cwd: string): Promise<string | null> {
+  return git(['rev-parse', '--show-toplevel'], cwd)
+}
+
+/**
+ * A detached worktree at `commit`. Detached on purpose: checking out the *branch*
+ * would move it, and `crust diff a b --build` must leave the user's refs and
+ * working copy exactly as they were (plan: no checkout of user HEAD).
+ */
+export async function addWorktree(repo: string, dir: string, commit: string): Promise<void> {
+  await gitOrThrow(['worktree', 'add', '--detach', dir, commit], repo)
+}
+
+/** Remove a worktree crust created. `--force` because the build left artifacts in it. */
+export async function removeWorktree(repo: string, dir: string): Promise<void> {
+  await gitOrThrow(['worktree', 'remove', '--force', dir], repo)
+}
+
+/**
+ * Drop registrations whose directories are gone. A killed run leaves one behind,
+ * and git then refuses to reuse that path - so pruning is what makes the second
+ * attempt work rather than inherit the first one's crash.
+ */
+export async function pruneWorktrees(repo: string): Promise<void> {
+  await git(['worktree', 'prune'], repo)
 }
 
 /**

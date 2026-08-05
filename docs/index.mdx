@@ -16,6 +16,11 @@ completed `.next` build with the application's source graph and stores a compati
 `crust diff [base] [head]` then derives one decision from rendering, caching, shell, and client-cost
 movement.
 
+Two named refs are compared from stored snapshots, so nothing is rebuilt and neither side has to be
+checked out. When a ref has not been measured yet, `crust diff <base> <head> --build` records it -
+each tip built in its own detached git worktree, both snapshots written to the project's `.perf/`,
+your checkout untouched.
+
 It reads:
 
 - route, prerender, client-reference, build, and resolved-config manifests
@@ -128,7 +133,8 @@ what postpones, and it fails quietly.
 
 <CardGroup cols={2}>
   <Card title="Compare two builds" icon="code-compare" href="/docs/reference/cli#diff">
-    Branches, tags, commits, and build ids with one decision, grouped causes, and improvements.
+    Branches, tags, commits, and build ids with one decision, grouped causes, and improvements -
+    building both refs on demand when neither has been measured.
   </Card>
   <Card title="Analyze a build" icon="chart-simple" href="/docs/quickstart">
     Prioritized findings, route modes, first-load JS, shell composition, and source-level reasons.

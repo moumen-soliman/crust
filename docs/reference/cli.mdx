@@ -98,10 +98,11 @@ Use `diff [base] [head]` for the decision-first comparison surface. It can compa
 
 ## diff
 
-Compare two builds. Exits non-zero if either side has no stored snapshot.
+Compare two builds. Exits non-zero if either side has no stored snapshot, or if `--build` could not
+produce one.
 
 ```bash
-npx @moumensoliman/crust diff [base] [head]
+npx @moumensoliman/crust diff [base] [head] [--build [cmd]]
 ```
 
 Each side accepts a build id, a git SHA, a tag, a branch name, or `HEAD~3`. `base` defaults to
@@ -115,6 +116,53 @@ With two arguments nothing is rebuilt and neither side has anything to do with w
 each ref resolves to the snapshot at that ref, or the newest one its own ancestry can reach. That is
 what makes `crust diff v1.2.0 release/next` answer about those two builds while you sit on a third
 branch.
+
+### Build both refs first
+
+`--build` fills the gap two named refs leave: someone has to have measured them. It records each ref
+in its own detached git worktree and then runs the comparison above on the two snapshots it wrote.
+
+```bash
+npx @moumensoliman/crust diff develop chore/crust-ci --build
+```
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `--build [cmd]` | off; `next build` when bare | Build both refs before comparing. Needs both positionals. |
+| `--parallel` | `false` | Build the two refs at the same time; more CPU and disk at once. |
+| `--cwd <dir>` | `pwd` | The app directory - the build target in each worktree, and the store anchor. |
+| `--dist-dir <dir>` | `.next` | Build output, relative to the app directory inside each worktree. |
+| `--keep-worktrees` | `false` | Leave the worktrees on disk to inspect a build. |
+
+Quote a command with arguments: `--build 'pnpm --filter web build'`. In a monorepo, point `--cwd` at
+the package: `crust diff develop feature --build --cwd apps/web`.
+
+Your checkout is never touched. The worktrees are detached at each tip, live under the system temp
+directory, and are removed whether the build succeeds or fails - so this works from a dirty working
+tree on an unrelated branch, which is the situation it exists for. Both snapshots are written to the
+project's single `.perf/`, exactly where `crust analyze` on each ref would have put them, so the next
+comparison of the same two tips rebuilds nothing.
+
+A tip that already has a comparable snapshot is not rebuilt. "Comparable" is checked as a pair: two
+snapshots at the right commits that cannot be compared to each other - a bundler swap, a Next major,
+or another package in the same monorepo store - are rebuilt rather than reported as
+`CANNOT COMPARE THESE BUILDS`.
+
+Dependencies come from this checkout: crust links its `node_modules` into each worktree. When the
+ref's lockfile differs from the installed one it refuses instead, because the bundle that install
+produces is not the one that ref describes - build with an install step to measure it:
+
+```bash
+npx @moumensoliman/crust diff develop feature --build 'pnpm install --frozen-lockfile && pnpm build'
+```
+
+A worktree contains committed files only. Untracked build inputs - `.env.local` above all - are not
+in it; export the variables in your shell, or set them in the build command.
+
+A failed build or analysis names the ref it failed on and exits non-zero. It never falls through to a
+comparison of one side against an older snapshot.
+
+### Output
 
 Output leads with the decision (`BLOCK`, `REVIEW`, `CLEAR`, `CANNOT DECIDE`), the changes behind it -
 regressions and improvements together, each with the strongest source location and the likely next
@@ -246,8 +294,9 @@ npx @moumensoliman/crust list
 ## Exit codes
 
 `crust ci` exits with `1` when an automatic regression or configured ceiling is breached.
-`crust diff` exits with `1` only when it cannot find the requested baseline; a displayed regression
-does not make `diff` a CI gate. Other successful commands exit with `0`.
+`crust diff` exits with `1` when it cannot find the requested baseline, and with `--build` when a
+build or an analysis of either ref failed; a displayed regression does not make `diff` a CI gate.
+Other successful commands exit with `0`.
 
 Any unsupported project - Next outside 15–16, a dev-only build, a Pages Router app - throws with a
 message naming the reason rather than emitting numbers it cannot stand behind.
