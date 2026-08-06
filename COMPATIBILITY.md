@@ -32,6 +32,18 @@ view is presentation - it is expected to change, and is the reason `--json` exis
 Exit codes are load-bearing: `0` clean, non-zero on a budget breach or regression verdict. A command
 that fails to *run* must not exit `0`, and a clean run must never exit non-zero.
 
+### MCP tool surface
+
+`crust mcp` is a command and is covered by the rules above; the **tool names, inputs and response
+shapes it serves are not yet**. They are explicitly unstable while the surface settles, and may be
+renamed or restructured in a patch release. This is why the server is a subcommand rather than a
+subpath export: the transport is an implementation detail, and the answers are consumed by a model
+that re-reads the schema on every session rather than by code that pinned to it.
+
+Two guarantees do hold from the start, because an agent cannot verify either one before calling:
+every tool is read-only - none builds, installs, or writes a snapshot - and every answer names the
+`buildId` behind it. Withdrawing either is breaking regardless of what the tool surface does.
+
 ## Node API
 
 The subpath exports (`/widget`, `/collector`, `/ingest`, `/otel`) are public API under the same rules

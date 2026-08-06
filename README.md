@@ -332,9 +332,43 @@ older snapshot.
 npx @moumensoliman/crust report --open
 ```
 
-The report is one self-contained file with no service or external requests. Search routes,
-components, and source files; filter and group routes; expand complete cause chains; and inspect
-shared-cause blast radius.
+The report is one self-contained file with no service or external requests. It opens with **Fix
+first** — the ranked findings, each with its evidence and a concrete next step — then shared-cause
+blast radius, then the route table. Search routes, components, and source files; filter and group
+routes; and expand any route to its complete cause chains.
+
+## Ask an agent about a build
+
+Try it with no agent and no setup — `crust ask` runs the same tools and prints the answer:
+
+```bash
+crust ask                                   # the eight tools and their arguments
+crust ask build_findings                    # what is worth an afternoon
+crust ask explain_route_cause route=/dashboard
+```
+
+Then wire it to the agent you already use:
+
+```bash
+claude mcp add crust -- npx @moumensoliman/crust mcp
+```
+
+`crust mcp` serves the snapshots in `.perf/` to any MCP-capable agent over stdio, so the coding
+agent you already run can answer “why did `/dashboard` stop being static”, “which routes does
+`date-fns` reach”, and “what changed between `release` and this branch” from recorded evidence.
+
+crust ships no model, no embeddings and no API key. Retrieval over a snapshot is a query, not a
+vector search: the store is structured, so every answer is an exact lookup that names the `buildId`
+it came from and can be re-derived by hand with `crust diff`. Generation is whatever agent you
+already pay for.
+
+Eight read-only tools: `list_builds`, `build_summary`, `route_detail`, `explain_route_cause`,
+`compare_builds`, `cause_blast_radius`, `route_history`, `build_findings`.
+
+No tool builds, installs, or writes a snapshot — an agent cannot publish a baseline or start a
+production build. Every answer carries its attribution coverage, so a short finding list under weak
+coverage reads as *not measured* rather than *nothing wrong*, and a missing conclusion is returned
+as an explicit unknown with a reason instead of an absent field.
 
 ## Compared with Next.js Bundle Analyzer
 
@@ -355,6 +389,8 @@ only bundle contents.
 - `crust ci [ref]` — enforce regressions and budgets; optionally write a PR comment
 - `crust findings list|agree|dispute|rate` — review and score blocking findings
 - `crust report` — generate a self-contained HTML report
+- `crust mcp` — serve stored snapshots to an MCP-capable agent over stdio, read-only
+- `crust ask [tool]` — run one of those tools here and print its answer; no agent needed
 - `crust history fetch|push` — synchronize snapshots with `perf-history`
 - `crust list` — list saved snapshots
 - `crust prune` — apply snapshot retention
