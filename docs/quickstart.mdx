@@ -92,8 +92,10 @@ what remains generated.
 npx @moumensoliman/crust report --open
 ```
 
-A single self-contained HTML file with no server or external requests. It adds route, component,
-and source search; filters and grouping; complete cause chains; and shared-cause blast radius.
+A single self-contained HTML file with no server or external requests. It opens with **Fix first** —
+the same ranked findings the terminal printed, with the rest of the list the terminal deferred here —
+then shared-cause blast radius and the route table, with route, component and source search, filters
+and grouping, and complete cause chains.
 
 ## 4. Compare production builds
 
@@ -186,5 +188,8 @@ would rather not ship them.
   </Card>
   <Card title="Add the CI check" icon="circle-check" href="/docs/guides/ci">
     Regression enforcement, budgets, a PR comment, and history on an orphan branch.
+  </Card>
+  <Card title="Ask an agent" icon="robot" href="/docs/guides/agents">
+    Point your coding agent at the same evidence over MCP, or run one tool with `crust ask`.
   </Card>
 </CardGroup>

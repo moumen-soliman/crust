@@ -12,6 +12,49 @@ this project cannot afford: a diff against a baseline that quietly stopped being
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-06
+
+### Added
+
+- `crust mcp` serves the snapshots in `.perf/` to any MCP-capable agent over stdio, so an existing
+  Claude Code or Cursor subscription can answer questions about a build from recorded evidence.
+  Eight read-only tools: `list_builds`, `build_summary`, `route_detail`, `explain_route_cause`,
+  `compare_builds`, `cause_blast_radius`, `route_history`, `build_findings`.
+
+  crust ships no model, no embeddings and no API key. A snapshot is structured, so retrieval over it
+  is an exact query rather than a vector search - which is both free and more correct than
+  approximate matching, since there is no nearest-neighbour answer to mistake for the right one.
+  Every response names the `buildId` behind it and is re-derivable with `crust diff`.
+
+  No tool builds, installs or writes: an agent cannot publish a baseline or trigger a production
+  build. Responses carry their attribution coverage and are capped, so a short finding list under
+  weak coverage reads as "not measured" rather than "nothing wrong", and a missing conclusion comes
+  back as an explicit unknown with a reason instead of an absent field.
+
+  The tool surface itself is not covered by the CLI stability rules yet - see
+  [COMPATIBILITY.md](COMPATIBILITY.md#mcp-tool-surface).
+
+- `crust ask [tool] [key=value ...]` runs one of those tools against this project and prints the
+  answer. Seeing what the agent sees otherwise costs a build, an MCP client, a registration and a
+  session restart - and when the answer is wrong, none of those steps tells you which one failed.
+  `crust ask` with no arguments lists the tools and their arguments.
+
+- The report now has a **Fix first** section: the ranked, actionable findings, worst first, each
+  with its evidence and a concrete next step. `crust analyze` has always printed the top three and
+  then "+ N more in `crust report`" - a promise the report did not keep, because the section did not
+  exist and the rest of the list was reachable from nowhere. Same deterministic `findingsFor` the
+  terminal and `crust ask build_findings` call; nothing is generated.
+
+### Fixed
+
+- The report's search, filter and grouping controls could open below the fold, so the report read as
+  though it had no search at all. Everything it says first - the verdict, the findings, the shared
+  causes - sits above the route table and competed with the controls for the same vertical space.
+  There is now a jump bar on the first screen naming the sections the report actually has, with a
+  `Search routes` control that focuses the input rather than only scrolling to it. Shared causes and
+  findings each show the three worst and fold the rest behind a disclosure that says how many there
+  are.
+
 ## [0.2.3] - 2026-08-05
 
 ### Added

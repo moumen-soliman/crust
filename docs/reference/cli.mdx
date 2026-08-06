@@ -225,7 +225,16 @@ Write a self-contained HTML report.
 npx @moumensoliman/crust report [--out crust-report.html] [--open]
 ```
 
-No external requests: styles, script and data are inlined. The report supports:
+No external requests: styles, script and data are inlined. The report opens with **Fix first** — the
+same ranked findings `analyze` prints, worst first, each with its evidence and a concrete next step —
+then shared-cause blast radius, then the route table. A jump bar names the sections the report
+actually has; its `Search routes` control focuses the table's search box.
+
+Findings and shared causes each show the three worst and fold the rest behind a disclosure that says
+how many there are. The fold is a native `<details>`, so browser find-in-page opens it to reveal a
+match.
+
+The report also supports:
 
 - search across route patterns, components, and source files
 - filters for dynamic, partially static, heavy, and unattributed routes
@@ -237,6 +246,48 @@ No external requests: styles, script and data are inlined. The report supports:
 `--out` is resolved from the shell's current directory, not from `--cwd`. In a monorepo, either run
 the command from the app directory or pass an explicit path such as
 `--out apps/web/crust-report.html`.
+
+## mcp
+
+Serve this project's stored snapshots to an MCP-capable agent over stdio.
+
+```bash
+npx @moumensoliman/crust mcp [--cwd .]
+```
+
+Register it once with the agent you already use:
+
+```bash
+claude mcp add crust -- npx @moumensoliman/crust mcp
+```
+
+Eight read-only tools: `list_builds`, `build_summary`, `route_detail`, `explain_route_cause`,
+`compare_builds`, `cause_blast_radius`, `route_history`, `build_findings`. See
+[Ask an agent](/docs/guides/agents) for what each answers and the guarantees they hold to.
+
+<Warning>
+No tool builds, installs, or writes a snapshot, so an agent cannot publish a baseline or start a
+production build. Answers only cover commits someone has already run `analyze` on.
+</Warning>
+
+The tool names, inputs and response shapes are not covered by the CLI stability rules yet — see
+[COMPATIBILITY.md](https://github.com/moumensoliman/crust/blob/master/COMPATIBILITY.md#mcp-tool-surface).
+
+## ask
+
+Run one of those tools here and print its answer. No agent, no client, no registration.
+
+```bash
+npx @moumensoliman/crust ask                            # the tools and their arguments
+npx @moumensoliman/crust ask build_findings
+npx @moumensoliman/crust ask route_detail route=/dashboard
+npx @moumensoliman/crust ask compare_builds base=<buildId> head=<buildId>
+```
+
+Arguments are `key=value` rather than flags, so a tool can gain an argument without colliding with
+`--cwd` or a future crust option. Output is the same JSON the agent receives. A refusal exits `1`.
+
+Use it to check an answer the agent gave you, or to see the evidence without wiring anything up.
 
 ## manifest
 

@@ -1,5 +1,6 @@
 import { causeChainLines } from '../analyze/cause.ts'
 import { coverageLines } from '../analyze/coverage.ts'
+import { findingsFor, type Finding } from '../findings/findings.ts'
 import type { RouteSnapshot, Snapshot } from '../store/snapshot.ts'
 import { renderSparklineSvg, renderTreemapSvg } from './viz.ts'
 
@@ -209,6 +210,70 @@ export function renderReportStyles(): string {
 .crust .causes {
   border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; background: var(--bg);
 }
+/* The first-screen jump bar. Deliberately not sticky: the table's own controls
+   already pin themselves, and two sticky rows at top:0 fight over the same
+   pixels. This one only has to survive until the first click. */
+.crust .jump {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 16px 0 0;
+}
+.crust .jump a, .crust .jump button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; font: inherit; font-size: var(--t-meta); color: var(--muted);
+  text-decoration: none; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--bg);
+  transition-property: color, border-color; transition-duration: 120ms; transition-timing-function: var(--ease);
+}
+.crust .jump a:hover, .crust .jump button:hover { color: var(--fg); border-color: var(--border-strong); }
+.crust .jump a:focus-visible, .crust .jump button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.crust .jump button { margin-inline-start: auto; }
+.crust .jump svg { width: 13px; height: 13px; }
+@media (max-width: 620px) { .crust .jump button { margin-inline-start: 0; } }
+
+/* Fix-first. Shares the cause list's card frame so the two read as one column of
+   evidence rather than two competing panels. */
+.crust .findings {
+  list-style: none; margin: 0; padding: 0;
+  border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; background: var(--bg);
+}
+.crust .finding {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start;
+  gap: 8px 12px; padding: 12px 14px;
+  border-block-start: 1px solid var(--border);
+}
+.crust .finding:first-child { border-block-start: 0; }
+.crust .finding .rank {
+  min-width: 18px; height: 18px; margin-block-start: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-variant-numeric: tabular-nums; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 50%;
+}
+.crust .finding-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+/* The action is the point of a finding - a finding with no action is noise, so
+   it is the one line that never renders as muted supporting text. */
+.crust .finding .action { margin: 4px 0 0; font-size: var(--t-meta); color: var(--fg); }
+.crust .finding .action::before { content: '→ '; color: var(--muted); }
+
+/* The folded tail of the cause list. Styled as a quiet control rather than a
+   button: it is a way back to detail already ranked below the fold, not an
+   action competing with the table's own filters. */
+.crust .fold { margin-block-start: 8px; }
+.crust .fold > summary {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+  padding: 5px 10px; cursor: pointer; list-style: none;
+  font-size: var(--t-meta); color: var(--muted);
+  border: 1px solid var(--border); border-radius: var(--r-inner); background: var(--bg);
+  transition-property: color, border-color; transition-duration: 120ms; transition-timing-function: var(--ease);
+}
+.crust .fold > summary::-webkit-details-marker { display: none; }
+.crust .fold > summary::before {
+  content: '▸'; font-size: 9px; line-height: 1;
+  transition: rotate 120ms var(--ease);
+}
+.crust .fold[open] > summary::before { rotate: 90deg; }
+.crust .fold > summary:hover { color: var(--fg); border-color: var(--border-strong); }
+.crust .fold > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.crust .fold .causes { margin-block-start: 8px; }
 .crust .cause {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
   gap: 8px 12px; padding: 12px 14px; cursor: pointer;
@@ -247,6 +312,19 @@ export function renderReportStyles(): string {
 .crust .k-layout, .crust .k-package {
   color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent);
   background: color-mix(in srgb, var(--blue) 10%, transparent);
+}
+/* Finding kinds. dynamic and shell are the two that describe a route serving less
+   static HTML than it could, which is the tool's actual subject; size and setup
+   are amber because one is a threshold and the other is about crust's own
+   accuracy. unknown stays neutral - it is a gap in the analyzer, not a verdict on
+   the app, and colouring it red would read as a finding against the code. */
+.crust .k-dynamic, .crust .k-shell {
+  color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+.crust .k-size, .crust .k-setup {
+  color: var(--amber); border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
 }
 
 /* ── buttons ────────────────────────────────────────────── */
@@ -545,9 +623,13 @@ export function renderReportBody(snapshot: Snapshot): string {
 
   ${attributed ? '' : `<div class="note"><b>Per-file attribution unavailable.</b> This build shipped without browser source maps, so bytes cannot be traced to a source file. Set <code>productionBrowserSourceMaps: true</code> in next.config and rebuild. Route sizes and shell analysis below are unaffected.</div>`}
 
+  ${renderJump(snapshot)}
+
+  ${renderFindings(snapshot)}
+
   ${renderSharedCauses(snapshot)}
 
-  <div class="sec-head">
+  <div class="sec-head" id="crust-routes">
     <h2>Routes</h2>
     <p class="sub route-help">Open any route to inspect its cause chains, shell exits, and bundle composition.</p>
   </div>
@@ -665,6 +747,86 @@ const GROUP_LABELS: Record<string, string> = {
  * Each entry filters the table to its own routes, which is the roadmap's "show
  * every route affected by a shared import" without a second view to maintain.
  */
+/**
+ * Where this report goes, on the first screen.
+ *
+ * Everything above the route table is evidence worth reading - the verdict, what
+ * to fix, the shared causes - and all of it competes for the same vertical space
+ * as the table's own search and filter controls. Trading sections against each
+ * other to keep a text input above the fold is optimising the wrong thing, and it
+ * breaks again the next time the report learns to say something.
+ *
+ * So the controls stop depending on scroll depth: this names the sections and
+ * takes you to them. `Search routes` focuses the input rather than only scrolling
+ * to it, because "I could not find the search" is the failure it exists to fix.
+ */
+function renderJump(snapshot: Snapshot): string {
+  const hasFindings = findingsFor(snapshot).length > 0
+  const hasCauses = snapshot.sharedCauses.length > 0
+
+  return `
+  <nav class="jump" aria-label="Report sections">
+    ${hasFindings ? '<a href="#crust-fix">Fix first</a>' : ''}
+    ${hasCauses ? '<a href="#crust-causes">Shared causes</a>' : ''}
+    <a href="#crust-routes">${snapshot.routes.length} routes</a>
+    <button type="button" id="crust-jump-search">${SEARCH_ICON}Search routes</button>
+  </nav>`
+}
+
+/**
+ * What to do first, ranked.
+ *
+ * `crust analyze` names the top three and then says "+ N more in `crust report`"
+ * - a promise the report did not keep, because this section did not exist. The
+ * findings were only ever reachable from the terminal, which is the one place
+ * they scroll away. Every one of them is precomputed and deterministic: the same
+ * `findingsFor` the terminal and `crust ask build_findings` call.
+ */
+function renderFindings(snapshot: Snapshot): string {
+  const findings = findingsFor(snapshot)
+  if (findings.length === 0) return ''
+
+  // Three visible, matching the terminal, with the tail one disclosure away. The
+  // route table's search sits below this section and the shared causes, and both
+  // folding is what keeps it on the first screen.
+  const SHOWN = 3
+  const shown = findings.slice(0, SHOWN)
+  const folded = findings.slice(SHOWN)
+
+  const item = (finding: Finding, index: number): string => `
+    <li class="finding">
+      <span class="rank">${index + 1}</span>
+      <div>
+        <div class="finding-head">
+          <span class="kind k-${escape(finding.kind)}">${escape(finding.kind)}</span>
+          ${finding.route ? `<code>${escape(finding.route)}</code>` : ''}
+          <b>${escape(finding.headline)}</b>
+        </div>
+        ${finding.detail ? `<span class="meta">${escape(finding.detail)}</span>` : ''}
+        <p class="action">${escape(finding.action)}</p>
+      </div>
+    </li>`
+
+  return `
+  <div class="sec-head" id="crust-fix">
+    <h2>Fix first</h2>
+    <p class="sub">${findings.length} actionable finding${findings.length === 1 ? '' : 's'}, worst first. Ranked by crust, not generated.</p>
+  </div>
+  <ol class="findings">
+    ${shown.map((finding, i) => item(finding, i)).join('')}
+  </ol>
+  ${
+    folded.length === 0
+      ? ''
+      : `<details class="fold">
+    <summary>${folded.length} more finding${folded.length === 1 ? '' : 's'}</summary>
+    <ol class="findings" start="${SHOWN + 1}">
+      ${folded.map((finding, i) => item(finding, i + SHOWN)).join('')}
+    </ol>
+  </details>`
+  }`
+}
+
 function renderSharedCauses(snapshot: Snapshot): string {
   const causes = snapshot.sharedCauses.slice(0, 12)
   if (causes.length === 0) return ''
@@ -673,14 +835,22 @@ function renderSharedCauses(snapshot: Snapshot): string {
   // are one click away in the table, which is where you would read them anyway.
   const SHOWN_ROUTES = 6
 
-  return `
-  <div class="sec-head">
-    <h2>Shared causes</h2>
-    <p class="sub">One root cause, every route it reaches. Select one to filter the table.</p>
-  </div>
-  <div class="causes shared">
-    ${causes
-      .map((cause) => {
+  /**
+   * Causes shown before the rest fold away.
+   *
+   * This section sits above the route table's search and filter controls, and a
+   * card is about 100px tall - so twelve of them push the controls a full screen
+   * below the fold and the report opens looking like it has no search at all. The
+   * ranking already puts the worst first, so the fold costs nothing: what is
+   * hidden is the tail, behind a control that says how much of it there is.
+   *
+   * Three rather than four because a card carrying an owner line and a long route
+   * list runs past 100px, and four of those still cleared an 800px laptop by a
+   * few pixels. The number has to hold for the tallest card, not the average one.
+   */
+  const SHOWN_CAUSES = 3
+
+  const card = (cause: (typeof causes)[number]): string => {
         const cost =
           cause.bytesPerRoute !== null
             ? `adds ${kb(cause.bytesPerRoute)} to ${cause.routes.length} routes`
@@ -704,9 +874,32 @@ function renderSharedCauses(snapshot: Snapshot): string {
       </div>
       <button type="button" class="copy" data-crust-copy="${escape(prExplanation(cause))}">Copy for PR</button>
     </div>`
-      })
-      .join('')}
-  </div>`
+  }
+
+  const shown = causes.slice(0, SHOWN_CAUSES)
+  const folded = causes.slice(SHOWN_CAUSES)
+
+  return `
+  <div class="sec-head" id="crust-causes">
+    <h2>Shared causes</h2>
+    <p class="sub">One root cause, every route it reaches. Select one to filter the table.</p>
+  </div>
+  <div class="causes shared">
+    ${shown.map(card).join('')}
+  </div>
+  ${
+    folded.length === 0
+      ? ''
+      : // `details` rather than a scripted toggle: it works with JavaScript off,
+        // ships its own keyboard and screen-reader behaviour, and browser
+        // find-in-page opens it to reveal a match.
+        `<details class="fold">
+    <summary>${folded.length} more shared cause${folded.length === 1 ? '' : 's'}</summary>
+    <div class="causes shared">
+      ${folded.map(card).join('')}
+    </div>
+  </details>`
+  }`
 }
 
 /** A shared cause as a line someone can paste into a review without editing it. */
@@ -1047,6 +1240,18 @@ export function renderReportScript(): string {
       state.query = search.value.trim().toLowerCase()
       state.only = null
       apply()
+    })
+  }
+
+  // The jump bar's search button. Scrolling to the controls is not enough - the
+  // point is to be typing, so it takes focus too. Centred rather than aligned to
+  // the top, because the controls are sticky and would otherwise land underneath
+  // themselves.
+  var jumpSearch = scope.querySelector('#crust-jump-search')
+  if (jumpSearch && search) {
+    jumpSearch.addEventListener('click', function () {
+      search.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      search.focus({ preventScroll: true })
     })
   }
 

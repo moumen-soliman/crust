@@ -20,6 +20,7 @@ import { buildPair, DEFAULT_BUILD_COMMAND } from './compare/build-pair.ts'
 import { STORE_DIR } from './store/store.ts'
 import { renderReportHtml } from './report/render.ts'
 import { diffSnapshots, type RouteAliases } from './diff/diff.ts'
+import { readAliases } from './diff/aliases.ts'
 import { latestCompatibleBaseline } from './diff/compatible.ts'
 import { findWorkspaceRoot } from './core/workspace.ts'
 import { revParse } from './core/git.ts'
@@ -463,6 +464,72 @@ cli
     }
   })
 
+cli
+  // A subcommand rather than a subpath export: `exports` in package.json is
+  // public API under COMPATIBILITY.md, and the tool surface is still settling.
+  .command('mcp', 'Serve this project\'s snapshots to an MCP-capable agent over stdio')
+  .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
+  .action(async (options: CommonOptions) => {
+    // Nothing is printed to stdout here on purpose - see `protectStdout`.
+    const { serveMcp } = await import('./mcp/server.ts')
+    await serveMcp({ cwd: options.cwd, version: VERSION })
+  })
+
+cli
+  /**
+   * The same tools `crust mcp` serves, run once against this project and printed.
+   *
+   * Without this, seeing a single answer costs a build, an MCP client, a
+   * registration and a session restart - and if the answer is wrong, none of
+   * those steps tells you which one failed. The tools are plain functions over
+   * `.perf/`, so the honest way to try them is to call one.
+   */
+  .command('ask [tool] [...pairs]', 'Run one MCP tool here and print its answer (key=value arguments)')
+  .option('--cwd <dir>', 'Project directory', { default: process.cwd() })
+  .example('  crust ask')
+  .example('  crust ask build_findings')
+  .example('  crust ask route_detail route=/dashboard')
+  .example('  crust ask compare_builds base=<buildId> head=<buildId>')
+  .action(async (tool: string | undefined, pairs: string[], options: CommonOptions) => {
+    const { openSession } = await import('./mcp/answers.ts')
+    const { callTool, TOOLS } = await import('./mcp/tools.ts')
+
+    if (!tool) {
+      console.log(pc.bold('crust ask <tool> [key=value ...]'))
+      console.log(pc.dim('The same read-only tools `crust mcp` serves an agent. Nothing here builds.\n'))
+      for (const spec of TOOLS) {
+        const args = Object.keys(spec.inputSchema.properties)
+        const required = new Set(spec.inputSchema.required ?? [])
+        const signature = args.map((arg) => (required.has(arg) ? `${arg}=` : pc.dim(`[${arg}=]`))).join(' ')
+        console.log(`  ${pc.bold(spec.name.padEnd(20))} ${signature}`)
+        console.log(`  ${' '.repeat(20)} ${pc.dim(spec.title)}`)
+      }
+      console.log(pc.dim('\ne.g. crust ask route_detail route=/dashboard'))
+      return
+    }
+
+    // `key=value`, not `--key value`: these are tool arguments rather than crust
+    // flags, and keeping them out of the flag namespace means a tool can grow an
+    // argument without colliding with `--cwd` or a future crust option.
+    const input: Record<string, unknown> = {}
+    for (const pair of pairs) {
+      const at = pair.indexOf('=')
+      if (at === -1) {
+        console.error(pc.red(`"${pair}" is not a key=value pair.`))
+        console.error(pc.dim('  e.g. crust ask route_detail route=/dashboard'))
+        process.exitCode = 1
+        return
+      }
+      const key = pair.slice(0, at)
+      const value = pair.slice(at + 1)
+      input[key] = /^\d+$/.test(value) ? Number(value) : value
+    }
+
+    const answer = await callTool(await openSession(options.cwd), tool, input)
+    console.log(JSON.stringify(answer, null, 2))
+    if ((answer as { ok?: unknown }).ok === false) process.exitCode = 1
+  })
+
 async function withHistory(snapshot: Snapshot, cwd: string): Promise<Snapshot> {
   const store = new SnapshotStore(await findWorkspaceRoot(resolve(cwd)))
   const trends = await store.routeHistory(30, snapshot)
@@ -531,14 +598,6 @@ async function loadPair(
   }
 
   return { head, base, aliases }
-}
-
-async function readAliases(root: string): Promise<RouteAliases> {
-  try {
-    return JSON.parse(await readFile(join(root, '.perf', 'aliases.json'), 'utf8')) as RouteAliases
-  } catch {
-    return {}
-  }
 }
 
 cli.help()

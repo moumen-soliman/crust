@@ -1,0 +1,118 @@
+---
+title: "Ask an agent"
+description: "Serve stored build evidence to the coding agent you already run, with no model, embeddings, or API key."
+---
+
+`crust mcp` serves the snapshots in `.perf/` to any MCP-capable agent over stdio. The agent you
+already pay for can then answer “why did `/dashboard` stop being static”, “which routes does
+`date-fns` reach”, and “what changed between `release` and this branch” — from recorded evidence
+rather than from reading your source and guessing.
+
+crust ships no model, no embeddings and no API key.
+
+## Why there is nothing to pay for
+
+Retrieval-augmented generation exists because unstructured prose needs approximate semantic search.
+A crust snapshot is not prose. It is structured JSON with route patterns, file paths, byte counts,
+cause chains and coverage counters, so retrieval over it is a **query** — exact, deterministic and
+free.
+
+That splits the problem in half, and only one half costs anything:
+
+| Half | Who pays | How |
+|---|---|---|
+| Retrieval | nobody | a query over `.perf/` |
+| Generation | your existing agent subscription | MCP over stdio |
+
+It is also *more* correct than vector search. There is no nearest-neighbour answer to mistake for
+the right one: every response points at a real field in a real snapshot, names the `buildId` it came
+from, and can be re-derived by hand with `crust diff`.
+
+## Try it without setting anything up
+
+[`crust ask`](/docs/reference/cli#ask) runs the same tools and prints the answer:
+
+```bash
+crust ask                                     # the tools and their arguments
+crust ask build_findings
+crust ask explain_route_cause route=/dashboard
+```
+
+Use this to check an answer the agent gave you. It is the same code path, so a disagreement between
+`crust ask` and the agent is the agent's summary, not crust's evidence.
+
+## Wire it to your agent
+
+```bash
+claude mcp add crust -- npx @moumensoliman/crust mcp
+```
+
+For a monorepo, point it at the app: `-- npx @moumensoliman/crust mcp --cwd apps/web`.
+
+The one prerequisite is a store with snapshots in it. `crust mcp` never builds, so run
+[`analyze`](/docs/reference/cli#analyze) on a production build first — ideally on two commits, so
+`compare_builds` and `route_history` have something to work with. With an empty store every tool
+says so rather than failing quietly.
+
+## The tools
+
+| Tool | Question it answers |
+|---|---|
+| `list_builds` | What snapshots exist? Start here — every other tool takes a ref this returns |
+| `build_summary` | What is this build: verdict, routes that moved, shared causes, coverage |
+| `route_detail` | Rendering mode and why, first-load breakdown, boundaries, barrels, shell |
+| `explain_route_cause` | The chain: route → component → import hops → call site, with evidence |
+| `compare_builds` | What changed between two refs, and what is responsible |
+| `cause_blast_radius` | Which routes one package, boundary, barrel or layout reaches |
+| `route_history` | Has this route regressed before |
+| `build_findings` | Of everything here, what is worth an afternoon |
+
+<Note>
+`build_findings` is unrelated to the [`crust findings`](/docs/reference/cli#findings) CLI command.
+The tool ranks what to fix in a build; the command records whether authors agreed a blocking finding
+was real.
+</Note>
+
+## What the tools will not do
+
+These are the constraints that keep deterministic evidence from turning back into a guess. They
+matter more than the tool list.
+
+**Read-only.** No tool writes a snapshot, mutates `.perf/`, or touches `perf-history`. An agent
+cannot publish a baseline.
+
+**Never builds.** `--build` and its worktrees are human-invoked. A tool that could start an install
+and a production build would be an arbitrary-command surface and a multi-minute hang.
+
+**Coverage travels with every answer.** Anything reporting bytes also reports the share of the build
+those bytes came from, with the denominator. `48.2 kB from date-fns` without `94% attributed` beside
+it invites more confidence than the evidence supports.
+
+**`unknown` is returned, never omitted.** An absent field reads as “no problem” to a model, so a
+missing conclusion comes back as a value with a reason — the same refusal the CLI makes.
+
+**Bounded responses.** Summaries with drill-down, and capped lists that say they are capped. A tool
+that floods the context window makes the agent worse, not better.
+
+**Cited.** Every answer names its `buildId`, and a comparison names both, so any claim can be
+checked against `crust diff` by hand.
+
+## Checking an answer
+
+Everything the agent says should be reproducible without it:
+
+```bash
+crust ask compare_builds base=<buildId> head=<buildId>
+crust diff <buildId> <buildId>
+```
+
+The verdict, the causes and the attribution percentage come from the same functions, so they agree.
+If they ever do not, trust `crust diff` and
+[open an issue](https://github.com/moumensoliman/crust/issues).
+
+## Stability
+
+`crust mcp` is a command and follows the CLI's versioning rules. The tool names, inputs and response
+shapes **do not yet** — they may be renamed or restructured in a patch release while the surface
+settles. Two guarantees hold from the start, because an agent cannot verify either before calling:
+every tool is read-only, and every answer names the build behind it.
