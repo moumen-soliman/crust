@@ -167,7 +167,11 @@ const CERTAINTY = [
 const SECONDARY = [
   {
     title: 'Self-contained report',
-    body: 'One searchable HTML file with route filters, grouping, cause chains, module attribution and shell composition. No server or account.',
+    body: 'One searchable HTML file. Opens with the ranked findings, then shared-cause blast radius, then route filters, grouping, cause chains and shell composition. No server or account.',
+  },
+  {
+    title: 'Agent access',
+    body: 'Serve the same snapshots to any MCP-capable agent over stdio, read-only. Eight tools, every answer naming the build it came from. Or run one from the terminal with crust ask.',
   },
   {
     title: 'Optional in-app panel',
@@ -185,6 +189,7 @@ const NON_GOALS = [
   ['Not a Lighthouse replacement.', 'It measures what your build produced, not a generic lab score.'],
   ['Not multi-framework.', 'Next.js App Router only. Pages Router is detect-and-warn.'],
   ['Not a hosted service.', 'No accounts or SaaS dashboard. Your snapshots stay in your repository.'],
+  ['Not an AI tool.', 'crust ships no model, embeddings or API key, and never generates a finding. The MCP server answers from stored snapshots; your agent does the talking, and every claim cites a build you can re-derive.'],
   ['Not a bundler.', 'It reads build output and never changes how the application builds.'],
 ]
 
